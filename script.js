@@ -62,28 +62,41 @@ class SeniorYoutubeTrendsExcel {
     
     // 이벤트 리스너 설정
     setupEventListeners() {
-        // 검색 버튼
-        document.getElementById('searchBtn').addEventListener('click', () => this.performSearch());
-        
-        // 새로고침 버튼
-        document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
-        
-        // 다운로드 버튼들
-        document.getElementById('downloadExcel').addEventListener('click', () => this.downloadExcel());
-        document.getElementById('downloadCSV').addEventListener('click', () => this.downloadCSV());
-        document.getElementById('downloadJSON').addEventListener('click', () => this.downloadJSON());
-        document.getElementById('downloadPDF').addEventListener('click', () => this.downloadPDF());
-        
-        // 보기 모드 변경
-        document.getElementById('viewMode').addEventListener('change', (e) => this.changeViewMode(e.target.value));
-        
-        // 엔터 키 검색
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                this.performSearch();
-            }
-        });
+      // 검색 버튼
+      document.getElementById('searchBtn').addEventListener('click', () => this.performSearch());
+    
+      // 새로고침 버튼
+      document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
+    
+      // 다운로드 버튼들
+      document.getElementById('downloadExcel').addEventListener('click', () => this.downloadExcel());
+      document.getElementById('downloadCSV').addEventListener('click', () => this.downloadCSV());
+      document.getElementById('downloadJSON').addEventListener('click', () => this.downloadJSON());
+      document.getElementById('downloadPDF').addEventListener('click', () => this.downloadPDF());
+    
+      // 보기 모드 변경
+      document.getElementById('viewMode').addEventListener('change', (e) => this.changeViewMode(e.target.value));
+    
+      // 엔터 키 검색
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          this.performSearch();
+        }
+      });
+    
+      // ★ API 키 불러오기/초기화 버튼
+      const loadBtn = document.getElementById('loadApiKeyBtn');
+      const clearBtn = document.getElementById('clearApiKeyBtn');
+      const fileInput = document.getElementById('apiKeyFile');
+      if (loadBtn && fileInput) {
+        loadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => this.handleApiKeyFile(e));
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => this.clearSavedApiKey());
+      }
     }
+
     
     // 초기 메시지 표시
     showInitialMessage() {
