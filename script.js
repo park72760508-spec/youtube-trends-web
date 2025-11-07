@@ -868,13 +868,9 @@ async fetchRealYoutubeData(category, count) {
     
     // 대시보드 업데이트
     // 대시보드 업데이트 (Pro 버전 호환)
+    // 대시보드 업데이트 (Pro 버전 완전 호환)
     updateDashboard() {
         const totalVideos = this.currentData.length;
-        const totalViews = this.currentData.reduce((sum, video) => sum + parseInt(video.viewCount), 0);
-        const avgEngagement = totalVideos > 0 ? 
-            (this.currentData.reduce((sum, video) => sum + this.calculateEngagementRate(video), 0) / totalVideos).toFixed(1) : 0;
-    
-        // 쇼츠/롱폼 카운트 (Pro 기능)
         const shortsCount = this.currentData.filter(v => {
             const duration = this.parseDuration(v.duration || 'PT0S');
             return duration <= 60;
@@ -885,27 +881,24 @@ async fetchRealYoutubeData(category, count) {
         const avgViralScore = totalVideos > 0 ?
             (this.currentData.reduce((sum, v) => sum + (v.viralScore || this.calculateViralScore(v)), 0) / totalVideos).toFixed(0) : 0;
     
+        const totalViews = this.currentData.reduce((sum, video) => sum + parseInt(video.viewCount || 0), 0);
+    
         // 성장률 계산 (Pro 기능)
         const avgGrowthRate = totalVideos > 0 ?
             (this.currentData.reduce((sum, v) => sum + this.calculateGrowthRate(v), 0) / totalVideos).toFixed(1) : 0;
     
-        // DOM 요소 안전하게 업데이트
+        // 🎯 Pro 버전 HTML과 일치하는 요소들만 업데이트
         this.safeUpdateElement('totalVideos', totalVideos);
-        this.safeUpdateElement('totalViews', this.formatNumber(totalViews));
-        this.safeUpdateElement('avgEngagement', avgEngagement + '%');
-        this.safeUpdateElement('lastUpdate', new Date().toLocaleTimeString());
-        
-        // Pro 버전 전용 요소들
         this.safeUpdateElement('shortsCount', shortsCount);
         this.safeUpdateElement('longFormCount', longFormCount);
         this.safeUpdateElement('avgViralScore', avgViralScore);
         this.safeUpdateElement('avgGrowthRate', avgGrowthRate + '%');
+        this.safeUpdateElement('lastUpdate', new Date().toLocaleTimeString());
     
-        // 다운로드 섹션 통계 업데이트
+        // 다운로드 섹션 통계 업데이트 (Pro 버전 ID와 일치)
         this.safeUpdateElement('downloadVideosCount', totalVideos);
         this.safeUpdateElement('downloadTotalViews', this.formatNumber(totalViews));
         this.safeUpdateElement('downloadAvgViral', avgViralScore);
-        this.safeUpdateElement('downloadAvgGrowth', avgGrowthRate + '%');
         this.safeUpdateElement('downloadShortsRatio', totalVideos > 0 ? 
             Math.round((shortsCount / totalVideos) * 100) + '%' : '0%');
     
@@ -914,6 +907,10 @@ async fetchRealYoutubeData(category, count) {
         if (dashboard) {
             dashboard.style.display = 'block';
         }
+    
+        console.log('✅ 대시보드 업데이트 완료:', {
+            totalVideos, shortsCount, longFormCount, avgViralScore, avgGrowthRate
+        });
     }
 
 
@@ -1038,14 +1035,23 @@ async fetchRealYoutubeData(category, count) {
     }
     
     // 차트 업데이트
+    // Pro 버전 HTML과 완전 일치하는 차트 시스템
     updateCharts() {
-        this.createCategoryChart();
-        this.createGrowthChart();
+        this.createFormatChart();     // 📱 쇼츠/롱폼 비율 차트
+        this.createViralChart();      // 🚀 바이럴 점수 분포 차트  
+        this.createCategoryChart();   // 📊 카테고리별 트렌드 차트
+        this.createTimeChart();       // ⏰ 시간대별 업로드 차트
     }
     
     // 카테고리 차트 생성
     createCategoryChart() {
-        const ctx = document.getElementById('categoryChart').getContext('2d');
+        // 안전한 요소 확인 후 접근
+        const canvas = document.getElementById('formatChart');
+        if (!canvas) {
+            console.warn('formatChart 캔버스를 찾을 수 없습니다.');
+            return;
+        }
+        const ctx = canvas.getContext('2d');  // ✅ 안전함
         
         if (this.charts.categoryChart) {
             this.charts.categoryChart.destroy();
@@ -1188,13 +1194,17 @@ async fetchRealYoutubeData(category, count) {
         
         // DOM 요소 안전하게 업데이트
         // DOM 요소 안전하게 업데이트
-        this.safeUpdateElement('downloadVideosCount', this.currentData.length.toLocaleString());
-        this.safeUpdateElement('downloadTotalViews', this.formatNumber(totalViews));
-        this.safeUpdateElement('downloadAvgGrowth', `${avgGrowthRate}%`);
+        // Pro 버전 HTML과 일치하는 요소들만 업데이트
+        this.safeUpdateElement('totalVideos', totalVideos);                         // ✅
+        this.safeUpdateElement('shortsCount', shortsCount);                         // ✅
+        this.safeUpdateElement('longFormCount', longFormCount);                     // ✅
+        this.safeUpdateElement('avgViralScore', avgViralScore);                     // ✅
+        this.safeUpdateElement('avgGrowthRate', avgGrowthRate + '%');              // ✅
+        this.safeUpdateElement('downloadShortsRatio', shortsRatio + '%');          // ✅
         
         // Pro 버전 전용 요소들 업데이트
         this.safeUpdateElement('downloadAvgViral', avgViralScore);
-        this.safeUpdateElement('downloadShortsRatio', `${shortsRatio}%`);
+        //this.safeUpdateElement('downloadShortsRatio', `${shortsRatio}%`);
         
         console.log(`✅ 다운로드 섹션 업데이트 완료: ${this.currentData.length}개 영상, 총 조회수 ${totalViews.toLocaleString()}`);
     }
