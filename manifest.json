@@ -83,54 +83,30 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
+"shortcuts": [
     {
       "name": "🔥 핫한 영상 검출",
       "short_name": "핫한검출",
       "description": "최근 1주일간 가장 핫한 영상을 즉시 검출",
-      "url": "./index_improved.html?action=hot_search",
-      "icons": [
-        {
-          "src": "assets/icons/shortcut-hot.png",
-          "sizes": "96x96"
-        }
-      ]
+      "url": "./index.html?action=hot_search"
     },
     {
       "name": "📱 쇼츠 분석",
       "short_name": "쇼츠분석", 
       "description": "쇼츠 영상만 골라서 트렌드 분석",
-      "url": "./index_improved.html?format=shorts",
-      "icons": [
-        {
-          "src": "assets/icons/shortcut-shorts.png",
-          "sizes": "96x96"
-        }
-      ]
+      "url": "./index.html?format=shorts"
     },
     {
       "name": "🎬 롱폼 분석",
       "short_name": "롱폼분석",
       "description": "롱폼 영상 트렌드 심화 분석", 
-      "url": "./index_improved.html?format=long",
-      "icons": [
-        {
-          "src": "assets/icons/shortcut-long.png",
-          "sizes": "96x96"
-        }
-      ]
+      "url": "./index.html?format=long"
     },
     {
       "name": "📊 Excel 다운로드",
       "short_name": "Excel",
       "description": "분석 데이터를 Excel로 바로 다운로드",
-      "url": "./index_improved.html?action=download",
-      "icons": [
-        {
-          "src": "assets/icons/shortcut-excel.png", 
-          "sizes": "96x96"
-        }
-      ]
+      "url": "./index.html?action=download"
     }
   ],
   "share_target": {
