@@ -1,13 +1,217 @@
 {
-  "name": "시니어 YouTube 트렌드 분석기",
-  "short_name": "시니어트렌드",
-  "start_url": "./",
+  "name": "시니어 YouTube 트렌드 분석기 Pro - 막강한 핫한 영상 검출 도구",
+  "short_name": "시니어트렌드Pro",
+  "description": "🔥 최근 1주일간 가장 핫한 영상을 검출하는 막강한 도구. 쇼츠/롱폼 구분, 바이럴 점수 계산, 고급 분석 기능 제공",
+  "start_url": "./index_improved.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f8fafc",
   "theme_color": "#3b82f6",
+  "lang": "ko",
+  "dir": "ltr",
+  "categories": [
+    "productivity", 
+    "utilities", 
+    "business",
+    "analytics",
+    "social"
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/desktop-main.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "메인 대시보드 - 바이럴 점수 기반 핫한 영상 검출"
+    },
+    {
+      "src": "assets/screenshots/mobile-analysis.png", 
+      "sizes": "390x844",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "모바일 분석 화면 - 쇼츠/롱폼 구분 분석"
+    }
+  ],
   "icons": [
-    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
-
+    {
+      "src": "assets/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-96.png", 
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-128.png",
+      "sizes": "128x128", 
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png", 
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-384.png",
+      "sizes": "384x384", 
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png", 
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "🔥 핫한 영상 검출",
+      "short_name": "핫한검출",
+      "description": "최근 1주일간 가장 핫한 영상을 즉시 검출",
+      "url": "./index_improved.html?action=hot_search",
+      "icons": [
+        {
+          "src": "assets/icons/shortcut-hot.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "📱 쇼츠 분석",
+      "short_name": "쇼츠분석", 
+      "description": "쇼츠 영상만 골라서 트렌드 분석",
+      "url": "./index_improved.html?format=shorts",
+      "icons": [
+        {
+          "src": "assets/icons/shortcut-shorts.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "🎬 롱폼 분석",
+      "short_name": "롱폼분석",
+      "description": "롱폼 영상 트렌드 심화 분석", 
+      "url": "./index_improved.html?format=long",
+      "icons": [
+        {
+          "src": "assets/icons/shortcut-long.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "📊 Excel 다운로드",
+      "short_name": "Excel",
+      "description": "분석 데이터를 Excel로 바로 다운로드",
+      "url": "./index_improved.html?action=download",
+      "icons": [
+        {
+          "src": "assets/icons/shortcut-excel.png", 
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "./share.html",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+youtube",
+      "url": "./analyze.html?url=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./import.html",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/vnd.ms-excel": [".xls"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "display_override": [
+    "window-controls-overlay",
+    "minimal-ui",
+    "standalone",
+    "fullscreen"
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://youtube-trends-pro.com/"
+    }
+  ],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "custom": {
+    "pro_features": {
+      "viral_score_algorithm": "고급 바이럴 점수 계산 엔진",
+      "hot_video_detection": "최근 1주일간 핫한 영상 자동 검출",
+      "format_classification": "쇼츠/롱폼 자동 분류 시스템",
+      "growth_rate_analysis": "구독자 대비 조회수 성장률 분석",
+      "engagement_metrics": "참여율 심화 분석",
+      "advanced_filtering": "채널 규모별, 업로드 빈도별 필터링",
+      "multi_format_export": "Excel, CSV, JSON, PDF 다중 포맷 지원",
+      "real_time_charts": "실시간 데이터 시각화",
+      "senior_optimized_ui": "시니어 친화적 대형 폰트 & 고대비",
+      "accessibility_compliant": "WCAG 2.1 AA 접근성 준수"
+    },
+    "target_audience": {
+      "primary": "시니어 (50세 이상)",
+      "secondary": "YouTube 크리에이터",
+      "tertiary": "콘텐츠 마케터"
+    },
+    "key_benefits": [
+      "🔥 핫한 영상 즉시 검출로 트렌드 선점",
+      "📈 바이럴 점수로 성공 확률 예측",
+      "📱 쇼츠/롱폼별 맞춤 전략 수립", 
+      "📊 Excel 다운로드로 심화 분석",
+      "🎯 시니어 특화 콘텐츠 발굴",
+      "⚡ 실시간 데이터로 빠른 의사결정"
+    ],
+    "competitive_advantages": [
+      "업계 최고 수준의 바이럴 예측 알고리즘",
+      "시니어 친화적 UI/UX 설계",
+      "쇼츠/롱폼 구분 자동화",
+      "다중 키워드 병렬 검색",
+      "실시간 성장률 분석",
+      "고급 참여율 계산 엔진"
+    ]
+  }
 }
