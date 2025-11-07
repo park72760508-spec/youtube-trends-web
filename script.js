@@ -243,147 +243,153 @@ async performSearch() {
 
     // 반환: displayResults()에서 그대로 사용할 수 있는 객체 배열
     // 조회기간: 최근 7일, 페이지네이션, 채널 구독자수 반영, 조회수/구독자수 정규화 지표 계산
-    async fetchRealYoutubeData(category, count) {
-      if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
-        throw new Error('API 키가 없습니다. (현재 데모 모드)');
-      }
-    
-      // ========= 0) 파라미터/필터 준비 =========
-      const desired = Math.max(1, Math.min(count || 25, 200)); // 안전상한 200 (필요시 조절)
-      const publishedAfter = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 최근 7일
-    
-      const catMap = {
-        health: '시니어 건강',
-        hobby: '시니어 취미',
-        cooking: '시니어 요리',
-        life: '시니어 생활 정보',
-        travel: '시니어 여행',
-        tech: '시니어 스마트폰'
-      };
-      const q = category === 'all' ? '시니어' : (catMap[category] || '시니어');
-    
-      // ========= 1) search 페이지네이션 (maxResults=50 제한 보완) =========
-      let nextPageToken = undefined;
-      const videoIds = [];
-      const videoSnippetById = {}; // channelId, title 등 보관
-    
-      while (videoIds.length < desired) {
-        const perPage = Math.min(50, desired - videoIds.length);
-        const searchParams = new URLSearchParams({
-          key: this.apiKey,
-          part: 'snippet',
-          maxResults: String(perPage),
-          q,
-          type: 'video',
-          order: 'date',              // 최신순
-          publishedAfter,             // 최근 7일
-          regionCode: 'KR',
-          relevanceLanguage: 'ko'
-        });
-        if (nextPageToken) searchParams.set('pageToken', nextPageToken);
-    
-        const searchRes = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
-        if (!searchRes.ok) throw new Error(`search 실패: ${searchRes.status}`);
-        const searchJson = await searchRes.json();
-    
-        const batch = (searchJson.items || [])
-          .map(it => {
-            const vid = it?.id?.videoId;
-            if (!vid) return null;
-            videoSnippetById[vid] = it.snippet || {};
-            return vid;
-          })
-          .filter(Boolean);
-    
-        videoIds.push(...batch);
-    
-        nextPageToken = searchJson.nextPageToken;
-        if (!nextPageToken || batch.length === 0) break; // 더 없음
-      }
-    
-      const finalIds = videoIds.slice(0, desired);
-      if (finalIds.length === 0) return [];
-    
-      // ========= 2) videos 상세/통계(50개씩) =========
-      const videoDetails = [];
-      for (let i = 0; i < finalIds.length; i += 50) {
-        const chunk = finalIds.slice(i, i + 50);
-        const videosParams = new URLSearchParams({
-          key: this.apiKey,
-          part: 'statistics,contentDetails,snippet',
-          id: chunk.join(',')
-        });
-        const videosRes = await fetch(`${this.baseUrl}/videos?${videosParams.toString()}`);
-        if (!videosRes.ok) throw new Error(`videos 실패: ${videosRes.status}`);
-        const videosJson = await videosRes.json();
-        videoDetails.push(...(videosJson.items || []));
-      }
-    
-      // ========= 3) 채널 구독자수 수집(channels API, 50개씩) =========
-      const channelIds = [...new Set(videoDetails.map(v => v?.snippet?.channelId).filter(Boolean))];
-      const subsByChannel = {};
-      for (let i = 0; i < channelIds.length; i += 50) {
-        const chunk = channelIds.slice(i, i + 50);
-        const channelsParams = new URLSearchParams({
-          key: this.apiKey,
-          part: 'statistics',
-          id: chunk.join(',')
-        });
-        const chRes = await fetch(`${this.baseUrl}/channels?${channelsParams.toString()}`);
-        if (!chRes.ok) throw new Error(`channels 실패: ${chRes.status}`);
-        const chJson = await chRes.json();
-        (chJson.items || []).forEach(ch => {
-          const cid = ch.id;
-          const subs = Number(ch?.statistics?.subscriberCount || 0); // 숨김일 때 0 처리
-          subsByChannel[cid] = subs;
-        });
-      }
-    
-      // ========= 4) 매핑 + views/sub 계산 =========
-      const mapped = videoDetails.map((v, i) => {
-        const s  = v.statistics || {};
-        const sn = v.snippet || {};
-        const cd = v.contentDetails || {};
-    
-        const views    = Number(s.viewCount || 0);
-        const likes    = Number(s.likeCount || 0);
-        const comments = Number(s.commentCount || 0);
-        const cid      = sn.channelId;
-        const subs     = Number(subsByChannel[cid] || 0);
-        const vps      = subs > 0 ? (views / subs) : 0; // 구독자 숨김/0인 채널은 0
-    
-        const normCat = category === 'all' ? 'life' : category;
-    
-        return {
-          id: v.id,
-          rank: i + 1,
-          title: sn.title || '(제목 없음)',
-          channel: sn.channelTitle || '-',
-          category: normCat,
-          categoryName: this.getCategoryName ? this.getCategoryName(normCat) : normCat,
-          views: views.toLocaleString(),
-          likes: likes.toLocaleString(),
-          comments: comments.toLocaleString(),
-          duration: (cd.duration || 'PT0M').replace(/^PT/, '').toLowerCase(),
-          publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
-          growthRate: (Math.random() * 20 + 5).toFixed(1), // 기존 임시값 유지
-          thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
-          engagement: (likes && views ? ((likes / views) * 100) : (Math.random() * 5 + 2)).toFixed(1),
-          tags: sn.tags || [],
-          description: sn.description || '',
-          publishedAt: (sn.publishedAt || '').slice(0, 10),
-          videoId: v.id,
-    
-          // ✅ 추가: 구독자/정규화 지표
-          subscriberCount: subs,
-          viewsNumeric: views,
-          viewsPerSubNumeric: vps,
-          viewsPerSub: subs > 0 ? vps.toFixed(4) : '0'
-        };
-      });
-    
-      return mapped;
-    }
+// 최근 7일 + 조회수 내림차순 + 페이지네이션 + 채널 구독자수 포함
+async fetchRealYoutubeData(category, count) {
+  if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
+    throw new Error('API 키가 없습니다. (현재 데모 모드)');
+  }
+
+  // 0) 파라미터/필터
+  const desired = Math.max(1, Math.min(count || 25, 200)); // 안전상한
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const publishedAfter = new Date(sevenDaysAgo).toISOString();
+
+  const catMap = {
+    health: '시니어 건강',
+    hobby: '시니어 취미',
+    cooking: '시니어 요리',
+    life: '시니어 생활 정보',
+    travel: '시니어 여행',
+    tech: '시니어 스마트폰' 
+  };
+  const q = category === 'all' ? '시니어' : (catMap[category] || '시니어');
+
+  // 1) search: 조회수 순 + 페이지네이션
+  let nextPageToken;
+  const videoIds = [];
+  while (videoIds.length < desired) {
+    const perPage = Math.min(50, desired - videoIds.length);
+    const searchParams = new URLSearchParams({
+      key: this.apiKey,
+      part: 'snippet',
+      maxResults: String(perPage),
+      q,
+      type: 'video',
+      order: 'viewCount',       // 조회수 높은 순
+      publishedAfter,           // 최근 7일
+      regionCode: 'KR',
+      relevanceLanguage: 'ko'
+    });
+    if (nextPageToken) searchParams.set('pageToken', nextPageToken);
+
+    const res = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
+    if (!res.ok) throw new Error(`search 실패: ${res.status}`);
+    const json = await res.json();
+
+    const batch = (json.items || [])
+      .map(it => it?.id?.videoId)
+      .filter(Boolean);
+
+    videoIds.push(...batch);
+    nextPageToken = json.nextPageToken;
+    if (!nextPageToken || batch.length === 0) break;
+  }
+
+  const ids = videoIds.slice(0, desired);
+  if (ids.length === 0) return [];
+
+  // 2) videos 상세/통계 (50개 단위)
+  const videos = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const params = new URLSearchParams({
+      key: this.apiKey,
+      part: 'statistics,contentDetails,snippet',
+      id: chunk.join(',')
+    });
+    const r = await fetch(`${this.baseUrl}/videos?${params.toString()}`);
+    if (!r.ok) throw new Error(`videos 실패: ${r.status}`);
+    const j = await r.json();
+    videos.push(...(j.items || []));
+  }
+
+  // 3) 채널 구독자수 수집 (channels API)
+  const channelIds = [...new Set(videos.map(v => v?.snippet?.channelId).filter(Boolean))];
+  const subsByChannel = {};
+  for (let i = 0; i < channelIds.length; i += 50) {
+    const chunk = channelIds.slice(i, i + 50);
+    const params = new URLSearchParams({
+      key: this.apiKey,
+      part: 'statistics',
+      id: chunk.join(',')
+    });
+    const r = await fetch(`${this.baseUrl}/channels?${params.toString()}`);
+    if (!r.ok) throw new Error(`channels 실패: ${r.status}`);
+    const j = await r.json();
+    (j.items || []).forEach(ch => {
+      const cid = ch.id;
+      const subs = Number(ch?.statistics?.subscriberCount || 0); // 숨김/비공개면 0 처리
+      subsByChannel[cid] = subs;
+    });
+  }
+
+  // 4) 매핑 + 7일 재검증 + 정렬용 숫자 보존
+  const within7d = [];
+  for (const v of videos) {
+    const s  = v.statistics || {};
+    const sn = v.snippet || {};
+    const cd = v.contentDetails || {};
+
+    const publishedAt = sn.publishedAt ? Date.parse(sn.publishedAt) : now;
+    if (!(publishedAt >= sevenDaysAgo && publishedAt <= now)) continue; // 7일 재확인
+
+    const views = Number(s.viewCount || 0);
+    const likes = Number(s.likeCount || 0);
+    const comments = Number(s.commentCount || 0);
+    const channelId = sn.channelId;
+    const subs = Number(subsByChannel[channelId] || 0);
+
+    const normCat = category === 'all' ? 'life' : category;
+
+    within7d.push({
+      id: v.id,
+      rank: 0, // 나중에 채움
+      title: sn.title || '(제목 없음)',
+      channel: sn.channelTitle || '-',
+      category: normCat,
+      categoryName: this.getCategoryName ? this.getCategoryName(normCat) : normCat,
+
+      // 표시는 문자열, 정렬은 숫자
+      views: views.toLocaleString(),
+      likes: likes.toLocaleString(),
+      comments: comments.toLocaleString(),
+      subscriberCount: subs,                              // 숫자
+      subscriberCountFormatted: subs.toLocaleString(),    // 표시용
+
+      duration: (cd.duration || 'PT0M').replace(/^PT/, '').toLowerCase(),
+      publishTime: new Date(publishedAt).toLocaleDateString('ko-KR'),
+      growthRate: (Math.random() * 20 + 5).toFixed(1),
+      thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
+      engagement: (likes && views ? ((likes / views) * 100) : (Math.random() * 5 + 2)).toFixed(1),
+      tags: sn.tags || [],
+      description: sn.description || '',
+      publishedAt: (sn.publishedAt || '').slice(0, 10),
+      videoId: v.id,
+
+      // 정렬용
+      viewsNumeric: views
+    });
+  }
+
+  // 5) 최종 정렬: 조회수 내림차순 + 상위 desired개
+  within7d.sort((a, b) => (b.viewsNumeric || 0) - (a.viewsNumeric || 0));
+  const top = within7d.slice(0, desired);
+  top.forEach((v, i) => v.rank = i + 1);
+
+  return top;
+}
+
 
 
 
@@ -737,13 +743,30 @@ async performSearch() {
     
     // 결과 표시
     displayResults() {
-        document.getElementById('dashboard').style.display = 'block';
-        document.getElementById('chartsSection').style.display = 'block';
-        document.getElementById('videoResults').style.display = 'block';
-        
-        const viewMode = document.getElementById('viewMode').value;
-        this.renderVideos(viewMode);
+      const tbody = document.querySelector('#resultsTable tbody');
+      const list = this.currentData || [];
+    
+      // 테이블 헤더(구독자 수 추가)가 별도라면 그대로 두고, 여기선 바디만 갱신
+      tbody.innerHTML = list.map(v => `
+        <tr>
+          <td>${v.rank}</td>
+          <td>${v.title}</td>
+          <td>${v.channel}</td>
+          <td>${v.categoryName}</td>
+          <td>${v.views}</td>
+          <td>${(v.subscriberCountFormatted || (v.subscriberCount ?? 0).toLocaleString())}</td>
+          <td>${v.likes}</td>
+          <td>${v.comments}</td>
+          <td>${v.growthRate}%</td>
+          <td>${v.publishTime}</td>
+          <td>${v.duration}</td>
+        </tr>
+      `).join('');
     }
+
+
+
+    
     
     // 비디오 렌더링
     renderVideos(mode) {
@@ -955,42 +978,53 @@ async performSearch() {
     }
     
     // Excel 다운로드 - 핵심 기능!
-    downloadExcel() {
-        console.log('📊 Excel 파일 생성 시작...');
+        downloadExcel() {
+          if (!this.currentData || !this.currentData.length) {
+            alert('다운로드할 데이터가 없습니다.');
+            return;
+          }
         
-        try {
-            const workbook = XLSX.utils.book_new();
-            
-            // 요약 시트
-            const summaryData = this.createSummaryData();
-            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "요약");
-            
-            // 상세 데이터 시트
-            const detailData = this.createDetailData();
-            const detailSheet = XLSX.utils.aoa_to_sheet(detailData);
-            XLSX.utils.book_append_sheet(workbook, detailSheet, "상세데이터");
-            
-            // 카테고리별 분석 시트
-            const categoryData = this.createCategoryAnalysis();
-            const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
-            XLSX.utils.book_append_sheet(workbook, categorySheet, "카테고리분석");
-            
-            // 스타일링 적용
-            this.applyExcelStyling(detailSheet);
-            
-            // 파일 다운로드
-            const filename = this.generateFilename('시니어_YouTube_트렌드', 'xlsx');
-            XLSX.writeFile(workbook, filename);
-            
-            console.log('✅ Excel 파일 다운로드 완료:', filename);
-            this.showDownloadSuccess('Excel');
-            
-        } catch (error) {
-            console.error('❌ Excel 다운로드 오류:', error);
-            this.showDownloadError('Excel');
+          // 전체 목록 사용 + 구독자 수 포함
+          const list = this.currentData.map(v => ({
+            순위: v.rank,
+            제목: v.title,
+            채널: v.channel,
+            카테고리: v.categoryName,
+            조회수: v.views,
+            구독자수: (v.subscriberCountFormatted || (v.subscriberCount ?? 0).toLocaleString()),
+            좋아요: v.likes,
+            댓글: v.comments,
+            성장률: `${v.growthRate}%`,
+            게시시간: v.publishTime,
+            영상길이: v.duration,
+            영상ID: v.videoId
+          }));
+        
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.json_to_sheet(list);
+        
+          // 열 너비 조금 가독성 좋게
+          const cols = [
+            { wch: 6 },   // 순위
+            { wch: 60 },  // 제목
+            { wch: 24 },  // 채널
+            { wch: 10 },  // 카테고리
+            { wch: 12 },  // 조회수
+            { wch: 12 },  // 구독자수
+            { wch: 10 },  // 좋아요
+            { wch: 10 },  // 댓글
+            { wch: 10 },  // 성장률
+            { wch: 14 },  // 게시시간
+            { wch: 10 },  // 영상길이
+            { wch: 14 }   // 영상ID
+          ];
+          ws['!cols'] = cols;
+        
+          const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+          XLSX.utils.book_append_sheet(wb, ws, 'YouTube Trends');
+          XLSX.writeFile(wb, `youtube_trends_${dateStr}.xlsx`);
         }
-    }
+
     
     // Excel 요약 데이터 생성
     createSummaryData() {
