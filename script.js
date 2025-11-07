@@ -200,49 +200,58 @@ class SeniorYoutubeTrendsExcel {
     }
     
     // 검색 실행
-    async performSearch() {
-        const category = document.getElementById('categorySelect').value;
-        const sortBy = document.getElementById('sortBy').value;
-        const videoCount = parseInt(document.getElementById('videoCount').value);
-        
-        console.log(`🔍 트렌드 검색 시작: 카테고리=${category}, 정렬=${sortBy}, 개수=${videoCount}`);
-        
-        this.showLoading();
-        
-        try {
-            // 데이터 로드 (실제 API 또는 모의 데이터)
-            if (this.apiKey === 'DEMO_MODE') {
-                this.currentData = await this.generateEnhancedMockData(category, videoCount);
-            } else {
-                this.currentData = await this.fetchRealYoutubeData(category, videoCount);
-            }
-            
-            // 정렬 적용
-            this.applySorting(sortBy);
-            
-            // 결과 표시
-            this.displayResults();
-            this.updateDashboard();
-            this.updateCharts();
-            this.showDownloadSection();
-            
+async performSearch() {
+    const category = document.getElementById('categorySelect').value;
+    const sortBy = document.getElementById('sortBy').value; // UI 값은 받되, 내부에서 강제 정렬
+    const videoCount = parseInt(document.getElementById('videoCount').value);
+
+    console.log(`🔍 트렌드 검색 시작: 카테고리=${category}, 정렬=${sortBy}, 개수=${videoCount}`);
+
+    this.showLoading();
+
+    try {
+        // ✅ 데모 모드 차단
+        if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
+            alert('YouTube API 키가 필요합니다. 상단의 "API 키 불러오기" 버튼으로 키를 저장해 주세요.');
             this.hideLoading();
-            console.log('✅ 검색 완료:', this.currentData.length, '개 영상');
-            
-        } catch (error) {
-            console.error('❌ 검색 오류:', error);
-            this.showError();
+            return;
         }
+
+        // ✅ 실데이터만 조회
+        this.currentData = await this.fetchRealYoutubeData(category, videoCount);
+
+        // ✅ 구독자 대비 조회수(viewsPerSubNumeric)로 강제 정렬
+        this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
+        this.currentData.forEach((v, i) => v.rank = i + 1);
+
+        // 결과 표시
+        this.displayResults();
+        this.updateDashboard();
+        this.updateCharts();
+        this.showDownloadSection();
+
+        this.hideLoading();
+        console.log('✅ 검색 완료:', this.currentData.length, '개 영상');
+
+    } catch (error) {
+        console.error('❌ 검색 오류:', error);
+        this.showError();
     }
+}
+
 
 
     // 반환: displayResults()에서 그대로 사용할 수 있는 객체 배열
+    // 조회기간: 최근 7일, 페이지네이션, 채널 구독자수 반영, 조회수/구독자수 정규화 지표 계산
     async fetchRealYoutubeData(category, count) {
       if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
         throw new Error('API 키가 없습니다. (현재 데모 모드)');
       }
     
-      // 카테고리 → 검색 키워드 간단 매핑
+      // ========= 0) 파라미터/필터 준비 =========
+      const desired = Math.max(1, Math.min(count || 25, 200)); // 안전상한 200 (필요시 조절)
+      const publishedAfter = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 최근 7일
+    
       const catMap = {
         health: '시니어 건강',
         hobby: '시니어 취미',
@@ -253,49 +262,96 @@ class SeniorYoutubeTrendsExcel {
       };
       const q = category === 'all' ? '시니어' : (catMap[category] || '시니어');
     
-      // 1) search API: 최신 영상 id 목록
-      const searchParams = new URLSearchParams({
-        key: this.apiKey,
-        part: 'snippet',
-        maxResults: String(Math.min(count || 25, 50)),
-        q,
-        type: 'video',
-        order: 'date',
-        regionCode: 'KR',
-        relevanceLanguage: 'ko'
-      });
+      // ========= 1) search 페이지네이션 (maxResults=50 제한 보완) =========
+      let nextPageToken = undefined;
+      const videoIds = [];
+      const videoSnippetById = {}; // channelId, title 등 보관
     
-      const searchRes = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
-      if (!searchRes.ok) throw new Error(`search 실패: ${searchRes.status}`);
-      const searchJson = await searchRes.json();
-      const ids = (searchJson.items || [])
-        .map(it => it?.id?.videoId)
-        .filter(Boolean);
+      while (videoIds.length < desired) {
+        const perPage = Math.min(50, desired - videoIds.length);
+        const searchParams = new URLSearchParams({
+          key: this.apiKey,
+          part: 'snippet',
+          maxResults: String(perPage),
+          q,
+          type: 'video',
+          order: 'date',              // 최신순
+          publishedAfter,             // 최근 7일
+          regionCode: 'KR',
+          relevanceLanguage: 'ko'
+        });
+        if (nextPageToken) searchParams.set('pageToken', nextPageToken);
     
-      if (!ids.length) return [];
+        const searchRes = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
+        if (!searchRes.ok) throw new Error(`search 실패: ${searchRes.status}`);
+        const searchJson = await searchRes.json();
     
-      // 2) videos API: 통계/상세 정보
-      const videosParams = new URLSearchParams({
-        key: this.apiKey,
-        part: 'statistics,contentDetails,snippet',
-        id: ids.join(',')
-      });
+        const batch = (searchJson.items || [])
+          .map(it => {
+            const vid = it?.id?.videoId;
+            if (!vid) return null;
+            videoSnippetById[vid] = it.snippet || {};
+            return vid;
+          })
+          .filter(Boolean);
     
-      const videosRes = await fetch(`${this.baseUrl}/videos?${videosParams.toString()}`);
-      if (!videosRes.ok) throw new Error(`videos 실패: ${videosRes.status}`);
-      const videosJson = await videosRes.json();
+        videoIds.push(...batch);
     
-      // 3) UI 표시용 구조로 변환 (모의데이터와 필드 호환)
-      const mapped = (videosJson.items || []).map((v, i) => {
-        const s = v.statistics || {};
+        nextPageToken = searchJson.nextPageToken;
+        if (!nextPageToken || batch.length === 0) break; // 더 없음
+      }
+    
+      const finalIds = videoIds.slice(0, desired);
+      if (finalIds.length === 0) return [];
+    
+      // ========= 2) videos 상세/통계(50개씩) =========
+      const videoDetails = [];
+      for (let i = 0; i < finalIds.length; i += 50) {
+        const chunk = finalIds.slice(i, i + 50);
+        const videosParams = new URLSearchParams({
+          key: this.apiKey,
+          part: 'statistics,contentDetails,snippet',
+          id: chunk.join(',')
+        });
+        const videosRes = await fetch(`${this.baseUrl}/videos?${videosParams.toString()}`);
+        if (!videosRes.ok) throw new Error(`videos 실패: ${videosRes.status}`);
+        const videosJson = await videosRes.json();
+        videoDetails.push(...(videosJson.items || []));
+      }
+    
+      // ========= 3) 채널 구독자수 수집(channels API, 50개씩) =========
+      const channelIds = [...new Set(videoDetails.map(v => v?.snippet?.channelId).filter(Boolean))];
+      const subsByChannel = {};
+      for (let i = 0; i < channelIds.length; i += 50) {
+        const chunk = channelIds.slice(i, i + 50);
+        const channelsParams = new URLSearchParams({
+          key: this.apiKey,
+          part: 'statistics',
+          id: chunk.join(',')
+        });
+        const chRes = await fetch(`${this.baseUrl}/channels?${channelsParams.toString()}`);
+        if (!chRes.ok) throw new Error(`channels 실패: ${chRes.status}`);
+        const chJson = await chRes.json();
+        (chJson.items || []).forEach(ch => {
+          const cid = ch.id;
+          const subs = Number(ch?.statistics?.subscriberCount || 0); // 숨김일 때 0 처리
+          subsByChannel[cid] = subs;
+        });
+      }
+    
+      // ========= 4) 매핑 + views/sub 계산 =========
+      const mapped = videoDetails.map((v, i) => {
+        const s  = v.statistics || {};
         const sn = v.snippet || {};
         const cd = v.contentDetails || {};
     
-        const views = Number(s.viewCount || 0);
-        const likes = Number(s.likeCount || 0);
+        const views    = Number(s.viewCount || 0);
+        const likes    = Number(s.likeCount || 0);
         const comments = Number(s.commentCount || 0);
+        const cid      = sn.channelId;
+        const subs     = Number(subsByChannel[cid] || 0);
+        const vps      = subs > 0 ? (views / subs) : 0; // 구독자 숨김/0인 채널은 0
     
-        // 프로젝트 내부 카테고리 이름/색 등을 쓰는 코드가 있다면 유지
         const normCat = category === 'all' ? 'life' : category;
     
         return {
@@ -308,22 +364,27 @@ class SeniorYoutubeTrendsExcel {
           views: views.toLocaleString(),
           likes: likes.toLocaleString(),
           comments: comments.toLocaleString(),
-          duration: (cd.duration || 'PT0M')
-                      .replace(/^PT/, '')
-                      .toLowerCase(), // 간단 표기
+          duration: (cd.duration || 'PT0M').replace(/^PT/, '').toLowerCase(),
           publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
-          growthRate: (Math.random() * 20 + 5).toFixed(1), // 임시 지표(원하면 계산식 교체)
+          growthRate: (Math.random() * 20 + 5).toFixed(1), // 기존 임시값 유지
           thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
           engagement: (likes && views ? ((likes / views) * 100) : (Math.random() * 5 + 2)).toFixed(1),
           tags: sn.tags || [],
           description: sn.description || '',
           publishedAt: (sn.publishedAt || '').slice(0, 10),
-          videoId: v.id
+          videoId: v.id,
+    
+          // ✅ 추가: 구독자/정규화 지표
+          subscriberCount: subs,
+          viewsNumeric: views,
+          viewsPerSubNumeric: vps,
+          viewsPerSub: subs > 0 ? vps.toFixed(4) : '0'
         };
       });
     
       return mapped;
     }
+
 
 
     
@@ -630,6 +691,9 @@ class SeniorYoutubeTrendsExcel {
     // 정렬 적용
     applySorting(sortBy) {
         switch (sortBy) {
+            case 'vps': // ✅ 신규: 구독자 대비 조회수
+                this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
+                break;
             case 'growth':
                 this.currentData.sort((a, b) => parseFloat(b.growthRate) - parseFloat(a.growthRate));
                 break;
@@ -650,13 +714,16 @@ class SeniorYoutubeTrendsExcel {
                     return aHours - bHours;
                 });
                 break;
+            default:
+                // 기본값도 vps로
+                this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
         }
-        
-        // 순위 재설정
+    
         this.currentData.forEach((video, index) => {
             video.rank = index + 1;
         });
     }
+
     
     // 시간을 시간 단위로 변환
     parseTimeToHours(timeString) {
