@@ -211,27 +211,93 @@ class SeniorYoutubeTrendsExcel {
         
         try {
             // 데이터 로드 (실제 API 또는 모의 데이터)
-            if (this.apiKey === 'DEMO_MODE') {
-                this.currentData = await this.generateEnhancedMockData(category, videoCount);
-            } else {
-                this.currentData = await this.fetchRealYoutubeData(category, videoCount);
+            async fetchRealYoutubeData(category, count) {
+              if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
+                throw new Error('API 키가 없습니다. (현재 데모 모드)');
+              }
+            
+              // 카테고리 → 검색 키워드 간단 매핑
+              const catMap = {
+                health: '시니어 건강',
+                hobby: '시니어 취미',
+                cooking: '시니어 요리',
+                life: '시니어 생활 정보',
+                travel: '시니어 여행',
+                tech: '시니어 스마트폰'
+              };
+              const q = category === 'all' ? '시니어' : (catMap[category] || '시니어');
+            
+              // 1) search API: 최신 영상 id 목록
+              const searchParams = new URLSearchParams({
+                key: this.apiKey,
+                part: 'snippet',
+                maxResults: String(Math.min(count || 25, 50)),
+                q,
+                type: 'video',
+                order: 'date',
+                regionCode: 'KR',
+                relevanceLanguage: 'ko'
+              });
+            
+              const searchRes = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
+              if (!searchRes.ok) throw new Error(`search 실패: ${searchRes.status}`);
+              const searchJson = await searchRes.json();
+              const ids = (searchJson.items || [])
+                .map(it => it?.id?.videoId)
+                .filter(Boolean);
+            
+              if (!ids.length) return [];
+            
+              // 2) videos API: 통계/상세 정보
+              const videosParams = new URLSearchParams({
+                key: this.apiKey,
+                part: 'statistics,contentDetails,snippet',
+                id: ids.join(',')
+              });
+            
+              const videosRes = await fetch(`${this.baseUrl}/videos?${videosParams.toString()}`);
+              if (!videosRes.ok) throw new Error(`videos 실패: ${videosRes.status}`);
+              const videosJson = await videosRes.json();
+            
+              // 3) UI 표시용 구조로 변환 (모의데이터와 필드 호환)
+              const mapped = (videosJson.items || []).map((v, i) => {
+                const s = v.statistics || {};
+                const sn = v.snippet || {};
+                const cd = v.contentDetails || {};
+            
+                const views = Number(s.viewCount || 0);
+                const likes = Number(s.likeCount || 0);
+                const comments = Number(s.commentCount || 0);
+            
+                // 프로젝트 내부 카테고리 이름/색 등을 쓰는 코드가 있다면 유지
+                const normCat = category === 'all' ? 'life' : category;
+            
+                return {
+                  id: v.id,
+                  rank: i + 1,
+                  title: sn.title || '(제목 없음)',
+                  channel: sn.channelTitle || '-',
+                  category: normCat,
+                  categoryName: this.getCategoryName ? this.getCategoryName(normCat) : normCat,
+                  views: views.toLocaleString(),
+                  likes: likes.toLocaleString(),
+                  comments: comments.toLocaleString(),
+                  duration: (cd.duration || 'PT0M')
+                              .replace(/^PT/, '')
+                              .toLowerCase(), // 간단 표기
+                  publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
+                  growthRate: (Math.random() * 20 + 5).toFixed(1), // 임시 지표(원하면 계산식 교체)
+                  thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
+                  engagement: (likes && views ? ((likes / views) * 100) : (Math.random() * 5 + 2)).toFixed(1),
+                  tags: sn.tags || [],
+                  description: sn.description || '',
+                  publishedAt: (sn.publishedAt || '').slice(0, 10),
+                  videoId: v.id
+                };
+              });
+            
+              return mapped;
             }
-            
-            // 정렬 적용
-            this.applySorting(sortBy);
-            
-            // 결과 표시
-            this.displayResults();
-            this.updateDashboard();
-            this.updateCharts();
-            this.showDownloadSection();
-            
-            this.hideLoading();
-            console.log('✅ 검색 완료:', this.currentData.length, '개 영상');
-            
-        } catch (error) {
-            console.error('❌ 검색 오류:', error);
-            this.showError();
         }
     }
     
