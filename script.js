@@ -518,7 +518,8 @@ class SeniorYoutubeTrendsExcel {
             life: '라이프'
         };
         
-        return `https://via.placeholder.com/480x270/${colors[category]}?text=${categoryNames[category] || '시니어'}`;
+        return `https://placehold.co/480x270/${colors[category]}?text=${encodeURIComponent(categoryNames[category] || '시니어')}`;
+
     }
     
     // 카테고리명 변환
