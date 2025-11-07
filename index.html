@@ -20,6 +20,7 @@
     <!-- PWA 지원 -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="시니어트렌드">
@@ -112,6 +113,22 @@
                                 새로고침
                             </button>
                         </div>
+
+                        <!-- API 키 불러오기 (로컬 txt에서 읽어 localStorage 저장) -->
+                        <div class="search-buttons" style="margin-top:12px">
+                          <input id="apiKeyFile" type="file" accept=".txt" style="display:none">
+                          <button id="loadApiKeyBtn" class="btn-secondary" type="button" aria-label="API 키 불러오기">
+                            <i class="fas fa-key"></i> C:\\ 의 txt에서 API 키 불러오기
+                          </button>
+                          <button id="clearApiKeyBtn" class="btn-secondary" type="button" aria-label="API 키 초기화">
+                            <i class="fas fa-eraser"></i> 저장된 API 키 초기화
+                          </button>
+                        </div>
+                        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:6px">
+                          파일 예시: <code>api-key.txt</code> (내용: <code>AIza...</code> 키 문자열 1줄)
+                        </p>
+
+                        
                     </div>
                 </div>
             </section>
