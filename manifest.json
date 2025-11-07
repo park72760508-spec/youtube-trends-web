@@ -1,0 +1,20 @@
+{
+  "name": "시니어 YouTube 트렌드 분석기",
+  "short_name": "시니어트렌드",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/3b82f6/ffffff?text=%F0%9F%93%8A",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/3b82f6/ffffff?text=%F0%9F%93%8A",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
