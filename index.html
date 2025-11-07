@@ -4,39 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Content Security Policy 설정 (eval 허용) -->
+    <!-- Content Security Policy 설정 (CSP 오류 해결) -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
         script-src 'self' 'unsafe-eval' 'unsafe-inline' 
             https://cdnjs.cloudflare.com 
             https://cdn.jsdelivr.net 
-            https://www.googleapis.com;
+            https://www.googleapis.com 
+            https://youtube.googleapis.com;
         style-src 'self' 'unsafe-inline' 
             https://cdnjs.cloudflare.com 
             https://fonts.googleapis.com;
         font-src 'self' 
             https://cdnjs.cloudflare.com 
             https://fonts.gstatic.com;
-        img-src 'self' data: https:;
+        img-src 'self' data: https: blob:;
         connect-src 'self' 
             https://www.googleapis.com 
-            https://youtube.googleapis.com;
+            https://youtube.googleapis.com 
+            https://content-youtube.googleapis.com;
+        worker-src 'self' blob:;
+        child-src 'self' blob:;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
     ">
     
-    <title>🎯 시니어 YouTube 트렌드 분석기 Pro</title>
+    <title>🎯 시니어 YouTube 트렌드 분석기 Pro | CSP 해결</title>
     
     <!-- CSS 파일 -->
     <link rel="stylesheet" href="styles.css">
     
-    <!-- 외부 라이브러리 -->
     <!-- 외부 라이브러리 (CSP 호환 버전) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js" 
             integrity="sha512-7+pVVSrGGN5FzlP8SH9VXgGPwvj4+c2aqtOC4ZHWnB9RY6LGOcQbWU0X+vZM+RfL5Ay1QLWi44p9zKGhW0f8g==" 
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            crossorigin="anonymous" 
+            referrerpolicy="no-referrer">
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js" 
-            integrity="sha256-6XWDzFpz9IZ7D1CwbWQlRtRE2s5kZJRj8P8T0EopjNQ=" 
-            crossorigin="anonymous"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+            crossorigin="anonymous" 
+            referrerpolicy="no-referrer">
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+          rel="stylesheet" 
+          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" 
+          crossorigin="anonymous" 
+          referrerpolicy="no-referrer">
     
     <!-- 메타 태그 -->
     <meta name="description" content="시니어 관련 YouTube 트렌드를 분석하고 엑셀 파일로 다운로드할 수 있는 웹 애플리케이션">
