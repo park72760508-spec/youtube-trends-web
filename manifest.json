@@ -33,53 +33,53 @@
       "label": "모바일 분석 화면 - 쇼츠/롱폼 구분 분석"
     }
   ],
-  "icons": [
+"icons": [
     {
-      "src": "assets/icons/icon-72.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "72x72",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-96.png", 
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "96x96",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-128.png",
-      "sizes": "128x128", 
-      "type": "image/png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "sizes": "128x128",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-144.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "144x144",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-152.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "152x152",
-      "type": "image/png", 
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-192.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "assets/icons/icon-384.png",
-      "sizes": "384x384", 
-      "type": "image/png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "sizes": "384x384",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-512.png",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "512x512",
-      "type": "image/png", 
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
