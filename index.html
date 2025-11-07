@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎯 시니어 YouTube 트렌드 분석기 | 엑셀 다운로드</title>
+    <title>🎯 시니어 YouTube 트렌드 분석기 Pro | 막강한 검출 도구</title>
     
     <!-- CSS 파일 -->
     <link rel="stylesheet" href="styles.css">
@@ -34,14 +34,14 @@
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://your-username.github.io/senior-youtube-trends-excel/">
-    <meta property="og:title" content="시니어 YouTube 트렌드 분석기">
+    <meta property="og:title" content="시니어 YouTube 트렌드 분석기 Pro">
     <meta property="og:description" content="시니어 특화 YouTube 트렌드 분석 및 Excel 다운로드 도구">
     <meta property="og:image" content="https://via.placeholder.com/1200x630/3b82f6/ffffff?text=시니어+YouTube+트렌드+분석기">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://your-username.github.io/senior-youtube-trends-excel/">
-    <meta property="twitter:title" content="시니어 YouTube 트렌드 분석기">
+    <meta property="twitter:title" content="시니어 YouTube 트렌드 분석기 Pro">
     <meta property="twitter:description" content="시니어 특화 YouTube 트렌드 분석 및 Excel 다운로드 도구">
     <meta property="twitter:image" content="https://via.placeholder.com/1200x630/3b82f6/ffffff?text=시니어+YouTube+트렌드+분석기">
 </head>
@@ -51,9 +51,9 @@
         <div class="container">
             <h1>
                 <i class="fas fa-chart-trending-up"></i>
-                시니어 YouTube 트렌드 분석기
+                시니어 YouTube 트렌드 분석기 Pro
             </h1>
-            <p class="subtitle">시니어 관련 트렌드를 분석하고 엑셀로 내보내세요</p>
+            <p class="subtitle">🔥 최근 1주일 핫한 영상 검출 | 쇼츠/롱폼 구분 분석</p>
         </div>
     </header>
 
@@ -64,10 +64,20 @@
             <!-- 검색 및 설정 섹션 -->
             <section class="search-section">
                 <div class="search-container">
-                    <h2>🔍 트렌드 검색 설정</h2>
+                    <h2>🔍 고급 트렌드 검색 설정</h2>
                     
                     <div class="search-form">
+                        <!-- 첫 번째 행: 기본 설정 -->
                         <div class="form-row">
+                            <div class="form-group">
+                                <label for="videoFormat">📺 영상 형식</label>
+                                <select id="videoFormat" class="form-control">
+                                    <option value="all">🌟 전체 형식</option>
+                                    <option value="shorts">📱 쇼츠 (60초 이하)</option>
+                                    <option value="long">🎬 롱폼 (60초 초과)</option>
+                                </select>
+                            </div>
+                            
                             <div class="form-group">
                                 <label for="categorySelect">카테고리 선택</label>
                                 <select id="categorySelect" class="form-control">
@@ -82,53 +92,121 @@
                             </div>
                             
                             <div class="form-group">
-                                <label for="sortBy">정렬 기준</label>
+                                <label for="timeRange">📅 분석 기간</label>
+                                <select id="timeRange" class="form-control">
+                                    <option value="week" selected>🔥 최근 1주일 (핫한 영상)</option>
+                                    <option value="month">📈 최근 1개월</option>
+                                    <option value="3months">📊 최근 3개월</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- 두 번째 행: 고급 설정 -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sortBy">🎯 분석 기준</label>
                                 <select id="sortBy" class="form-control">
-                                    <option value="growth">📈 성장률 높은 순</option>
-                                    <option value="views">👀 조회수 높은 순</option>
-                                    <option value="likes">👍 좋아요 많은 순</option>
-                                    <option value="recent">🕐 최신 순</option>
+                                    <option value="viral_score" selected>🚀 바이럴 점수 (종합)</option>
+                                    <option value="growth_rate">📈 성장률 높은 순</option>
+                                    <option value="engagement_rate">💬 참여율 높은 순</option>
+                                    <option value="views_per_sub">👑 구독자 대비 조회수</option>
+                                    <option value="recent_popular">🕐 최신 인기 영상</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="minViews">🎬 최소 조회수</label>
+                                <select id="minViews" class="form-control">
+                                    <option value="0">제한 없음</option>
+                                    <option value="1000">1천 이상</option>
+                                    <option value="5000" selected>5천 이상</option>
+                                    <option value="10000">1만 이상</option>
+                                    <option value="50000">5만 이상</option>
                                 </select>
                             </div>
                             
                             <div class="form-group">
                                 <label for="videoCount">영상 개수</label>
                                 <select id="videoCount" class="form-control">
-                                    <option value="10">10개</option>
-                                    <option value="20" selected>20개</option>
-                                    <option value="50">50개</option>
+                                    <option value="20">20개</option>
+                                    <option value="50" selected>50개</option>
                                     <option value="100">100개</option>
+                                    <option value="200">200개</option>
                                 </select>
                             </div>
                         </div>
                         
+                        <!-- 세 번째 행: 검색 버튼 -->
                         <div class="search-buttons">
                             <button id="searchBtn" class="btn-primary">
-                                <i class="fas fa-search"></i>
-                                트렌드 분석하기
+                                <i class="fas fa-rocket"></i>
+                                🔥 핫한 영상 검출하기
                             </button>
                             
                             <button id="refreshBtn" class="btn-secondary">
                                 <i class="fas fa-refresh"></i>
                                 새로고침
                             </button>
+                            
+                            <button id="advancedBtn" class="btn-secondary">
+                                <i class="fas fa-cogs"></i>
+                                고급 설정
+                            </button>
                         </div>
 
-                        <!-- API 키 불러오기 (로컬 txt에서 읽어 localStorage 저장) -->
+                        <!-- API 키 불러오기 -->
                         <div class="search-buttons" style="margin-top:12px">
                           <input id="apiKeyFile" type="file" accept=".txt" style="display:none">
                           <button id="loadApiKeyBtn" class="btn-secondary" type="button" aria-label="API 키 불러오기">
-                            <i class="fas fa-key"></i> C:\\ 의 txt에서 API 키 불러오기
+                            <i class="fas fa-key"></i> YouTube API 키 불러오기
                           </button>
                           <button id="clearApiKeyBtn" class="btn-secondary" type="button" aria-label="API 키 초기화">
-                            <i class="fas fa-eraser"></i> 저장된 API 키 초기화
+                            <i class="fas fa-eraser"></i> API 키 초기화
                           </button>
                         </div>
                         <p style="text-align:center;color:#64748b;font-size:14px;margin-top:6px">
                           파일 예시: <code>api-key.txt</code> (내용: <code>AIza...</code> 키 문자열 1줄)
                         </p>
+                    </div>
+                </div>
+            </section>
 
+            <!-- 고급 설정 패널 (토글) -->
+            <section class="advanced-settings" id="advancedSettings" style="display: none;">
+                <div class="advanced-container">
+                    <h3>⚙️ 고급 검출 설정</h3>
+                    
+                    <div class="advanced-grid">
+                        <div class="form-group">
+                            <label for="channelSizeFilter">📊 채널 규모 필터</label>
+                            <select id="channelSizeFilter" class="form-control">
+                                <option value="all">전체 채널</option>
+                                <option value="micro">마이크로 (1만 미만)</option>
+                                <option value="small">소규모 (1만~10만)</option>
+                                <option value="medium">중규모 (10만~100만)</option>
+                                <option value="large">대규모 (100만 이상)</option>
+                            </select>
+                        </div>
                         
+                        <div class="form-group">
+                            <label for="viralThreshold">🚀 바이럴 임계값</label>
+                            <select id="viralThreshold" class="form-control">
+                                <option value="low">낮음 (2배 이상)</option>
+                                <option value="medium" selected>보통 (5배 이상)</option>
+                                <option value="high">높음 (10배 이상)</option>
+                                <option value="extreme">극높음 (20배 이상)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="uploadFreq">📅 업로드 빈도</label>
+                            <select id="uploadFreq" class="form-control">
+                                <option value="all">모든 채널</option>
+                                <option value="daily">매일 업로드</option>
+                                <option value="weekly">주간 업로드</option>
+                                <option value="monthly">월간 업로드</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -137,20 +215,24 @@
             <section class="download-section" id="downloadSection" style="display: none;">
                 <div class="download-container">
                     <h2>📥 데이터 다운로드</h2>
-                    <p>분석된 트렌드 데이터를 다양한 형식으로 다운로드하세요</p>
+                    <p>분석된 핫한 트렌드 데이터를 다양한 형식으로 다운로드하세요</p>
                     
                     <div class="download-stats">
                         <div class="stat-item">
                             <span class="stat-number" id="downloadVideosCount">0</span>
-                            <span class="stat-label">분석된 영상</span>
+                            <span class="stat-label">핫한 영상</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-number" id="downloadTotalViews">0</span>
                             <span class="stat-label">총 조회수</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-number" id="downloadAvgGrowth">0%</span>
-                            <span class="stat-label">평균 성장률</span>
+                            <span class="stat-number" id="downloadAvgViral">0</span>
+                            <span class="stat-label">평균 바이럴 점수</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="downloadShortsRatio">0%</span>
+                            <span class="stat-label">쇼츠 비율</span>
                         </div>
                     </div>
                     
@@ -159,7 +241,7 @@
                             <i class="fas fa-file-excel"></i>
                             <div>
                                 <span class="btn-title">Excel 다운로드</span>
-                                <span class="btn-desc">상세 데이터 포함 (.xlsx)</span>
+                                <span class="btn-desc">상세 분석 데이터 (.xlsx)</span>
                             </div>
                         </button>
                         
@@ -194,29 +276,38 @@
             <section class="dashboard" id="dashboard" style="display: none;">
                 <div class="stats-grid">
                     <div class="stat-card trend-up">
-                        <i class="fas fa-video"></i>
+                        <i class="fas fa-fire"></i>
                         <div class="stat-content">
                             <h3 id="totalVideos">0</h3>
-                            <p>분석된 영상 수</p>
-                            <span class="trend-indicator">+12%</span>
+                            <p>핫한 영상 수</p>
+                            <span class="trend-indicator">🔥</span>
                         </div>
                     </div>
                     
                     <div class="stat-card trend-up">
-                        <i class="fas fa-eye"></i>
+                        <i class="fas fa-mobile-alt"></i>
                         <div class="stat-content">
-                            <h3 id="totalViews">0</h3>
-                            <p>총 조회수</p>
-                            <span class="trend-indicator">+8%</span>
+                            <h3 id="shortsCount">0</h3>
+                            <p>쇼츠 영상</p>
+                            <span class="trend-indicator">📱</span>
                         </div>
                     </div>
                     
                     <div class="stat-card trend-up">
-                        <i class="fas fa-thumbs-up"></i>
+                        <i class="fas fa-video"></i>
                         <div class="stat-content">
-                            <h3 id="avgEngagement">0%</h3>
-                            <p>평균 참여도</p>
-                            <span class="trend-indicator">+5%</span>
+                            <h3 id="longFormCount">0</h3>
+                            <p>롱폼 영상</p>
+                            <span class="trend-indicator">🎬</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card trend-up">
+                        <i class="fas fa-rocket"></i>
+                        <div class="stat-content">
+                            <h3 id="avgViralScore">0</h3>
+                            <p>평균 바이럴 점수</p>
+                            <span class="trend-indicator">🚀</span>
                         </div>
                     </div>
                     
@@ -228,6 +319,15 @@
                             <span class="update-time">방금 전</span>
                         </div>
                     </div>
+                    
+                    <div class="stat-card trend-up">
+                        <i class="fas fa-chart-line"></i>
+                        <div class="stat-content">
+                            <h3 id="avgGrowthRate">0%</h3>
+                            <p>평균 성장률</p>
+                            <span class="trend-indicator">📈</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -235,12 +335,22 @@
             <section class="charts-section" id="chartsSection" style="display: none;">
                 <div class="chart-row">
                     <div class="chart-container">
-                        <h3>📊 카테고리별 트렌드 분포</h3>
+                        <h3>📊 쇼츠 vs 롱폼 비율</h3>
+                        <canvas id="formatChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>🚀 바이럴 점수 분포</h3>
+                        <canvas id="viralChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-container">
+                        <h3>📈 카테고리별 성장률</h3>
                         <canvas id="categoryChart"></canvas>
                     </div>
                     <div class="chart-container">
-                        <h3>📈 성장률 분석</h3>
-                        <canvas id="growthChart"></canvas>
+                        <h3>⏰ 시간대별 업로드 트렌드</h3>
+                        <canvas id="timeChart"></canvas>
                     </div>
                 </div>
             </section>
@@ -248,11 +358,16 @@
             <!-- 트렌드 영상 목록 -->
             <section class="video-results" id="videoResults" style="display: none;">
                 <div class="results-header">
-                    <h3>🔥 트렌드 분석 결과</h3>
+                    <h3>🔥 핫한 트렌드 영상 분석 결과</h3>
                     <div class="results-controls">
                         <select id="viewMode" class="form-control">
                             <option value="card">카드 보기</option>
                             <option value="table">표 보기</option>
+                        </select>
+                        <select id="filterFormat" class="form-control">
+                            <option value="all">전체</option>
+                            <option value="shorts">쇼츠만</option>
+                            <option value="long">롱폼만</option>
                         </select>
                     </div>
                 </div>
@@ -265,10 +380,16 @@
             <!-- 로딩 및 에러 상태 -->
             <div id="loadingSpinner" class="loading-container" style="display: none;">
                 <div class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <p>트렌드 데이터를 분석하고 있습니다...</p>
+                    <i class="fas fa-fire fa-spin"></i>
+                    <p>🔥 핫한 트렌드 데이터를 분석하고 있습니다...</p>
                     <div class="loading-progress">
                         <div class="progress-bar"></div>
+                    </div>
+                    <div class="loading-steps">
+                        <div class="step active" id="step1">📊 데이터 수집 중...</div>
+                        <div class="step" id="step2">🚀 바이럴 점수 계산 중...</div>
+                        <div class="step" id="step3">📱 쇼츠/롱폼 분류 중...</div>
+                        <div class="step" id="step4">✨ 결과 정리 중...</div>
                     </div>
                 </div>
             </div>
@@ -292,31 +413,95 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-info">
-                    <h4>시니어 YouTube 트렌드 분석기</h4>
-                    <p>시니어를 위한 맞춤형 콘텐츠 트렌드 분석 도구</p>
+                    <h4>시니어 YouTube 트렌드 분석기 Pro</h4>
+                    <p>시니어를 위한 최강의 핫한 영상 검출 도구</p>
                 </div>
                 <div class="footer-features">
-                    <h5>주요 기능</h5>
+                    <h5>Pro 기능</h5>
                     <ul>
-                        <li>📊 실시간 트렌드 분석</li>
-                        <li>📥 Excel/CSV/JSON 다운로드</li>
-                        <li>📈 데이터 시각화</li>
-                        <li>🎯 시니어 특화 필터링</li>
+                        <li>🔥 실시간 핫한 영상 검출</li>
+                        <li>📱 쇼츠/롱폼 구분 분석</li>
+                        <li>🚀 바이럴 점수 계산</li>
+                        <li>📈 성장률 예측 분석</li>
+                        <li>📊 고급 데이터 시각화</li>
                     </ul>
                 </div>
                 <div class="footer-contact">
                     <h5>문의 및 지원</h5>
-                    <p>GitHub: <a href="https://github.com/your-username/senior-youtube-trends" target="_blank">프로젝트 페이지</a></p>
+                    <p>GitHub: <a href="https://github.com/your-username/senior-youtube-trends-pro" target="_blank">프로젝트 페이지</a></p>
                     <p>Email: support@example.com</p>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2025 시니어 YouTube 트렌드 분석기. 시니어를 위한 디지털 혁신.</p>
+                <p>&copy; 2025 시니어 YouTube 트렌드 분석기 Pro. 막강한 검출 도구로 유튜브 성공하세요!</p>
             </div>
         </div>
     </footer>
 
     <!-- JavaScript 파일 -->
-    <script src="script.js"></script>
+    <script src="script_improved.js"></script>
+
+    <style>
+    /* 고급 설정 패널 스타일 */
+    .advanced-settings {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+        border: 2px dashed #cbd5e0;
+    }
+    
+    .advanced-container h3 {
+        color: #2d3748;
+        margin-bottom: 20px;
+        font-weight: 600;
+    }
+    
+    .advanced-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+    
+    /* 로딩 스텝 스타일 */
+    .loading-steps {
+        margin-top: 20px;
+        text-align: left;
+    }
+    
+    .loading-steps .step {
+        padding: 8px 16px;
+        margin: 4px 0;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.1);
+        color: #64748b;
+        transition: all 0.3s ease;
+    }
+    
+    .loading-steps .step.active {
+        background: #3b82f6;
+        color: white;
+        transform: translateX(4px);
+    }
+    
+    /* 통계 카드 개선 */
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    
+    /* 차트 섹션 개선 */
+    .chart-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    
+    @media (max-width: 768px) {
+        .chart-row {
+            grid-template-columns: 1fr;
+        }
+    }
+    </style>
 </body>
 </html>
