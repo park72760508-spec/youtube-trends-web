@@ -2,7 +2,7 @@
   "name": "시니어 YouTube 트렌드 분석기 Pro - 막강한 핫한 영상 검출 도구",
   "short_name": "시니어트렌드Pro",
   "description": "🔥 최근 1주일간 가장 핫한 영상을 검출하는 막강한 도구. 쇼츠/롱폼 구분, 바이럴 점수 계산, 고급 분석 기능 제공",
-  "start_url": "./index_improved.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -17,22 +17,7 @@
     "analytics",
     "social"
   ],
-  "screenshots": [
-    {
-      "src": "assets/screenshots/desktop-main.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "platform": "wide",
-      "label": "메인 대시보드 - 바이럴 점수 기반 핫한 영상 검출"
-    },
-    {
-      "src": "assets/screenshots/mobile-analysis.png", 
-      "sizes": "390x844",
-      "type": "image/png",
-      "platform": "narrow",
-      "label": "모바일 분석 화면 - 쇼츠/롱폼 구분 분석"
-    }
-  ],
+"screenshots": [],
 "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
