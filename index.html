@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 시니어 YouTube 트렌드 분석기 | 엑셀 다운로드</title>
+    
+    <!-- CSS 파일 -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- 외부 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 메타 태그 -->
+    <meta name="description" content="시니어 관련 YouTube 트렌드를 분석하고 엑셀 파일로 다운로드할 수 있는 웹 애플리케이션">
+    <meta name="keywords" content="시니어, YouTube, 트렌드, 엑셀, 다운로드, 분석, 노인, 실버">
+    
+    <!-- PWA 지원 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="시니어트렌드">
+    
+    <!-- 파비콘 및 아이콘 -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+    <link rel="apple-touch-icon" sizes="180x180" href="https://via.placeholder.com/180x180/3b82f6/ffffff?text=📊">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://via.placeholder.com/32x32/3b82f6/ffffff?text=📊">
+    <link rel="icon" type="image/png" sizes="16x16" href="https://via.placeholder.com/16x16/3b82f6/ffffff?text=📊">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-username.github.io/senior-youtube-trends-excel/">
+    <meta property="og:title" content="시니어 YouTube 트렌드 분석기">
+    <meta property="og:description" content="시니어 특화 YouTube 트렌드 분석 및 Excel 다운로드 도구">
+    <meta property="og:image" content="https://via.placeholder.com/1200x630/3b82f6/ffffff?text=시니어+YouTube+트렌드+분석기">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://your-username.github.io/senior-youtube-trends-excel/">
+    <meta property="twitter:title" content="시니어 YouTube 트렌드 분석기">
+    <meta property="twitter:description" content="시니어 특화 YouTube 트렌드 분석 및 Excel 다운로드 도구">
+    <meta property="twitter:image" content="https://via.placeholder.com/1200x630/3b82f6/ffffff?text=시니어+YouTube+트렌드+분석기">
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <div class="container">
+            <h1>
+                <i class="fas fa-chart-trending-up"></i>
+                시니어 YouTube 트렌드 분석기
+            </h1>
+            <p class="subtitle">시니어 관련 트렌드를 분석하고 엑셀로 내보내세요</p>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- 검색 및 설정 섹션 -->
+            <section class="search-section">
+                <div class="search-container">
+                    <h2>🔍 트렌드 검색 설정</h2>
+                    
+                    <div class="search-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="categorySelect">카테고리 선택</label>
+                                <select id="categorySelect" class="form-control">
+                                    <option value="all">🌟 전체 카테고리</option>
+                                    <option value="health">🏥 건강 & 운동</option>
+                                    <option value="hobby">🎨 취미 & 여가</option>
+                                    <option value="cooking">🍳 요리 & 레시피</option>
+                                    <option value="life">🏠 생활 정보</option>
+                                    <option value="travel">✈️ 여행</option>
+                                    <option value="tech">📱 시니어 테크</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sortBy">정렬 기준</label>
+                                <select id="sortBy" class="form-control">
+                                    <option value="growth">📈 성장률 높은 순</option>
+                                    <option value="views">👀 조회수 높은 순</option>
+                                    <option value="likes">👍 좋아요 많은 순</option>
+                                    <option value="recent">🕐 최신 순</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="videoCount">영상 개수</label>
+                                <select id="videoCount" class="form-control">
+                                    <option value="10">10개</option>
+                                    <option value="20" selected>20개</option>
+                                    <option value="50">50개</option>
+                                    <option value="100">100개</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="search-buttons">
+                            <button id="searchBtn" class="btn-primary">
+                                <i class="fas fa-search"></i>
+                                트렌드 분석하기
+                            </button>
+                            
+                            <button id="refreshBtn" class="btn-secondary">
+                                <i class="fas fa-refresh"></i>
+                                새로고침
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 다운로드 섹션 -->
+            <section class="download-section" id="downloadSection" style="display: none;">
+                <div class="download-container">
+                    <h2>📥 데이터 다운로드</h2>
+                    <p>분석된 트렌드 데이터를 다양한 형식으로 다운로드하세요</p>
+                    
+                    <div class="download-stats">
+                        <div class="stat-item">
+                            <span class="stat-number" id="downloadVideosCount">0</span>
+                            <span class="stat-label">분석된 영상</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="downloadTotalViews">0</span>
+                            <span class="stat-label">총 조회수</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="downloadAvgGrowth">0%</span>
+                            <span class="stat-label">평균 성장률</span>
+                        </div>
+                    </div>
+                    
+                    <div class="download-buttons">
+                        <button id="downloadExcel" class="btn-download excel">
+                            <i class="fas fa-file-excel"></i>
+                            <div>
+                                <span class="btn-title">Excel 다운로드</span>
+                                <span class="btn-desc">상세 데이터 포함 (.xlsx)</span>
+                            </div>
+                        </button>
+                        
+                        <button id="downloadCSV" class="btn-download csv">
+                            <i class="fas fa-file-csv"></i>
+                            <div>
+                                <span class="btn-title">CSV 다운로드</span>
+                                <span class="btn-desc">간편 데이터 (.csv)</span>
+                            </div>
+                        </button>
+                        
+                        <button id="downloadJSON" class="btn-download json">
+                            <i class="fas fa-file-code"></i>
+                            <div>
+                                <span class="btn-title">JSON 다운로드</span>
+                                <span class="btn-desc">개발자용 데이터 (.json)</span>
+                            </div>
+                        </button>
+                        
+                        <button id="downloadPDF" class="btn-download pdf">
+                            <i class="fas fa-file-pdf"></i>
+                            <div>
+                                <span class="btn-title">PDF 리포트</span>
+                                <span class="btn-desc">분석 보고서 (.pdf)</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 통계 대시보드 -->
+            <section class="dashboard" id="dashboard" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card trend-up">
+                        <i class="fas fa-video"></i>
+                        <div class="stat-content">
+                            <h3 id="totalVideos">0</h3>
+                            <p>분석된 영상 수</p>
+                            <span class="trend-indicator">+12%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card trend-up">
+                        <i class="fas fa-eye"></i>
+                        <div class="stat-content">
+                            <h3 id="totalViews">0</h3>
+                            <p>총 조회수</p>
+                            <span class="trend-indicator">+8%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card trend-up">
+                        <i class="fas fa-thumbs-up"></i>
+                        <div class="stat-content">
+                            <h3 id="avgEngagement">0%</h3>
+                            <p>평균 참여도</p>
+                            <span class="trend-indicator">+5%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <i class="fas fa-clock"></i>
+                        <div class="stat-content">
+                            <h3 id="lastUpdate">-</h3>
+                            <p>마지막 분석</p>
+                            <span class="update-time">방금 전</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 차트 섹션 -->
+            <section class="charts-section" id="chartsSection" style="display: none;">
+                <div class="chart-row">
+                    <div class="chart-container">
+                        <h3>📊 카테고리별 트렌드 분포</h3>
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>📈 성장률 분석</h3>
+                        <canvas id="growthChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 트렌드 영상 목록 -->
+            <section class="video-results" id="videoResults" style="display: none;">
+                <div class="results-header">
+                    <h3>🔥 트렌드 분석 결과</h3>
+                    <div class="results-controls">
+                        <select id="viewMode" class="form-control">
+                            <option value="card">카드 보기</option>
+                            <option value="table">표 보기</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="videosList" class="videos-container">
+                    <!-- 동적으로 생성될 영상 목록 -->
+                </div>
+            </section>
+
+            <!-- 로딩 및 에러 상태 -->
+            <div id="loadingSpinner" class="loading-container" style="display: none;">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>트렌드 데이터를 분석하고 있습니다...</p>
+                    <div class="loading-progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-container" style="display: none;">
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>분석 중 오류가 발생했습니다</h3>
+                    <p>잠시 후 다시 시도해주세요.</p>
+                    <button class="btn-secondary" onclick="location.reload()">
+                        <i class="fas fa-refresh"></i>
+                        페이지 새로고침
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <h4>시니어 YouTube 트렌드 분석기</h4>
+                    <p>시니어를 위한 맞춤형 콘텐츠 트렌드 분석 도구</p>
+                </div>
+                <div class="footer-features">
+                    <h5>주요 기능</h5>
+                    <ul>
+                        <li>📊 실시간 트렌드 분석</li>
+                        <li>📥 Excel/CSV/JSON 다운로드</li>
+                        <li>📈 데이터 시각화</li>
+                        <li>🎯 시니어 특화 필터링</li>
+                    </ul>
+                </div>
+                <div class="footer-contact">
+                    <h5>문의 및 지원</h5>
+                    <p>GitHub: <a href="https://github.com/your-username/senior-youtube-trends" target="_blank">프로젝트 페이지</a></p>
+                    <p>Email: support@example.com</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 시니어 YouTube 트렌드 분석기. 시니어를 위한 디지털 혁신.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript 파일 -->
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+{
+  "name": "senior-youtube-trends-excel",
+  "version": "1.0.0",
+  "description": "시니어 관련 YouTube 트렌드를 분석하고 Excel, CSV, JSON, PDF 형태로 다운로드할 수 있는 웹 애플리케이션",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "npx http-server . -p 8000 -o",
+    "dev": "npx http-server . -p 8080 -c-1",
+    "build": "echo \"이 프로젝트는 빌드가 필요하지 않습니다 (정적 웹앱)\" && exit 0",
+    "test": "echo \"테스트는 브라우저에서 수동으로 진행하세요\" && exit 0",
+    "lint": "echo \"Linting is handled by browsers and code editors\" && exit 0",
+    "deploy": "echo \"GitHub Pages를 통해 자동 배포됩니다\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/senior-youtube-trends-excel.git"
+  },
+  "keywords": [
+    "시니어",
+    "senior",
+    "유튜브",
+    "youtube",
+    "트렌드",
+    "trends",
+    "엑셀",
+    "excel",
+    "다운로드",
+    "download",
+    "분석",
+    "analytics",
+    "노인",
+    "elderly",
+    "실버",
+    "silver",
+    "웹앱",
+    "webapp",
+    "데이터시각화",
+    "data-visualization",
+    "접근성",
+    "accessibility",
+    "반응형",
+    "responsive",
+    "csv",
+    "json",
+    "pdf",
+    "report",
+    "dashboard",
+    "chart",
+    "statistics"
+  ],
+  "author": {
+    "name": "Your Name",
+    "email": "your-email@example.com",
+    "url": "https://github.com/your-username"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/your-username/senior-youtube-trends-excel/issues"
+  },
+  "homepage": "https://your-username.github.io/senior-youtube-trends-excel/",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie <= 11"
+  ],
+  "config": {
+    "port": 8000,
+    "host": "localhost"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/your-username"
+  },
+  "contributors": [
+    {
+      "name": "Your Name",
+      "email": "your-email@example.com",
+      "role": "Developer & Maintainer"
+    }
+  ],
+  "directories": {
+    "doc": "./docs",
+    "example": "./examples"
+  },
+  "files": [
+    "index.html",
+    "styles.css",
+    "script.js",
+    "README.md",
+    "deployment-guide.md",
+    "LICENSE"
+  ],
+  "private": false,
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {},
+  "peerDependencies": {},
+  "optionalDependencies": {},
+  "overrides": {},
+  "packageManager": "npm@10.0.0",
+  "workspaces": [],
+  "type": "module",
+  "exports": {
+    ".": "./index.html"
+  },
+  "imports": {},
+  "sideEffects": false,
+  "preferGlobal": false,
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "man": [],
+  "bin": {},
+  "standard": {
+    "env": [
+      "browser"
+    ]
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "es2021": true
+    },
+    "extends": [
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 12,
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-unused-vars": "warn",
+      "no-console": "off"
+    }
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 100,
+    "tabWidth": 2
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ],
+    "*.css": [
+      "prettier --write",
+      "git add"
+    ],
+    "*.html": [
+      "prettier --write",
+      "git add"
+    ],
+    "*.md": [
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "release": {
+    "branches": [
+      "main"
+    ],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/github"
+    ]
+  },
+  "semantic-release": {
+    "branches": [
+      "main"
+    ]
+  },
+  "renovate": {
+    "extends": [
+      "config:base"
+    ]
+  },
+  "volta": {
+    "node": "18.17.0",
+    "npm": "9.6.7"
+  },
+  "custom": {
+    "features": {
+      "excel_download": true,
+      "csv_download": true,
+      "json_download": true,
+      "pdf_download": true,
+      "real_time_charts": true,
+      "responsive_design": true,
+      "accessibility_optimized": true,
+      "senior_friendly_ui": true,
+      "github_pages_ready": true,
+      "youtube_api_integration": true
+    },
+    "categories": [
+      "건강 & 운동",
+      "시니어 테크",
+      "요리 & 레시피",
+      "여행",
+      "취미 & 여가",
+      "생활 정보"
+    ],
+    "supported_formats": [
+      "Excel (.xlsx)",
+      "CSV (.csv)",
+      "JSON (.json)",
+      "PDF Report (.pdf)"
+    ],
+    "browser_support": {
+      "chrome": ">=90",
+      "firefox": ">=88",
+      "safari": ">=14",
+      "edge": ">=90"
+    },
+    "accessibility": {
+      "wcag_level": "AA",
+      "font_size": "18px (시니어 친화적)",
+      "color_contrast": "4.5:1 이상",
+      "keyboard_navigation": true,
+      "screen_reader_support": true
+    },
+    "performance": {
+      "lighthouse_target": ">= 90",
+      "first_contentful_paint": "< 2s",
+      "largest_contentful_paint": "< 4s",
+      "cumulative_layout_shift": "< 0.1"
+    },
+    "seo": {
+      "meta_tags": true,
+      "open_graph": true,
+      "structured_data": false,
+      "sitemap": false
+    }
+  }
+}

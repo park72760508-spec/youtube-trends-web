@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 park72760508-spec
+Copyright (c) 2025 Senior YouTube Trends Excel Analyzer
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,48 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+📊 시니어 YouTube 트렌드 분석기 (엑셀 다운로드)
+
+본 소프트웨어는 시니어(50세 이상)를 대상으로 한 YouTube 콘텐츠 트렌드를 
+분석하고 Excel, CSV, JSON, PDF 형태로 데이터를 다운로드할 수 있는 
+웹 애플리케이션입니다.
+
+주요 특징:
+✨ 시니어 특화 콘텐츠 키워드 분석
+📊 Excel 다중 시트 구조로 상세 데이터 제공
+📈 실시간 차트 및 시각화
+♿ 접근성 최적화 (WCAG 2.1 AA 준수)
+📱 완전 반응형 디자인
+🔒 개인정보 보호 (로컬 처리)
+
+라이선스 조건:
+- 상업적 및 비상업적 목적으로 자유롭게 사용 가능
+- 수정 및 재배포 가능
+- 라이선스 및 저작권 표기 필수
+- 소프트웨어 제공자는 어떠한 보증도 하지 않음
+
+기여 방법:
+1. GitHub 저장소 Fork
+2. 기능 브랜치 생성
+3. 변경사항 커밋
+4. Pull Request 제출
+
+문의 사항:
+GitHub Issues: https://github.com/your-username/senior-youtube-trends-excel/issues
+이메일: your-email@example.com
+
+감사의 글:
+- YouTube Data API (Google)
+- SheetJS (Excel 파일 처리)
+- Chart.js (데이터 시각화)
+- Font Awesome (아이콘)
+- 시니어 사용자 피드백 제공자들
+
+---
+
+이 프로젝트는 디지털 격차 해소와 시니어의 디지털 접근성 향상을 목표로 
+제작되었습니다. 모든 연령대가 기술의 혜택을 누릴 수 있는 
+포용적 디지털 환경 구축에 기여하고자 합니다.
