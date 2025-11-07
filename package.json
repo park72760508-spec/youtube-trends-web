@@ -1,8 +1,8 @@
 {
-  "name": "senior-youtube-trends-excel",
-  "version": "1.0.0",
-  "description": "시니어 관련 YouTube 트렌드를 분석하고 Excel, CSV, JSON, PDF 형태로 다운로드할 수 있는 웹 애플리케이션",
-  "main": "index.html",
+  "name": "senior-youtube-trends-pro",
+  "version": "2.0.0",
+  "description": "🔥 시니어 관련 YouTube 트렌드를 분석하고 최근 1주일간 가장 핫한 영상을 검출하는 막강한 도구. 쇼츠/롱폼 구분 분석, 바이럴 점수 계산, Excel/CSV/JSON/PDF 다운로드 지원",
+  "main": "index_improved.html",
   "scripts": {
     "start": "python -m http.server 8000",
     "serve": "npx http-server . -p 8000 -o",
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/senior-youtube-trends-excel.git"
+    "url": "git+https://github.com/your-username/senior-youtube-trends-pro.git"
   },
   "keywords": [
     "시니어",
@@ -23,6 +23,13 @@
     "youtube",
     "트렌드",
     "trends",
+    "핫한영상",
+    "viral",
+    "바이럴",
+    "쇼츠",
+    "shorts",
+    "롱폼",
+    "longform",
     "엑셀",
     "excel",
     "다운로드",
@@ -47,23 +54,36 @@
     "report",
     "dashboard",
     "chart",
-    "statistics"
+    "statistics",
+    "pro",
+    "advanced",
+    "검출도구",
+    "detection",
+    "알고리즘",
+    "algorithm",
+    "성장률",
+    "growth-rate",
+    "참여율",
+    "engagement",
+    "막강한",
+    "powerful"
   ],
   "author": {
-    "name": "Your Name",
-    "email": "your-email@example.com",
+    "name": "YouTube Trends Pro Team",
+    "email": "support@youtube-trends-pro.com",
     "url": "https://github.com/your-username"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/your-username/senior-youtube-trends-excel/issues"
+    "url": "https://github.com/your-username/senior-youtube-trends-pro/issues"
   },
-  "homepage": "https://your-username.github.io/senior-youtube-trends-excel/",
+  "homepage": "https://your-username.github.io/senior-youtube-trends-pro/",
   "devDependencies": {
     "http-server": "^14.1.1"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   },
   "browserslist": [
     "> 1%",
@@ -81,22 +101,29 @@
   },
   "contributors": [
     {
-      "name": "Your Name",
-      "email": "your-email@example.com",
-      "role": "Developer & Maintainer"
+      "name": "YouTube Trends Pro Team",
+      "email": "team@youtube-trends-pro.com",
+      "role": "Lead Developer & Algorithm Designer"
+    },
+    {
+      "name": "Senior UX Specialist",
+      "email": "ux@youtube-trends-pro.com", 
+      "role": "시니어 친화적 UI/UX 디자이너"
     }
   ],
   "directories": {
     "doc": "./docs",
-    "example": "./examples"
+    "example": "./examples",
+    "assets": "./assets"
   },
   "files": [
-    "index.html",
-    "styles.css",
-    "script.js",
+    "index_improved.html",
+    "styles_improved.css",
+    "script_improved.js",
     "README.md",
     "deployment-guide.md",
-    "LICENSE"
+    "LICENSE",
+    "manifest.json"
   ],
   "private": false,
   "publishConfig": {
@@ -110,7 +137,7 @@
   "workspaces": [],
   "type": "module",
   "exports": {
-    ".": "./index.html"
+    ".": "./index_improved.html"
   },
   "imports": {},
   "sideEffects": false,
@@ -145,7 +172,9 @@
     },
     "rules": {
       "no-unused-vars": "warn",
-      "no-console": "off"
+      "no-console": "off",
+      "prefer-const": "error",
+      "no-var": "error"
     }
   },
   "prettier": {
@@ -153,7 +182,8 @@
     "trailingComma": "es5",
     "singleQuote": true,
     "printWidth": 100,
-    "tabWidth": 2
+    "tabWidth": 2,
+    "useTabs": false
   },
   "commitlint": {
     "extends": [
@@ -210,7 +240,13 @@
     "npm": "9.6.7"
   },
   "custom": {
+    "version": "2.0.0 Pro",
     "features": {
+      "hot_video_detection": true,
+      "viral_score_calculation": true,
+      "shorts_longform_classification": true,
+      "advanced_sorting_algorithms": true,
+      "weekly_growth_analysis": true,
       "excel_download": true,
       "csv_download": true,
       "json_download": true,
@@ -220,25 +256,47 @@
       "accessibility_optimized": true,
       "senior_friendly_ui": true,
       "github_pages_ready": true,
-      "youtube_api_integration": true
+      "youtube_api_integration": true,
+      "advanced_settings_panel": true,
+      "multi_keyword_search": true,
+      "engagement_rate_calculation": true,
+      "channel_size_filtering": true,
+      "time_range_analysis": true
+    },
+    "algorithms": {
+      "viral_score": "다중 지표 기반 바이럴 점수 계산",
+      "growth_rate": "구독자 대비 조회수 성장률 분석",
+      "engagement_analysis": "좋아요, 댓글, 조회수 기반 참여율",
+      "format_detection": "영상 길이 기반 쇼츠/롱폼 자동 분류",
+      "trend_prediction": "최근성, 성장률, 참여율 종합 분석"
     },
     "categories": [
       "건강 & 운동",
-      "시니어 테크",
+      "시니어 테크", 
       "요리 & 레시피",
       "여행",
       "취미 & 여가",
       "생활 정보"
     ],
     "supported_formats": [
-      "Excel (.xlsx)",
-      "CSV (.csv)",
-      "JSON (.json)",
-      "PDF Report (.pdf)"
+      "Excel (.xlsx) - 상세 분석 데이터",
+      "CSV (.csv) - 간편 데이터",
+      "JSON (.json) - 개발자용 데이터",
+      "PDF Report (.pdf) - 분석 보고서"
+    ],
+    "detection_features": [
+      "🔥 최근 1주일간 핫한 영상 검출",
+      "📱 쇼츠/롱폼 구분 분석",
+      "🚀 바이럴 점수 계산 (최대 1000점)",
+      "📈 구독자 대비 조회수 성장률",
+      "💬 참여율 (좋아요+댓글/조회수)",
+      "⏰ 최신성 보너스 점수",
+      "🎯 채널 규모별 필터링",
+      "📊 카테고리별 트렌드 분석"
     ],
     "browser_support": {
       "chrome": ">=90",
-      "firefox": ">=88",
+      "firefox": ">=88", 
       "safari": ">=14",
       "edge": ">=90"
     },
@@ -247,19 +305,39 @@
       "font_size": "18px (시니어 친화적)",
       "color_contrast": "4.5:1 이상",
       "keyboard_navigation": true,
-      "screen_reader_support": true
+      "screen_reader_support": true,
+      "focus_indicators": true
     },
     "performance": {
-      "lighthouse_target": ">= 90",
-      "first_contentful_paint": "< 2s",
-      "largest_contentful_paint": "< 4s",
-      "cumulative_layout_shift": "< 0.1"
+      "lighthouse_target": ">= 95",
+      "first_contentful_paint": "< 1.5s",
+      "largest_contentful_paint": "< 3s", 
+      "cumulative_layout_shift": "< 0.1",
+      "time_to_interactive": "< 3.5s"
     },
     "seo": {
       "meta_tags": true,
       "open_graph": true,
-      "structured_data": false,
-      "sitemap": false
+      "structured_data": true,
+      "sitemap": true,
+      "robots_txt": true
+    },
+    "advanced_features": {
+      "multi_keyword_parallel_search": "여러 키워드 동시 검색",
+      "channel_statistics_analysis": "채널별 세부 통계",
+      "viral_threshold_customization": "바이럴 임계값 설정",
+      "time_range_flexibility": "1주일/1개월/3개월 분석",
+      "format_specific_filtering": "쇼츠/롱폼 개별 분석",
+      "engagement_deep_dive": "참여율 심화 분석",
+      "growth_prediction": "성장률 예측 모델",
+      "competitor_analysis": "경쟁 채널 분석"
+    },
+    "data_sources": {
+      "youtube_data_api_v3": "실시간 YouTube 데이터",
+      "video_statistics": "조회수, 좋아요, 댓글수",
+      "channel_statistics": "구독자수, 동영상수",
+      "video_details": "영상 길이, 업로드 시간",
+      "search_results": "키워드별 검색 결과"
     }
   }
 }
