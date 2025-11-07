@@ -84,7 +84,7 @@ class SeniorYoutubeTrendsExcel {
         }
       });
     
-      // ★ API 키 불러오기/초기화 버튼
+      // API 키 불러오기/초기화 버튼 연결
       const loadBtn = document.getElementById('loadApiKeyBtn');
       const clearBtn = document.getElementById('clearApiKeyBtn');
       const fileInput = document.getElementById('apiKeyFile');
@@ -95,7 +95,48 @@ class SeniorYoutubeTrendsExcel {
       if (clearBtn) {
         clearBtn.addEventListener('click', () => this.clearSavedApiKey());
       }
+
+        // 파일에서 API 키 읽어 localStorage 저장
+        async handleApiKeyFile(event) {
+          try {
+            const file = event.target.files?.[0];
+            if (!file) return;
+        
+            const text = await file.text();
+            const key = (text || '').trim();
+        
+            if (!this.isValidYouTubeApiKey(key)) {
+              alert('유효한 YouTube API 키 형식이 아닙니다. 파일 내용을 확인하세요.');
+              return;
+            }
+        
+            localStorage.setItem('youtube_api_key', key);
+            this.apiKey = key;
+            alert('✅ API 키가 저장되었습니다. 이제 실제 데이터로 검색할 수 있어요.');
+          } catch (err) {
+            console.error('API 키 파일 처리 오류:', err);
+            alert('API 키 파일을 읽는 중 오류가 발생했습니다.');
+          } finally {
+            const fileInput = document.getElementById('apiKeyFile');
+            if (fileInput) fileInput.value = '';
+          }
+        }
+        
+        // API 키 초기화
+        clearSavedApiKey() {
+          localStorage.removeItem('youtube_api_key');
+          this.apiKey = 'DEMO_MODE';
+          alert('🧹 저장된 API 키를 초기화했습니다. (현재는 데모 모드)');
+        }
+        
+        // 간단한 유효성 검사
+        isValidYouTubeApiKey(key) {
+          return /^AIza[0-9A-Za-z_\-]{10,}$/.test(key);
+        }
+
+        
     }
+
 
     
     // 초기 메시지 표시
@@ -1339,3 +1380,75 @@ isValidYouTubeApiKey(key) {
   // 공개 v3 키는 대체로 "AIza"로 시작, 35~45자 정도 (정확히 고정은 아님)
   return /^AIza[0-9A-Za-z_\-]{10,}$/.test(key);
 }
+
+
+// ======================
+// 전역 유틸 함수 (클래스 밖)
+// ======================
+
+// 파일에서 API 키 읽어 localStorage 저장
+async function handleApiKeyFile(event) {
+  try {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const key = (text || "").trim();
+
+    if (!isValidYouTubeApiKey(key)) {
+      alert("유효한 YouTube API 키 형식이 아닙니다. 파일 내용을 확인하세요.");
+      return;
+    }
+
+    localStorage.setItem("youtube_api_key", key);
+
+    // 클래스 인스턴스를 전역에서 쓰는 경우 갱신 (존재할 때만)
+    if (window.seniorTrendsExcel && typeof window.seniorTrendsExcel === "object") {
+      window.seniorTrendsExcel.apiKey = key;
+    }
+
+    alert("✅ API 키가 저장되었습니다. 이제 실제 데이터로 검색할 수 있어요.");
+  } catch (err) {
+    console.error("API 키 파일 처리 오류:", err);
+    alert("API 키 파일을 읽는 중 오류가 발생했습니다.");
+  } finally {
+    const fileInput = document.getElementById("apiKeyFile");
+    if (fileInput) fileInput.value = "";
+  }
+}
+
+// API 키 초기화
+function clearSavedApiKey() {
+  localStorage.removeItem("youtube_api_key");
+  if (window.seniorTrendsExcel && typeof window.seniorTrendsExcel === "object") {
+    window.seniorTrendsExcel.apiKey = "DEMO_MODE";
+  }
+  alert("🧹 저장된 API 키를 초기화했습니다. (현재는 데모 모드)");
+}
+
+// 간단한 유효성 검사
+function isValidYouTubeApiKey(key) {
+  // 공개 키는 보통 "AIza"로 시작. 길이는 고정 아님이라 대략 체크
+  return /^AIza[0-9A-Za-z_\-]{10,}$/.test(key);
+}
+
+// ======================
+// 전역 이벤트 연결
+// ======================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const loadBtn = document.getElementById("loadApiKeyBtn");
+  const clearBtn = document.getElementById("clearApiKeyBtn");
+  const fileInput = document.getElementById("apiKeyFile");
+
+  if (loadBtn && fileInput) {
+    loadBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", handleApiKeyFile);
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearSavedApiKey);
+  }
+
+  // 참고: 클래스 인스턴스를 전역에 노출해 두면(예: window.seniorTrendsExcel)
+  // 위 전역 함수들이 인스턴스 상태(apiKey)를 갱신할 수 있습니다.
+});
