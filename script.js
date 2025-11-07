@@ -1307,47 +1307,6 @@ window.copyToClipboard = function(text) {
 };
 
 
-// 파일에서 API 키 읽어 localStorage 저장
-async handleApiKeyFile(event) {
-  try {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const text = await file.text();
-    const key = (text || '').trim();
-
-    if (!this.isValidYouTubeApiKey(key)) {
-      alert('유효한 YouTube API 키 형식이 아닙니다. 파일 내용을 확인하세요.');
-      return;
-    }
-
-    localStorage.setItem('youtube_api_key', key);
-    this.apiKey = key;
-    alert('✅ API 키가 저장되었습니다. 이제 실제 데이터로 검색할 수 있어요.');
-  } catch (err) {
-    console.error('API 키 파일 처리 오류:', err);
-    alert('API 키 파일을 읽는 중 오류가 발생했습니다.');
-  } finally {
-    // 같은 파일을 다시 선택해도 change 이벤트가 뜨도록 초기화
-    const fileInput = document.getElementById('apiKeyFile');
-    if (fileInput) fileInput.value = '';
-  }
-}
-
-// API 키 초기화
-clearSavedApiKey() {
-  localStorage.removeItem('youtube_api_key');
-  this.apiKey = 'DEMO_MODE';
-  alert('🧹 저장된 API 키를 초기화했습니다. (현재는 데모 모드)');
-}
-
-// 간단한 유효성 검사 (키 접두/길이 체크)
-isValidYouTubeApiKey(key) {
-  // 공개 v3 키는 대체로 "AIza"로 시작, 35~45자 정도 (정확히 고정은 아님)
-  return /^AIza[0-9A-Za-z_\-]{10,}$/.test(key);
-}
-
-
 // ======================
 // 전역 유틸 함수 (클래스 밖)
 // ======================
