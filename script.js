@@ -1192,19 +1192,8 @@ async fetchRealYoutubeData(category, count) {
         const shortsRatio = this.currentData.length > 0 ? 
             Math.round((shortsCount / this.currentData.length) * 100) : 0;
         
-        // DOM 요소 안전하게 업데이트
-        // DOM 요소 안전하게 업데이트
-        // Pro 버전 HTML과 일치하는 요소들만 업데이트
-        this.safeUpdateElement('totalVideos', totalVideos);                         // ✅
-        this.safeUpdateElement('shortsCount', shortsCount);                         // ✅
-        this.safeUpdateElement('longFormCount', longFormCount);                     // ✅
-        this.safeUpdateElement('avgViralScore', avgViralScore);                     // ✅
-        this.safeUpdateElement('avgGrowthRate', avgGrowthRate + '%');              // ✅
-        this.safeUpdateElement('downloadShortsRatio', shortsRatio + '%');          // ✅
-        
-        // Pro 버전 전용 요소들 업데이트
-        this.safeUpdateElement('downloadAvgViral', avgViralScore);
-        //this.safeUpdateElement('downloadShortsRatio', `${shortsRatio}%`);
+
+
         
         console.log(`✅ 다운로드 섹션 업데이트 완료: ${this.currentData.length}개 영상, 총 조회수 ${totalViews.toLocaleString()}`);
     }
@@ -1793,28 +1782,7 @@ async fetchRealYoutubeData(category, count) {
         return n.toLocaleString();
     }
 
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 
-    generateFilename(prefix, extension) {
-        const now = new Date();
-        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-        const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
-        return `${prefix}_${dateStr}_${timeStr}.${extension}`;
-    }
-
-    downloadBlob(blob, filename) {
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }
 }
 
 // 앱 초기화
@@ -1823,12 +1791,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.seniorTrendsExcel = new SeniorYoutubeTrendsExcel();
 });
 
-// 글로벌 유틸리티 함수
-window.formatNumber = function(num) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
-};
+
 
 window.copyToClipboard = function(text) {
     navigator.clipboard.writeText(text).then(() => {
