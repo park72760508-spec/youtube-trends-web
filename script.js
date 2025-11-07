@@ -298,8 +298,7 @@ class SeniorYoutubeTrendsExcel {
             
               return mapped;
             }
-        }
-    }
+
     
     // 향상된 모의 데이터 생성
     async generateEnhancedMockData(category, count) {
