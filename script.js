@@ -1028,7 +1028,8 @@ async fetchRealYoutubeData(category, count) {
         }
 
 
-     * 결과 테이블이 없으면 자동으로 생성해 반환합니다.
+       /**
+       * 결과 테이블이 없으면 자동으로 생성해 반환합니다.
        * @returns {{table: HTMLTableElement, tbody: HTMLTableSectionElement}}
        */
       ensureResultsTable() {
