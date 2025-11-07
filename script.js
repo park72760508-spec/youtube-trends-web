@@ -218,7 +218,15 @@ async performSearch() {
         }
 
         // ✅ 실데이터만 조회
+        // 검색 결과 처리 시 바이럴 점수 적용
         this.currentData = await this.fetchRealYoutubeData(category, videoCount);
+        
+        // 각 비디오에 바이럴 점수 추가
+        this.currentData.forEach(video => {
+            video.viralScore = this.calculateViralScore(video);
+            video.isShorts = this.parseDuration(video.duration || 'PT0S') <= 60;
+            video.format = video.isShorts ? 'shorts' : 'long';
+        }););
 
         // ✅ 구독자 대비 조회수(viewsPerSubNumeric)로 강제 정렬
         this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
@@ -858,20 +866,174 @@ async fetchRealYoutubeData(category, count) {
     }
     
     // 대시보드 업데이트
+    // 대시보드 업데이트 (Pro 버전 호환)
     updateDashboard() {
-        const totalViews = this.currentData.reduce((sum, video) => 
-            sum + parseInt(video.views.replace(/,/g, '')), 0);
-            
-        const avgGrowthRate = (this.currentData.reduce((sum, video) => 
-            sum + parseFloat(video.growthRate), 0) / this.currentData.length).toFixed(1);
-            
-        const avgEngagement = (this.currentData.reduce((sum, video) => 
-            sum + parseFloat(video.engagement), 0) / this.currentData.length).toFixed(1);
+        const totalVideos = this.currentData.length;
+        const totalViews = this.currentData.reduce((sum, video) => sum + parseInt(video.viewCount), 0);
+        const avgEngagement = totalVideos > 0 ? 
+            (this.currentData.reduce((sum, video) => sum + this.calculateEngagementRate(video), 0) / totalVideos).toFixed(1) : 0;
+    
+        // 쇼츠/롱폼 카운트 (Pro 기능)
+        const shortsCount = this.currentData.filter(v => {
+            const duration = this.parseDuration(v.duration || 'PT0S');
+            return duration <= 60;
+        }).length;
+        const longFormCount = totalVideos - shortsCount;
+    
+        // 바이럴 점수 계산 (Pro 기능)
+        const avgViralScore = totalVideos > 0 ?
+            (this.currentData.reduce((sum, v) => sum + (v.viralScore || this.calculateViralScore(v)), 0) / totalVideos).toFixed(0) : 0;
+    
+        // 성장률 계산 (Pro 기능)
+        const avgGrowthRate = totalVideos > 0 ?
+            (this.currentData.reduce((sum, v) => sum + this.calculateGrowthRate(v), 0) / totalVideos).toFixed(1) : 0;
+    
+        // DOM 요소 안전하게 업데이트
+        this.safeUpdateElement('totalVideos', totalVideos);
+        this.safeUpdateElement('totalViews', this.formatNumber(totalViews));
+        this.safeUpdateElement('avgEngagement', avgEngagement + '%');
+        this.safeUpdateElement('lastUpdate', new Date().toLocaleTimeString());
         
-        document.getElementById('totalVideos').textContent = this.currentData.length.toLocaleString();
-        document.getElementById('totalViews').textContent = totalViews.toLocaleString();
-        document.getElementById('avgEngagement').textContent = `${avgEngagement}%`;
-        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('ko-KR');
+        // Pro 버전 전용 요소들
+        this.safeUpdateElement('shortsCount', shortsCount);
+        this.safeUpdateElement('longFormCount', longFormCount);
+        this.safeUpdateElement('avgViralScore', avgViralScore);
+        this.safeUpdateElement('avgGrowthRate', avgGrowthRate + '%');
+    
+        // 다운로드 섹션 통계 업데이트
+        this.safeUpdateElement('downloadVideosCount', totalVideos);
+        this.safeUpdateElement('downloadTotalViews', this.formatNumber(totalViews));
+        this.safeUpdateElement('downloadAvgViral', avgViralScore);
+        this.safeUpdateElement('downloadAvgGrowth', avgGrowthRate + '%');
+        this.safeUpdateElement('downloadShortsRatio', totalVideos > 0 ? 
+            Math.round((shortsCount / totalVideos) * 100) + '%' : '0%');
+    
+        // 대시보드 표시
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) {
+            dashboard.style.display = 'block';
+        }
+    }
+
+
+    // 바이럴 점수 계산 메서드 추가
+    calculateViralScore(video, channelStats = null, timeRange = 'week') {
+        const views = parseInt(video.viewCount) || 0;
+        const likes = parseInt(video.likeCount) || 0;
+        const comments = parseInt(video.commentCount) || 0;
+        const subscriberCount = parseInt(channelStats?.subscriberCount) || 
+                               parseInt(video.subscriberCount) || 1000; // 기본값
+    
+        // 1. 조회수 성장률 (구독자 대비)
+        const viewsPerSub = views / subscriberCount;
+        const viewGrowthScore = Math.min(viewsPerSub * 100, 1000); // 최대 1000점
+    
+        // 2. 참여율 (좋아요 + 댓글 / 조회수)
+        const engagementRate = views > 0 ? ((likes + comments) / views) * 100 : 0;
+        const engagementScore = Math.min(engagementRate * 100, 500); // 최대 500점
+    
+        // 3. 최신성 보너스
+        const publishDate = new Date(video.publishedAt);
+        const now = new Date();
+        const ageInHours = (now - publishDate) / (1000 * 60 * 60);
+        const recentBonus = Math.max(100 - ageInHours / 24 * 10, 0); // 최대 100점
+    
+        // 4. 영상 길이별 점수
+        const duration = this.parseDuration(video.duration || 'PT0S');
+        const durationScore = this.calculateDurationScore(duration);
+    
+        // 5. 종합 바이럴 점수 (가중치 적용)
+        const viralWeights = {
+            viewGrowthRate: 0.3,
+            engagementRate: 0.25,
+            viewsPerSubscriber: 0.2,
+            recentBoost: 0.15,
+            durationScore: 0.1
+        };
+    
+        const viralScore = 
+            viewGrowthScore * viralWeights.viewGrowthRate +
+            engagementScore * viralWeights.engagementRate +
+            viewsPerSub * 100 * viralWeights.viewsPerSubscriber +
+            recentBonus * viralWeights.recentBoost +
+            durationScore * viralWeights.durationScore;
+    
+        return Math.round(viralScore);
+    }
+    
+    // 영상 길이별 점수 계산
+    calculateDurationScore(duration) {
+        if (duration <= 60) return 100; // 쇼츠 보너스
+        if (duration <= 300) return 80;  // 5분 이하
+        if (duration <= 600) return 60;  // 10분 이하
+        if (duration <= 1200) return 40; // 20분 이하
+        return 20; // 20분 초과
+    }
+
+
+    // YouTube 시간 형식 파싱 메서드 추가 (PT1M30S -> 90초)
+    parseDuration(duration) {
+        if (!duration || duration === 'PT0S') return 0;
+        
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+        
+        const hours = parseInt(match[1]) || 0;
+        const minutes = parseInt(match[2]) || 0;
+        const seconds = parseInt(match[3]) || 0;
+        
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    
+
+    // 성장률 계산 메서드 개선
+    // 성장률 계산 메서드 (기존 것이 간단하다면 개선)
+    calculateGrowthRate(video) {
+        // viewCount 또는 views 필드에서 조회수 가져오기
+        let views = 0;
+        if (video.viewCount) {
+            views = parseInt(video.viewCount);
+        } else if (video.views) {
+            views = parseInt(video.views.toString().replace(/,/g, ''));
+        }
+        
+        // 구독자 수 가져오기
+        const subscriberCount = parseInt(video.subscriberCount) || 
+                               parseInt(video.channelStats?.subscriberCount) || 
+                               1000; // 기본값
+        
+        if (subscriberCount === 0) return 0;
+        
+        // 구독자 대비 조회수 비율로 성장률 계산
+        const growthRate = (views / subscriberCount) * 100;
+        
+        return Math.min(growthRate, 10000); // 최대 10000% 제한
+    }
+    
+    // 참여율 계산 메서드 개선
+    calculateEngagementRate(video) {
+        const views = parseInt(video.viewCount) || 0;
+        const likes = parseInt(video.likeCount) || 0;
+        const comments = parseInt(video.commentCount) || 0;
+        
+        if (views === 0) return 0;
+        
+        const engagementRate = ((likes + comments) / views) * 100;
+        return Math.min(engagementRate, 100); // 최대 100% 제한
+    }
+    
+
+
+    
+    // 안전한 DOM 업데이트 헬퍼 메서드 추가
+    safeUpdateElement(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        } else {
+            console.warn(`DOM 요소를 찾을 수 없습니다: ${id}`);
+        }
     }
     
     // 차트 업데이트
@@ -964,20 +1126,77 @@ async fetchRealYoutubeData(category, count) {
         });
     }
     
-    // 다운로드 섹션 표시
+    // 다운로드 섹션 표시 (Pro 버전 호환)
     showDownloadSection() {
-        document.getElementById('downloadSection').style.display = 'block';
+        // 다운로드 섹션 안전하게 표시
+        const downloadSection = document.getElementById('downloadSection');
+        if (downloadSection) {
+            downloadSection.style.display = 'block';
+        } else {
+            console.warn('downloadSection 요소를 찾을 수 없습니다.');
+            return;
+        }
         
-        const totalViews = this.currentData.reduce((sum, video) => 
-            sum + parseInt(video.views.replace(/,/g, '')), 0);
-            
-        const avgGrowthRate = (this.currentData.reduce((sum, video) => 
-            sum + parseFloat(video.growthRate), 0) / this.currentData.length).toFixed(1);
+        if (this.currentData.length === 0) {
+            console.warn('표시할 데이터가 없습니다.');
+            return;
+        }
         
-        document.getElementById('downloadVideosCount').textContent = this.currentData.length.toLocaleString();
-        document.getElementById('downloadTotalViews').textContent = totalViews.toLocaleString();
-        document.getElementById('downloadAvgGrowth').textContent = `${avgGrowthRate}%`;
+        // 총 조회수 계산 (Pro 버전 호환)
+        const totalViews = this.currentData.reduce((sum, video) => {
+            // viewCount 또는 views 필드 처리
+            let views = 0;
+            if (video.viewCount) {
+                views = parseInt(video.viewCount);
+            } else if (video.views) {
+                views = parseInt(video.views.toString().replace(/,/g, ''));
+            }
+            return sum + (isNaN(views) ? 0 : views);
+        }, 0);
+        
+        // 평균 성장률 계산 (Pro 버전 호환)
+        const avgGrowthRate = this.currentData.length > 0 ? 
+            (this.currentData.reduce((sum, video) => {
+                let growthRate = 0;
+                if (video.growthRate !== undefined) {
+                    growthRate = parseFloat(video.growthRate);
+                } else {
+                    // growthRate가 없으면 동적 계산
+                    growthRate = this.calculateGrowthRate(video);
+                }
+                return sum + (isNaN(growthRate) ? 0 : growthRate);
+            }, 0) / this.currentData.length).toFixed(1) : 0;
+        
+        // 쇼츠/롱폼 카운트 (Pro 기능)
+        const shortsCount = this.currentData.filter(video => {
+            const duration = this.parseDuration(video.duration || 'PT0S');
+            return duration <= 60;
+        }).length;
+        
+        // 바이럴 점수 평균 (Pro 기능)
+        const avgViralScore = this.currentData.length > 0 ?
+            (this.currentData.reduce((sum, video) => {
+                const viralScore = video.viralScore !== undefined ? 
+                    video.viralScore : this.calculateViralScore(video);
+                return sum + (isNaN(viralScore) ? 0 : viralScore);
+            }, 0) / this.currentData.length).toFixed(0) : 0;
+        
+        // 쇼츠 비율 계산 (Pro 기능)
+        const shortsRatio = this.currentData.length > 0 ? 
+            Math.round((shortsCount / this.currentData.length) * 100) : 0;
+        
+        // DOM 요소 안전하게 업데이트
+        this.safeUpdateElement('downloadVideosCount', this.currentData.length.toLocaleString());
+        this.safeUpdateElement('downloadTotalViews', totalViews.toLocaleString());
+        this.safeUpdateElement('downloadAvgGrowth', `${avgGrowthRate}%`);
+        
+        // Pro 버전 전용 요소들 업데이트
+        this.safeUpdateElement('downloadAvgViral', avgViralScore);
+        this.safeUpdateElement('downloadShortsRatio', `${shortsRatio}%`);
+        
+        console.log(`✅ 다운로드 섹션 업데이트 완료: ${this.currentData.length}개 영상, 총 조회수 ${totalViews.toLocaleString()}`);
     }
+    
     
     // Excel 다운로드 - 핵심 기능!
         downloadExcel() {
