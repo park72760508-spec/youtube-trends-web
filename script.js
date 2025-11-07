@@ -743,10 +743,10 @@ async fetchRealYoutubeData(category, count) {
     
     // 결과 표시
     displayResults() {
-      const tbody = document.querySelector('#resultsTable tbody');
-      const list = this.currentData || [];
+      // 테이블/바디를 보장적으로 획득
+      const { table, tbody } = this.ensureResultsTable();
     
-      // 테이블 헤더(구독자 수 추가)가 별도라면 그대로 두고, 여기선 바디만 갱신
+      const list = this.currentData || [];
       tbody.innerHTML = list.map(v => `
         <tr>
           <td>${v.rank}</td>
@@ -754,7 +754,7 @@ async fetchRealYoutubeData(category, count) {
           <td>${v.channel}</td>
           <td>${v.categoryName}</td>
           <td>${v.views}</td>
-          <td>${(v.subscriberCountFormatted || (v.subscriberCount ?? 0).toLocaleString())}</td>
+          <td>${v.subscriberCountFormatted ?? (v.subscriberCount ?? 0).toLocaleString()}</td>
           <td>${v.likes}</td>
           <td>${v.comments}</td>
           <td>${v.growthRate}%</td>
@@ -763,6 +763,8 @@ async fetchRealYoutubeData(category, count) {
         </tr>
       `).join('');
     }
+
+
 
 
 
@@ -1024,6 +1026,78 @@ async fetchRealYoutubeData(category, count) {
           XLSX.utils.book_append_sheet(wb, ws, 'YouTube Trends');
           XLSX.writeFile(wb, `youtube_trends_${dateStr}.xlsx`);
         }
+
+
+     * 결과 테이블이 없으면 자동으로 생성해 반환합니다.
+       * @returns {{table: HTMLTableElement, tbody: HTMLTableSectionElement}}
+       */
+      ensureResultsTable() {
+        // 1) 마운트 지점 확보 (없으면 body에 생성)
+        let mount = document.getElementById('resultsMount');
+        if (!mount) {
+          mount = document.createElement('div');
+          mount.id = 'resultsMount';
+          mount.style.marginTop = '12px';
+          document.body.appendChild(mount);
+        }
+    
+        // 2) 테이블 / tbody 확보 (없으면 생성)
+        let table = document.getElementById('resultsTable');
+        let tbody = table ? table.querySelector('tbody') : null;
+    
+        if (!table) {
+          table = document.createElement('table');
+          table.id = 'resultsTable';
+          table.style.width = '100%';
+          table.style.borderCollapse = 'collapse';
+          table.style.fontSize = '14px';
+    
+          // 간단한 스타일(필요 시 한 번만 추가)
+          if (!document.getElementById('resultsTableStyle')) {
+            const style = document.createElement('style');
+            style.id = 'resultsTableStyle';
+            style.textContent = `
+              #resultsTable th, #resultsTable td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+              #resultsTable thead { background: #f8fafc; }
+              #resultsTable tbody tr:nth-child(even) { background: #f9fafb; }
+            `;
+            document.head.appendChild(style);
+          }
+    
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th>순위</th>
+              <th>제목</th>
+              <th>채널</th>
+              <th>카테고리</th>
+              <th>조회수</th>
+              <th>구독자 수</th>
+              <th>좋아요</th>
+              <th>댓글</th>
+              <th>성장률</th>
+              <th>게시시간</th>
+              <th>영상길이</th>
+            </tr>
+          `;
+          tbody = document.createElement('tbody');
+    
+          table.appendChild(thead);
+          table.appendChild(tbody);
+    
+          // mount에 테이블 장착
+          mount.innerHTML = '';
+          mount.appendChild(table);
+        } else if (!tbody) {
+          // 테이블은 있는데 tbody만 없을 때
+          tbody = document.createElement('tbody');
+          table.appendChild(tbody);
+        }
+    
+        return { table, tbody };
+      }
+
+
 
     
     // Excel 요약 데이터 생성
