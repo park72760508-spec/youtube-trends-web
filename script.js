@@ -222,11 +222,12 @@ async performSearch() {
         this.currentData = await this.fetchRealYoutubeData(category, videoCount);
         
         // 각 비디오에 바이럴 점수 추가
+        // 각 비디오에 바이럴 점수 추가
         this.currentData.forEach(video => {
             video.viralScore = this.calculateViralScore(video);
             video.isShorts = this.parseDuration(video.duration || 'PT0S') <= 60;
             video.format = video.isShorts ? 'shorts' : 'long';
-        }););
+        });
 
         // ✅ 구독자 대비 조회수(viewsPerSubNumeric)로 강제 정렬
         this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
