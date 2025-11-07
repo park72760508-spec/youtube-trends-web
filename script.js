@@ -1187,8 +1187,9 @@ async fetchRealYoutubeData(category, count) {
             Math.round((shortsCount / this.currentData.length) * 100) : 0;
         
         // DOM 요소 안전하게 업데이트
+        // DOM 요소 안전하게 업데이트
         this.safeUpdateElement('downloadVideosCount', this.currentData.length.toLocaleString());
-        this.safeUpdateElement('downloadTotalViews', totalViews.toLocaleString());
+        this.safeUpdateElement('downloadTotalViews', this.formatNumber(totalViews));
         this.safeUpdateElement('downloadAvgGrowth', `${avgGrowthRate}%`);
         
         // Pro 버전 전용 요소들 업데이트
@@ -1772,6 +1773,37 @@ async fetchRealYoutubeData(category, count) {
     
     refreshData() {
         location.reload();
+    }
+
+    // 🔧 유틸리티 메서드들 추가
+    formatNumber(num) {
+        const n = parseInt(num) || 0;
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return n.toLocaleString();
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    generateFilename(prefix, extension) {
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
+        return `${prefix}_${dateStr}_${timeStr}.${extension}`;
+    }
+
+    downloadBlob(blob, filename) {
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 }
 
