@@ -394,19 +394,23 @@
 
     <!-- 🔧 JavaScript 파일 로딩 시점 최적화 -->
     <script>
-        // 라이브러리 로딩 확인
-        document.addEventListener('DOMContentLoaded', function() {
+        // 라이브러리 로딩 확인 (간단 버전)
+        window.addEventListener('load', function() {
+            console.log('🔍 라이브러리 로딩 상태 확인...');
+            
             if (typeof XLSX === 'undefined') {
                 console.error('❌ XLSX 라이브러리 로딩 실패');
-                alert('Excel 다운로드 기능을 사용할 수 없습니다. 페이지를 새로고침해주세요.');
+            } else {
+                console.log('✅ XLSX 라이브러리 로딩 완료');
             }
             
             if (typeof Chart === 'undefined') {
                 console.error('❌ Chart.js 라이브러리 로딩 실패'); 
-                console.warn('차트 기능을 사용할 수 없습니다.');
+            } else {
+                console.log('✅ Chart.js 라이브러리 로딩 완료');
             }
             
-            console.log('✅ 모든 라이브러리 로딩 완료');
+            console.log('✅ 모든 확인 완료');
         });
     </script>
     <script src="script.js"></script>
