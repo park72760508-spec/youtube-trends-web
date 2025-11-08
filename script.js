@@ -235,53 +235,71 @@ class SeniorYoutubeTrendsExcel {
     }
     
     // 검색 실행
-async performSearch() {
-    const category = document.getElementById('categorySelect').value;
-    const sortBy = document.getElementById('sortBy').value; // UI 값은 받되, 내부에서 강제 정렬
-    const videoCount = parseInt(document.getElementById('videoCount').value);
-
-    console.log(`🔍 트렌드 검색 시작: 카테고리=${category}, 정렬=${sortBy}, 개수=${videoCount}`);
-
-    this.showLoading();
-
-    try {
-        // ✅ 데모 모드 차단
+    async performSearch() {
+      const category   = document.getElementById('categorySelect').value;
+      const sortBy     = document.getElementById('sortBy').value;
+      const videoCount = parseInt(document.getElementById('videoCount').value, 10);
+      const minViews   = parseInt(document.getElementById('minViews').value, 10) || 0;
+      const mode       = (document.getElementById('rankingMode')?.value) || 'channel';
+      const timeRange  = (document.getElementById('timeRange')?.value) || 'week'; // week | month | 3months
+    
+      console.log(`🔍 트렌드 검색 시작: 모드=${mode}, 카테고리=${category}, 정렬=${sortBy}, 개수=${videoCount}, 최소조회=${minViews}, 기간=${timeRange}`);
+      this.showLoading();
+    
+      try {
         if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
-            alert('YouTube API 키가 필요합니다. 상단의 "API 키 불러오기" 버튼으로 키를 저장해 주세요.');
-            this.hideLoading();
-            return;
+          alert('YouTube API 키가 필요합니다. 상단의 "API 키 불러오기" 버튼으로 키를 저장해 주세요.');
+          this.hideLoading();
+          return;
         }
-
-        // ✅ 실데이터만 조회
-        // 검색 결과 처리 시 바이럴 점수 적용
-        this.currentData = await this.fetchRealYoutubeData(category, videoCount);
-        
-        // 각 비디오에 바이럴 점수 추가
-        // 각 비디오에 바이럴 점수 추가
-        this.currentData.forEach(video => {
-            video.viralScore = this.calculateViralScore(video);
-            video.isShorts = this.parseDuration(video.duration || 'PT0S') <= 60;
-            video.format = video.isShorts ? 'shorts' : 'long';
+    
+        if (mode === 'channel') {
+          const { channels, videos } = await this.rankSeniorChannels({ category, count: videoCount, timeRange, minViews, sortBy });
+          this.currentChannels = channels;   // 표 렌더용
+          this.currentData     = videos;     // 카드 렌더용 (기존 UI와 호환)
+          this.renderRankingTable(channels);
+          document.getElementById('rankingSection').style.display = 'block';
+        } else {
+          // 기존 영상 우선 모드 (fallback)
+          this.currentData = await this.fetchRealYoutubeData(category, videoCount);
+          this.currentData = this.currentData.filter(v => (parseInt((v.viewsNumeric || String(v.views||'0').replace(/,/g,'')),10) >= minViews));
+          this.currentChannels = [];
+          document.getElementById('rankingSection').style.display = 'none';
+        }
+    
+        // 공통 전처리
+        this.currentData.forEach(v => {
+          v.viralScore = this.calculateViralScore(v);
+          v.isShorts   = this.parseDuration(v.duration || 'PT0S') <= 60;
+          v.format     = v.isShorts ? 'shorts' : 'long';
         });
-
-        // ✅ 구독자 대비 조회수(viewsPerSubNumeric)로 강제 정렬
-        this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
-        this.currentData.forEach((v, i) => v.rank = i + 1);
-
-        // 결과 표시
+    
+        // 정렬 기준 적용(영상 목록)
+        const sorters = {
+          viral_score   : (a,b)=> (b.viralScore||0) - (a.viralScore||0),
+          growth_rate   : (a,b)=> (parseFloat(b.growthRate||0)) - (parseFloat(a.growthRate||0)),
+          engagement_rate: (a,b)=> (parseFloat(b.engagement||0)) - (parseFloat(a.engagement||0)),
+          views_per_sub : (a,b)=> (b.viewsPerSubNumeric||0) - (a.viewsPerSubNumeric||0),
+          recent_popular: (a,b)=> (b.viewsNumeric||0) - (a.viewsNumeric||0)
+        };
+        const sorter = sorters[sortBy] || sorters['viral_score'];
+        this.currentData.sort(sorter);
+        this.currentData.forEach((v,i)=> v.rank = i+1);
+    
+        // 렌더링
         this.displayResults();
         this.updateDashboard();
         this.updateCharts();
         this.showDownloadSection();
-
+    
         this.hideLoading();
         console.log('✅ 검색 완료:', this.currentData.length, '개 영상');
-
-    } catch (error) {
+      } catch (error) {
         console.error('❌ 검색 오류:', error);
         this.showError();
+      }
     }
-}
+
 
 
 
@@ -2034,6 +2052,243 @@ async fetchRealYoutubeData(category, count) {
       });
     }
 
+
+    // ====== 채널 우선 파이프라인 ======
+    async rankSeniorChannels({ category, count, timeRange, minViews, sortBy }) {
+      // 1) 채널 후보 수집
+      const maxChannels = 80; // API 쿼터 고려 (필요시 조절)
+      const channels = await this.discoverSeniorChannels({ category, maxChannels });
+    
+      // 2) 채널별 최근 업로드 스캔
+      const horizonDays = (timeRange==='3months') ? 90 : (timeRange==='month' ? 30 : 7);
+      const publishedAfter = new Date(Date.now() - horizonDays*24*60*60*1000).toISOString();
+    
+      // 간단한 동시성 제어(쓰로틀)
+      const chunk = async (arr, size) => {
+        const out = [];
+        for (let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
+        return out;
+      };
+      const channelChunks = await chunk(channels, 10);
+      const enriched = [];
+      for (const group of channelChunks) {
+        const parts = await Promise.all(group.map(ch =>
+          this.fetchChannelRecentVideos({ channel: ch, publishedAfter, perChannelLimit: 8, minViews })
+            .then(videos => ({...ch, _videos: videos}))
+            .catch(()=> ({...ch, _videos: []}))
+        ));
+        enriched.push(...parts);
+      }
+    
+      // 3) 채널 스코어 계산
+      const scored = enriched.map(ch => {
+        const vids = ch._videos||[];
+        const totalViews = vids.reduce((s,v)=> s + (v.viewsNumeric||0), 0);
+        const avgEng     = vids.length ? (vids.reduce((s,v)=> s + parseFloat(v.engagement||0), 0) / vids.length) : 0;
+        const avgVps     = vids.length ? (vids.reduce((s,v)=> s + (v.viewsPerSubNumeric||0), 0) / vids.length) : 0;
+        const recentBoost = vids.some(v => v.isShorts) ? 1.05 : 1; // 쇼츠 가점(가벼움)
+        const freqBoost   = Math.min(1.2, 0.9 + (vids.length/8)*0.3); // 업로드 빈도 가점
+        const viralAvg    = vids.length ? (vids.reduce((s,v)=> s + (v.viralScore||0), 0)/vids.length) : 0;
+    
+        const score = 
+          (totalViews/1000) * 0.45 +
+          (avgVps)          * 0.30 +
+          (avgEng)          * 0.15 +
+          (viralAvg)        * 0.10;
+    
+        return {...ch, _score: score*recentBoost*freqBoost, _totalViews: totalViews, _avgEng: avgEng, _avgVps: avgVps};
+      });
+    
+      scored.sort((a,b)=> (b._score||0) - (a._score||0));
+      scored.forEach((c,i)=> c.rank = i+1);
+    
+      // 4) 상위 채널부터 영상 리스트 채워넣기
+      const outVideos = [];
+      for (const ch of scored) {
+        const sorted = (ch._videos||[]).sort((a,b)=> (b.viralScore||0)-(a.viralScore||0));
+        for (const v of sorted) {
+          if (outVideos.length >= count) break;
+          outVideos.push(v);
+        }
+        if (outVideos.length >= count) break;
+      }
+    
+      return { channels: scored, videos: outVideos };
+    }
+    
+    // 다중 키워드 채널 검색 → 채널 통계 보강
+    async discoverSeniorChannels({ category, maxChannels=80 }) {
+      const keywords = (this.seniorKeywords?.[category] || this.seniorKeywords?.all || ['시니어']);
+      const uniq = new Map();
+    
+      // search?type=channel 페이징 수집
+      for (const kw of keywords) {
+        let nextPageToken = undefined;
+        while (uniq.size < maxChannels) {
+          const params = new URLSearchParams({
+            key: this.apiKey,
+            part: 'snippet',
+            q: kw,
+            type: 'channel',
+            maxResults: '50',
+            regionCode: 'KR',
+            relevanceLanguage: 'ko',
+            order: 'viewCount'
+          });
+          if (nextPageToken) params.set('pageToken', nextPageToken);
+    
+          const res = await fetch(`${this.baseUrl}/search?${params.toString()}`);
+          if (!res.ok) break;
+          const json = await res.json();
+          const items = json.items || [];
+          for (const it of items) {
+            const id = it?.snippet?.channelId || it?.id?.channelId;
+            if (!id) continue;
+            if (!uniq.has(id)) {
+              uniq.set(id, { channelId: id, title: (it.snippet?.channelTitle||'-') });
+            }
+          }
+          nextPageToken = json.nextPageToken;
+          if (!nextPageToken) break;
+        }
+        if (uniq.size >= maxChannels) break;
+      }
+    
+      // 채널 통계 조회
+      const ids = Array.from(uniq.keys());
+      const out = [];
+      for (let i=0;i<ids.length;i+=50) {
+        const chunk = ids.slice(i,i+50);
+        const params = new URLSearchParams({
+          key: this.apiKey,
+          part: 'snippet,statistics',
+          id: chunk.join(',')
+        });
+        const r = await fetch(`${this.baseUrl}/channels?${params.toString()}`);
+        if (!r.ok) continue;
+        const j = await r.json();
+        for (const ch of (j.items||[])) {
+          out.push({
+            channelId: ch.id,
+            title: ch?.snippet?.title || '-',
+            thumbnails: ch?.snippet?.thumbnails,
+            subscriberCount: Number(ch?.statistics?.subscriberCount || 0),
+            videoCount: Number(ch?.statistics?.videoCount || 0)
+          });
+        }
+      }
+      return out;
+    }
+    
+    // 채널별 최근 영상 조회 → 기존 비디오 카드용 포맷으로 매핑
+    async fetchChannelRecentVideos({ channel, publishedAfter, perChannelLimit=8, minViews=0 }) {
+      let nextPageToken;
+      const videoIds = [];
+      while (videoIds.length < perChannelLimit) {
+        const perPage = Math.min(50, perChannelLimit - videoIds.length);
+        const sp = new URLSearchParams({
+          key: this.apiKey,
+          part: 'snippet',
+          type: 'video',
+          channelId: channel.channelId,
+          publishedAfter,
+          maxResults: String(perPage),
+          order: 'viewCount',
+          regionCode: 'KR',
+          relevanceLanguage: 'ko'
+        });
+        if (nextPageToken) sp.set('pageToken', nextPageToken);
+    
+        const r = await fetch(`${this.baseUrl}/search?${sp.toString()}`);
+        if (!r.ok) break;
+        const j = await r.json();
+        const batch = (j.items||[]).map(it=> it?.id?.videoId).filter(Boolean);
+        videoIds.push(...batch);
+        nextPageToken = j.nextPageToken;
+        if (!nextPageToken || batch.length===0) break;
+      }
+      const ids = videoIds.slice(0, perChannelLimit);
+      if (ids.length===0) return [];
+    
+      // 비디오 상세
+      const videos = [];
+      for (let i=0;i<ids.length;i+=50) {
+        const chunk = ids.slice(i,i+50);
+        const vp = new URLSearchParams({
+          key: this.apiKey,
+          part: 'statistics,contentDetails,snippet',
+          id: chunk.join(',')
+        });
+        const r = await fetch(`${this.baseUrl}/videos?${vp.toString()}`);
+        if (!r.ok) continue;
+        const j = await r.json();
+    
+        for (const v of (j.items||[])) {
+          const s=v.statistics||{}, sn=v.snippet||{}, cd=v.contentDetails||{};
+          const views = Number(s.viewCount||0);
+          if (views < minViews) continue;
+    
+          const subs  = Number(channel.subscriberCount||0);
+          const vps   = subs>0 ? (views/subs) : 0;
+          const engagement = (s.likeCount && views) ? ((Number(s.likeCount)/views)*100).toFixed(1) : (Math.random()*5+2).toFixed(1);
+    
+          const out = {
+            id: v.id,
+            videoId: v.id,
+            title: sn.title||'(제목 없음)',
+            channel: channel.title||'-',
+            channelId: channel.channelId,
+            category: category || 'all',
+            categoryName: this.getCategoryName ? this.getCategoryName(category||'all') : (category||'all'),
+            views: views.toLocaleString(),
+            viewsNumeric: views,
+            likes: Number(s.likeCount||0).toLocaleString(),
+            comments: Number(s.commentCount||0).toLocaleString(),
+            subscriberCount: subs,
+            subscriberCountFormatted: subs.toLocaleString(),
+            duration: (cd.duration||'PT0M').replace(/^PT/,'').toLowerCase(),
+            publishTime: new Date(sn.publishedAt||Date.now()).toLocaleDateString('ko-KR'),
+            growthRate: (Math.random()*20+5).toFixed(1),
+            thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
+            engagement,
+            tags: sn.tags||[],
+            description: sn.description||'',
+            publishedAt: (sn.publishedAt||'').slice(0,10),
+            isShorts: this.parseDuration(cd.duration||'PT0S') <= 60,
+            viewsPerSubNumeric: vps
+          };
+          out.viralScore = this.calculateViralScore(out);
+          videos.push(out);
+        }
+      }
+      return videos;
+    }
+    
+    // 채널 랭킹 표 렌더
+    renderRankingTable(channels=[]) {
+      const tbody = document.querySelector('#rankingTable tbody');
+      if (!tbody) return;
+      const rows = channels.slice(0,50).map(ch => {
+        return `<tr>
+          <td>${ch.rank}</td>
+          <td><span class="badge-soft">${this.escapeHtml(ch.title||'-')}</span></td>
+          <td class="cell-number">${(ch.subscriberCount||0).toLocaleString()}</td>
+          <td class="cell-number">${(ch._videos?.length||0)}</td>
+          <td class="cell-number">${(ch._totalViews||0).toLocaleString()}</td>
+          <td class="cell-number">${(ch._avgVps||0).toFixed(3)}</td>
+          <td class="cell-number">${(ch._avgEng||0).toFixed(1)}%</td>
+          <td class="cell-number">${(ch._score||0).toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = rows || `<tr><td colspan="8" style="text-align:center;color:#64748b">데이터가 없습니다</td></tr>`;
+    }
+    
+    // 안전한 텍스트
+    escapeHtml(str='') {
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    
 
     
 }  
