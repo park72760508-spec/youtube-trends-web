@@ -181,6 +181,10 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (clearApiKeyBtn) {
             clearApiKeyBtn.addEventListener('click', () => this.clearApiKey());
         }
+
+
+        // 키워드 선택 관련 이벤트 리스너 추가
+        this.setupKeywordSelectionEvents();
         
         // 뷰 전환 버튼
         const cardViewBtn = document.getElementById('cardViewBtn');
@@ -1766,6 +1770,243 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.showResultsSections();
     }
 
+
+    // 키워드 선택 UI 초기화 및 이벤트 설정
+    setupKeywordSelectionEvents() {
+        // 키워드 체크박스 렌더링
+        this.renderKeywordCheckboxes();
+        
+        // 전체 선택/해제 버튼
+        const selectAllBtn = document.getElementById('selectAllKeywords');
+        const deselectAllBtn = document.getElementById('deselectAllKeywords');
+        const selectTier1Btn = document.getElementById('selectTier1Only');
+        
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => this.selectAllKeywords());
+        }
+        
+        if (deselectAllBtn) {
+            deselectAllBtn.addEventListener('click', () => this.deselectAllKeywords());
+        }
+        
+        if (selectTier1Btn) {
+            selectTier1Btn.addEventListener('click', () => this.selectTier1Only());
+        }
+        
+        // 티어별 토글 버튼
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tier-toggle')) {
+                const tier = e.target.dataset.tier;
+                this.toggleTierSelection(tier);
+            }
+        });
+        
+        // 키워드 체크박스 변경 이벤트
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('keyword-checkbox')) {
+                this.updateKeywordSelection();
+                this.updateApiCostEstimate();
+            }
+        });
+        
+        // 키워드 아이템 클릭 이벤트
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('keyword-item') || e.target.classList.contains('keyword-label')) {
+                const item = e.target.classList.contains('keyword-item') ? e.target : e.target.closest('.keyword-item');
+                const checkbox = item.querySelector('.keyword-checkbox');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    this.updateKeywordSelection();
+                    this.updateApiCostEstimate();
+                }
+            }
+        });
+    }
+    
+    // 키워드 체크박스 렌더링
+    renderKeywordCheckboxes() {
+        const tiers = ['tier1', 'tier2', 'tier3'];
+        
+        tiers.forEach(tier => {
+            const container = document.getElementById(`${tier}Keywords`);
+            if (!container) return;
+            
+            const keywords = this.optimizedKeywords[tier];
+            container.innerHTML = '';
+            
+            keywords.forEach((keyword, index) => {
+                const isDefaultSelected = tier === 'tier1'; // Tier1은 기본 선택
+                
+                const keywordItem = document.createElement('div');
+                keywordItem.className = `keyword-item ${isDefaultSelected ? 'selected' : ''}`;
+                
+                keywordItem.innerHTML = `
+                    <input type="checkbox" 
+                           class="keyword-checkbox" 
+                           id="${tier}_${index}" 
+                           value="${keyword}"
+                           data-tier="${tier}"
+                           ${isDefaultSelected ? 'checked' : ''}>
+                    <label for="${tier}_${index}" class="keyword-label">${keyword}</label>
+                    <span class="keyword-cost">~100</span>
+                `;
+                
+                container.appendChild(keywordItem);
+            });
+        });
+        
+        // 초기 상태 업데이트
+        this.updateKeywordSelection();
+        this.updateApiCostEstimate();
+    }
+    
+    // 전체 키워드 선택
+    selectAllKeywords() {
+        const checkboxes = document.querySelectorAll('.keyword-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            checkbox.closest('.keyword-item').classList.add('selected');
+        });
+        this.updateKeywordSelection();
+        this.updateApiCostEstimate();
+    }
+    
+    // 전체 키워드 해제
+    deselectAllKeywords() {
+        const checkboxes = document.querySelectorAll('.keyword-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.keyword-item').classList.remove('selected');
+        });
+        this.updateKeywordSelection();
+        this.updateApiCostEstimate();
+    }
+    
+    // Tier1만 선택
+    selectTier1Only() {
+        this.deselectAllKeywords();
+        
+        const tier1Checkboxes = document.querySelectorAll('.keyword-checkbox[data-tier="tier1"]');
+        tier1Checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            checkbox.closest('.keyword-item').classList.add('selected');
+        });
+        
+        this.updateKeywordSelection();
+        this.updateApiCostEstimate();
+    }
+    
+    // 티어별 토글
+    toggleTierSelection(tier) {
+        const tierCheckboxes = document.querySelectorAll(`.keyword-checkbox[data-tier="${tier}"]`);
+        const toggleBtn = document.querySelector(`.tier-toggle[data-tier="${tier}"]`);
+        
+        // 현재 티어의 선택 상태 확인
+        const checkedCount = Array.from(tierCheckboxes).filter(cb => cb.checked).length;
+        const shouldSelectAll = checkedCount < tierCheckboxes.length;
+        
+        // 토글 실행
+        tierCheckboxes.forEach(checkbox => {
+            checkbox.checked = shouldSelectAll;
+            const item = checkbox.closest('.keyword-item');
+            if (shouldSelectAll) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+        
+        // 버튼 상태 업데이트
+        if (shouldSelectAll) {
+            toggleBtn.classList.add('all-selected');
+            toggleBtn.innerHTML = '<i class="fas fa-check-square"></i> 전체 해제';
+        } else {
+            toggleBtn.classList.remove('all-selected');
+            toggleBtn.innerHTML = '<i class="fas fa-square"></i> 전체 선택';
+        }
+        
+        this.updateKeywordSelection();
+        this.updateApiCostEstimate();
+    }
+    
+    // 키워드 선택 상태 업데이트
+    updateKeywordSelection() {
+        const selectedCheckboxes = document.querySelectorAll('.keyword-checkbox:checked');
+        const selectedCount = selectedCheckboxes.length;
+        
+        // 선택 카운트 업데이트
+        const countElement = document.getElementById('selectedKeywordCount');
+        if (countElement) {
+            countElement.textContent = selectedCount;
+        }
+        
+        // 키워드 아이템 시각적 상태 업데이트
+        document.querySelectorAll('.keyword-checkbox').forEach(checkbox => {
+            const item = checkbox.closest('.keyword-item');
+            if (checkbox.checked) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+        
+        // 티어별 토글 버튼 상태 업데이트
+        ['tier1', 'tier2', 'tier3'].forEach(tier => {
+            const tierCheckboxes = document.querySelectorAll(`.keyword-checkbox[data-tier="${tier}"]`);
+            const checkedCount = Array.from(tierCheckboxes).filter(cb => cb.checked).length;
+            const toggleBtn = document.querySelector(`.tier-toggle[data-tier="${tier}"]`);
+            
+            if (toggleBtn) {
+                if (checkedCount === tierCheckboxes.length && tierCheckboxes.length > 0) {
+                    toggleBtn.classList.add('all-selected');
+                    toggleBtn.innerHTML = '<i class="fas fa-check-square"></i> 전체 해제';
+                } else {
+                    toggleBtn.classList.remove('all-selected');
+                    toggleBtn.innerHTML = '<i class="fas fa-square"></i> 전체 선택';
+                }
+            }
+        });
+    }
+    
+    // API 비용 예상 업데이트
+    updateApiCostEstimate() {
+        const selectedCheckboxes = document.querySelectorAll('.keyword-checkbox:checked');
+        const estimatedCost = selectedCheckboxes.length * 100; // 키워드당 약 100 할당량
+        
+        const costElement = document.getElementById('estimatedCost');
+        const warningElement = document.getElementById('costWarning');
+        
+        if (costElement) {
+            costElement.textContent = estimatedCost.toLocaleString();
+        }
+        
+        if (warningElement) {
+            const remaining = this.quotaLimit - this.quotaUsed;
+            if (estimatedCost > remaining) {
+                warningElement.style.display = 'block';
+                warningElement.textContent = `⚠️ 예상 비용(${estimatedCost})이 잔여 할당량(${remaining})을 초과합니다.`;
+            } else {
+                warningElement.style.display = 'none';
+            }
+        }
+    }
+    
+    // 선택된 키워드 가져오기 (기존 메서드 수정)
+    getSelectedKeywords() {
+        const selectedCheckboxes = document.querySelectorAll('.keyword-checkbox:checked');
+        const keywords = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+        
+        console.log(`🎯 선택된 키워드 (${keywords.length}개):`, keywords);
+        
+        if (keywords.length === 0) {
+            console.warn('⚠️ 선택된 키워드가 없습니다. Tier1 키워드를 기본 사용합니다.');
+            return this.optimizedKeywords.tier1;
+        }
+        
+        return keywords;
+    }
+
+    
     
   
 }  // ★★★★★ Class 모듈 끝 부분 ★★★★★
