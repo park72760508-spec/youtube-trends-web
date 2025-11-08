@@ -2,7 +2,7 @@
  * 시니어 YouTube 트렌드 분석기 Pro - API 할당량 최적화 버전
  * 할당량 초과 문제 해결을 위한 스마트 검색 시스템
  */
-
+// ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 시작 부분 ★★★★★
 class OptimizedYoutubeTrendsAnalyzer {
     constructor() {
         this.apiKey = this.getApiKey();
@@ -244,6 +244,7 @@ class OptimizedYoutubeTrendsAnalyzer {
             const format = document.getElementById('videoFormat')?.value || 'all';
             const count = parseInt(document.getElementById('resultCount')?.value || '50');
             const timeRange = document.getElementById('timeRange')?.value || 'week';
+            const viewCountFilter = document.getElementById('viewCountFilter')?.value || 'all';
             
             // 선택된 키워드 가져오기
             const keywords = this.getSelectedKeywords();
@@ -289,7 +290,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                 }
             } else {
                 // 정상 스캔 실행
-                await this.runFullScan(keywords, format, timeRange, count);
+                await this.runFullScan(keywords, format, timeRange, count, viewCountFilter);
             }
             
             // 결과 후처리 및 표시
@@ -1383,8 +1384,14 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
     // runFullScan 메서드 추가 (클래스 내부에)
-    async runFullScan(keywords, format, timeRange, count) {
-        console.log('🚀 전체 스캔 시작:', { keywords: keywords.length, format, timeRange, count });
+    async runFullScan(keywords, format, timeRange, count, viewCountFilter = 'all') {
+        console.log('🚀 전체 스캔 시작:', { 
+            keywords: keywords.length, 
+            format, 
+            timeRange, 
+            count, 
+            viewCountFilter: this.getViewCountFilterText(viewCountFilter)
+        });
         
         const totalKeywords = keywords.length;
         let processedKeywords = 0;
@@ -1403,7 +1410,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                 if (!videos) {
                     // API 호출
                     if (this.canUseQuota(100)) {
-                        videos = await this.searchVideosForKeyword(keyword, format, timeRange);
+                        videos = await this.searchVideosForKeyword(keyword, format, timeRange, viewCountFilter);
                         this.updateQuotaUsage(100);
                         this.saveToCache(cacheKey, videos);
                     } else {
@@ -1431,7 +1438,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
         
         // 바이럴 점수 계산 및 결과 정리
-        await this.processAndDisplayResults(count);
+        await this.processAndDisplayResults(count, viewCountFilter);
     }
     
     // runSmartMode 메서드 추가
@@ -1493,7 +1500,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // searchVideosForKeyword 메서드 추가 (실제 API 호출)
-    async searchVideosForKeyword(keyword, format, timeRange) {
+    async searchVideosForKeyword(keyword, format, timeRange, viewCountFilter = 'all') {
         const videos = [];
         
         try {
@@ -1554,7 +1561,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                 const duration = this.parseDuration(contentDetails.duration);
                 const isShorts = duration <= 60;
                 
-                return {
+                const videoData = {
                     id: item.id.videoId,
                     title: item.snippet.title,
                     channel: item.snippet.channelTitle,
@@ -1584,6 +1591,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                     
                     isSimulated: false
                 };
+                return videoData;
             }
         } catch (error) {
             console.error('❌ 비디오 상세 정보 가져오기 실패:', error);
@@ -1624,9 +1632,12 @@ class OptimizedYoutubeTrendsAnalyzer {
         return true;
     }
     
-    processAndDisplayResults(maxCount) {
+    processAndDisplayResults(maxCount, viewCountFilter = 'all') {
         // 중복 제거
-        const uniqueVideos = this.removeDuplicates(this.allVideos);
+        let uniqueVideos = this.removeDuplicates(this.allVideos);
+        
+        // 조회수 필터 적용
+        uniqueVideos = this.applyViewCountFilter(uniqueVideos, viewCountFilter);
         
         // 바이럴 점수 계산
         uniqueVideos.forEach(video => {
@@ -1962,10 +1973,14 @@ class OptimizedYoutubeTrendsAnalyzer {
         video.freshnessScore = Math.round(freshnessScore);
         
         // 쇼츠 보너스
+        // 쇼츠 보너스
         const formatBonus = video.isShorts ? 10 : 0;
         
+        // 조회수 보너스
+        const viewCountBonus = this.getViewCountBonus(video.viewCount);
+        
         // 최종 바이럴 점수 (0-1000점)
-        video.viralScore = Math.round((viewScore + engagementScore + growthScore + freshnessScore) * 10 + formatBonus);
+        video.viralScore = Math.round((viewScore + engagementScore + growthScore + freshnessScore) * 10 + formatBonus + viewCountBonus);
         
         return video.viralScore;
     }
@@ -2185,12 +2200,45 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.hideScanProgress();
     }
     
+    // 조회수 필터 텍스트 반환
+    getViewCountFilterText(viewCountFilter) {
+        const filterTexts = {
+            'all': '전체 조회수',
+            '1000000': '100만 이상',
+            '500000': '50만 이상', 
+            '100000': '10만 이상',
+            '10000': '1만 이상'
+        };
+        return filterTexts[viewCountFilter] || '전체 조회수';
+    }
     
+    // 조회수 필터 적용
+    applyViewCountFilter(videos, viewCountFilter) {
+        if (viewCountFilter === 'all') {
+            return videos;
+        }
+        
+        const minViewCount = parseInt(viewCountFilter);
+        const filteredVideos = videos.filter(video => video.viewCount >= minViewCount);
+        
+        console.log(`👁️ 조회수 필터 적용 (${this.getViewCountFilterText(viewCountFilter)}): ${videos.length} → ${filteredVideos.length}`);
+        
+        return filteredVideos;
+    }
+    
+    // 조회수에 따른 가중치 계산 (바이럴 점수 계산 시 사용)
+    getViewCountBonus(viewCount) {
+        if (viewCount >= 1000000) return 15;      // 100만 이상: +15점
+        if (viewCount >= 500000) return 10;       // 50만 이상: +10점
+        if (viewCount >= 100000) return 5;        // 10만 이상: +5점
+        if (viewCount >= 10000) return 2;         // 1만 이상: +2점
+        return 0;                                 // 그 외: +0점
+    }    
     
     
     
   
-}  // ★★★★★ Class 모듈 끝 부분 ★★★★★
+}  // ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 끝 부분 ★★★★★
 
 // 모의 데이터 생성기 클래스
 class MockDataGenerator {
