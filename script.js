@@ -149,6 +149,20 @@ class OptimizedYoutubeTrendsAnalyzer {
             fullScanBtn.addEventListener('click', () => this.startOptimizedScan());
         }
         
+        // 정렬 기능 이벤트 리스너 추가
+        const applySortBtn = document.getElementById('applySortBtn');
+        if (applySortBtn) {
+            applySortBtn.addEventListener('click', () => this.applySorting());
+        }
+        
+        // 정렬 옵션 변경시 자동 적용
+        const sortBy = document.getElementById('sortBy');
+        const sortOrder = document.getElementById('sortOrder');
+        if (sortBy && sortOrder) {
+            sortBy.addEventListener('change', () => this.applySorting());
+            sortOrder.addEventListener('change', () => this.applySorting());
+        }
+        
         const stopScanBtn = document.getElementById('stopScanBtn');
         if (stopScanBtn) {
             stopScanBtn.addEventListener('click', () => this.stopScan());
@@ -1282,7 +1296,178 @@ class OptimizedYoutubeTrendsAnalyzer {
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-}
+
+
+    // OptimizedYoutubeTrendsAnalyzer 클래스에 추가할 메서드들
+    
+    // 키워드 티어별 선택 메서드
+    getSelectedKeywords(category, tier) {
+        let keywords = [];
+        
+        switch (tier) {
+            case 'tier1':
+                keywords = this.optimizedKeywords.tier1;
+                break;
+            case 'tier1+2':
+                keywords = [...this.optimizedKeywords.tier1, ...this.optimizedKeywords.tier2];
+                break;
+            case 'all':
+                keywords = [...this.optimizedKeywords.tier1, ...this.optimizedKeywords.tier2, ...this.optimizedKeywords.tier3];
+                break;
+            default:
+                keywords = this.optimizedKeywords.tier1;
+        }
+        
+        // 카테고리별 키워드 필터링 (기존 로직과 연동)
+        if (category !== 'all') {
+            const categoryKeywords = this.getCategoryKeywords(category);
+            keywords = keywords.filter(k => categoryKeywords.includes(k));
+        }
+        
+        console.log(`🎯 선택된 키워드 (${tier}):`, keywords);
+        return keywords;
+    }
+    
+    // YouTube 링크 생성 메서드
+    generateYouTubeLink(videoId) {
+        return `https://www.youtube.com/watch?v=${videoId}`;
+    }
+    
+    // 영상 제목을 클릭 가능한 링크로 변환
+    createVideoTitleLink(video) {
+        if (video.isSimulated) {
+            return `<span class="video-title-link simulated" onclick="alert('모의 데이터입니다. 실제 링크가 없습니다.')">${video.title}</span>`;
+        } else {
+            const link = this.generateYouTubeLink(video.id);
+            return `<a href="${link}" target="_blank" class="video-title-link" title="YouTube에서 보기">${video.title}</a>`;
+        }
+    }
+    
+    // 정렬 적용 메서드
+    applySorting() {
+        if (!this.scanResults || this.scanResults.length === 0) {
+            console.log('정렬할 데이터가 없습니다.');
+            return;
+        }
+        
+        const sortBy = document.getElementById('sortBy')?.value || 'viralScore';
+        const sortOrder = document.getElementById('sortOrder')?.value || 'desc';
+        
+        console.log(`📊 정렬 적용: ${sortBy} (${sortOrder})`);
+        
+        // 정렬 실행
+        this.scanResults.sort((a, b) => {
+            let valueA = this.getSortValue(a, sortBy);
+            let valueB = this.getSortValue(b, sortBy);
+            
+            // 숫자 비교
+            if (typeof valueA === 'number' && typeof valueB === 'number') {
+                return sortOrder === 'desc' ? valueB - valueA : valueA - valueB;
+            }
+            
+            // 문자열 비교
+            if (typeof valueA === 'string' && typeof valueB === 'string') {
+                return sortOrder === 'desc' ? valueB.localeCompare(valueA) : valueA.localeCompare(valueB);
+            }
+            
+            // 날짜 비교
+            if (sortBy === 'publishedAt') {
+                const dateA = new Date(valueA);
+                const dateB = new Date(valueB);
+                return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+            }
+            
+            return 0;
+        });
+        
+        // 결과 다시 표시
+        this.displayResults();
+        this.updateSummaryCards();
+        
+        console.log(`✅ 정렬 완료: ${this.scanResults.length}개 영상 재정렬`);
+    }
+    
+    // 정렬값 추출 메서드
+    getSortValue(video, sortBy) {
+        switch (sortBy) {
+            case 'viralScore':
+                return video.viralScore || 0;
+            case 'viewCount':
+                return video.viewCount || 0;
+            case 'subscriberCount':
+                return video.subscriberCount || 0;
+            case 'engagementRate':
+                return video.engagementRate || 0;
+            case 'growthRate':
+                return video.growthRate || 0;
+            case 'publishedAt':
+                return video.publishedAt || new Date().toISOString();
+            default:
+                return 0;
+        }
+    }
+    
+    // startOptimizedScan 메서드 수정 (키워드 티어 반영)
+    async startOptimizedScan() {
+        if (!this.apiKey) {
+            this.showError('YouTube API 키가 필요합니다. API 키를 먼저 설정해주세요.');
+            return;
+        }
+        
+        if (this.isScanning) {
+            this.showError('이미 스캔이 진행 중입니다.');
+            return;
+        }
+        
+        this.isScanning = true;
+        this.allVideos = [];
+        this.scanResults = [];
+        
+        // UI 상태 변경
+        this.showScanProgress();
+        this.updateScanButton(true);
+        
+        try {
+            // 설정 값들 가져오기 (키워드 티어 추가)
+            const category = document.getElementById('scanCategory')?.value || 'all';
+            const format = document.getElementById('videoFormat')?.value || 'all';
+            const count = parseInt(document.getElementById('resultCount')?.value || '50');
+            const timeRange = document.getElementById('timeRange')?.value || 'week';
+            const keywordTier = document.getElementById('keywordTier')?.value || 'tier1';
+            
+            console.log('🔍 최적화된 스캔 설정:', { category, format, count, timeRange, keywordTier });
+            
+            // 선택된 티어에 따른 키워드 가져오기
+            const keywords = this.getSelectedKeywords(category, keywordTier);
+            
+            // 할당량 확인
+            this.checkQuotaReset();
+            const remaining = this.quotaLimit - this.quotaUsed;
+            const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
+            
+            console.log(`💰 예상 할당량 비용: ${estimatedCost} (현재 잔여: ${remaining})`);
+            
+            if (remaining < estimatedCost) {
+                // 할당량 부족 시 스마트 모드로 전환
+                console.warn('⚠️ 할당량 부족으로 스마트 모드로 전환합니다.');
+                await this.runSmartMode(category, format, count, keywords.slice(0, Math.floor(remaining / 100)));
+            } else {
+                // 정상 스캔 실행
+                await this.runFullScan(keywords, format, timeRange, count);
+            }
+            
+        } catch (error) {
+            console.error('❌ 스캔 중 오류:', error);
+            this.showError(`스캔 중 오류가 발생했습니다: ${error.message}`);
+        } finally {
+            this.isScanning = false;
+            this.updateScanButton(false);
+            this.hideScanProgress();
+        }
+    }
+
+    
+}  // ★★★★★ Class 모듈 끝 부분 ★★★★★
 
 // 모의 데이터 생성기 클래스
 class MockDataGenerator {
