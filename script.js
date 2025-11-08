@@ -1105,13 +1105,13 @@ async fetchRealYoutubeData(category, count) {
     
     // 쇼츠/롱폼 비율 차트 (Chart.js 3.x 호환)
     createFormatChart() {
-        const canvas = document.getElementById('formatChart');
-        if (!canvas) {
-            console.warn('formatChart 캔버스를 찾을 수 없습니다.');
-            return;
-        }
-
-        const ctx = canvas.getContext('2d');
+          if (typeof Chart === 'undefined') { 
+            console.warn('Chart.js 미사용 환경 - 차트 생성을 건너뜁니다.'); 
+            return; 
+          }
+          const canvas = document.getElementById('formatChart');
+          if (!canvas) { console.warn('formatChart 캔버스를 찾을 수 없습니다.'); return; }
+          const ctx = canvas.getContext('2d');
         const shortsCount = this.currentData.filter(v => {
             const duration = this.parseDuration(v.duration || 'PT0S');
             return duration <= 60;
@@ -1674,74 +1674,99 @@ async fetchRealYoutubeData(category, count) {
     }
     
     // JSON 다운로드
+    // JSON 다운로드
     downloadJSON() {
-        console.log('📋 JSON 파일 생성 시작...');
-        
-        try {
-            const exportData = {
-                metadata: {
-                    title: '시니어 YouTube 트렌드 분석 데이터',
-                    generatedAt: new Date().toISOString(),
-                    totalVideos: this.currentData.length,
-                    categories: [...new Set(this.currentData.map(v => v.categoryName))],
-                    summary: {
-                        totalViews: this.currentData.reduce((sum, video) => 
-                            sum + parseInt(video.views.replace(/,/g, '')), 0),
-                        avgGrowthRate: (this.currentData.reduce((sum, video) => 
-                            sum + parseFloat(video.growthRate), 0) / this.currentData.length).toFixed(1)
-                    }
-                },
-                data: this.currentData.map(video => ({
-                    ...video,
-                    viewsNumeric: parseInt(video.views.replace(/,/g, '')),
-                    likesNumeric: parseInt(video.likes.replace(/,/g, '')),
-                    commentsNumeric: parseInt(video.comments.replace(/,/g, '')),
-                    growthRateNumeric: parseFloat(video.growthRate),
-                    engagementNumeric: parseFloat(video.engagement)
-                }))
-            };
-            
-            const jsonString = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            
-            const filename = this.generateFilename('시니어_YouTube_트렌드', 'json');
-            this.downloadBlob(blob, filename);
-            
-            console.log('✅ JSON 파일 다운로드 완료:', filename);
-            this.showDownloadSuccess('JSON');
-            
-        } catch (error) {
-            console.error('❌ JSON 다운로드 오류:', error);
-            this.showDownloadError('JSON');
-        }
+      console.log('📋 JSON 파일 생성 시작.');
+      try {
+        const categories = Array.from(new Set((this.currentData || []).map(v => v.categoryName || '-')));
+    
+        const exportData = {
+          metadata: {
+            title: '시니어 YouTube 트렌드 분석 데이터',
+            generatedAt: new Date().toISOString(),
+            totalVideos: (this.currentData || []).length,
+            categories,
+            summary: {
+              totalViews: (this.currentData || []).reduce((sum, v) =>
+                sum + (parseInt(String(v.views).replace(/,/g, '')) || 0), 0),
+              avgGrowthRate: ((this.currentData || []).reduce((sum, v) =>
+                sum + (parseFloat(v.growthRate) || 0), 0) / ((this.currentData || []).length || 1)).toFixed(1)
+            }
+          },
+          data: (this.currentData || []).map(v => ({
+            rank: v.rank,
+            title: v.title,
+            channel: v.channel,
+            categoryName: v.categoryName,
+            views: v.views,
+            likes: v.likes,
+            comments: v.comments,
+            growthRate: v.growthRate,
+            engagement: v.engagement,
+            publishTime: v.publishTime,
+            duration: v.duration,
+            // 숫자형 파생값
+            viewsNumeric: parseInt(String(v.views).replace(/,/g, '')) || 0,
+            likesNumeric: parseInt(String(v.likes).replace(/,/g, '')) || 0,
+            commentsNumeric: parseInt(String(v.comments).replace(/,/g, '')) || 0,
+            growthRateNumeric: parseFloat(v.growthRate) || 0,
+            engagementNumeric: parseFloat(v.engagement) || 0
+          }))
+        };
+    
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const filename = this.generateFilename('시니어_YouTube_트렌드', 'json');
+        this.downloadBlob(blob, filename);
+    
+        console.log('✅ JSON 파일 다운로드 완료:', filename);
+        this.showDownloadSuccess('JSON');
+      } catch (error) {
+        console.error('❌ JSON 다운로드 오류:', error);
+        this.showDownloadError('JSON');
+      }
     }
+
     
     // PDF 리포트 다운로드 (간단한 HTML → PDF)
+    // PDF 리포트 다운로드 (간단한 HTML → PDF)
     downloadPDF() {
-        console.log('📄 PDF 리포트 생성 시작...');
-        
-        try {
-            // PDF 생성을 위한 HTML 콘텐츠 생성
-            const htmlContent = this.generatePDFContent();
-            
-            // 새 창에서 HTML을 열고 인쇄 다이얼로그 호출
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
-            
-            // 약간의 지연 후 인쇄 다이얼로그 호출
-            setTimeout(() => {
-                printWindow.print();
-            }, 500);
-            
-            console.log('✅ PDF 리포트 생성 완료');
-            this.showDownloadSuccess('PDF');
-            
-        } catch (error) {
-            console.error('❌ PDF 생성 오류:', error);
-            this.showDownloadError('PDF');
+      console.log('📄 PDF 리포트 생성 시작.');
+      try {
+        const htmlContent = this.generatePDFContent();
+        const printWindow = window.open('', '_blank');
+    
+        if (!printWindow) {
+          alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
+          return;
         }
+    
+        printWindow.document.open();
+        printWindow.document.write(`
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>시니어 YouTube 트렌드 리포트</title>
+              <style>
+                body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
+                h1 { margin-bottom: 12px; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+                thead { background:#f8fafc; }
+              </style>
+            </head>
+            <body>${htmlContent}</body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      } catch (error) {
+        console.error('❌ PDF 다운로드 오류:', error);
+        this.showDownloadError('PDF');
+      }
     }
+
     
     // PDF용 HTML 콘텐츠 생성
     generatePDFContent() {
