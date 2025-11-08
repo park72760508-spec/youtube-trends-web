@@ -230,7 +230,11 @@ class SeniorYoutubeTrendsExcel {
       const timeRange = (document.getElementById('timeRange')?.value) || '7d';
       const minViews  = parseInt(document.getElementById('minViews')?.value || '0', 10);
       const sortBy    = (document.getElementById('sortBy')?.value) || 'viral_score';
-      const limit     = parseInt(document.getElementById('videoCount')?.value || '50', 10);
+      const rawLimit  = parseInt(document.getElementById('videoCount')?.value || '50', 10);
+    
+      // 10000 선택 시 대용량 모드
+      const MAX_ALL   = 10000;
+      const limit     = (rawLimit === 10000) ? MAX_ALL : rawLimit;
     
       this.showLoading();
     
@@ -241,16 +245,21 @@ class SeniorYoutubeTrendsExcel {
           return;
         }
     
-        // 1) 기간 기준 publishedAfter 산출
+        // 기간 변환
         const now = Date.now();
         const rangeMap = { '24h': 1, '3d': 3, '7d': 7, '14d': 14 };
         const days = rangeMap[timeRange] || 7;
         const publishedAfter = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
     
-        // 2) 시니어 전수 검색 (type=video, 다중 키워드, 페이징 수집)
-        const allVideos = await this.collectSeniorVideosKR({ publishedAfter, format, minViews });
+        // 전수 수집(최대 필요 개수 전달 → 내부에서 조기 종료)
+        const allVideos = await this.collectSeniorVideosKR({
+          publishedAfter,
+          format,
+          minViews,
+          maxNeeded: limit   // ⬅️ 추가
+        });
     
-        // 3) 지표 계산 + 정렬 + 순위 매기기
+        // 정렬
         const sorters = {
           viral_score     : (a,b)=> (b.viralScore||0) - (a.viralScore||0),
           views           : (a,b)=> (b.viewsNumeric||0) - (a.viewsNumeric||0),
@@ -261,21 +270,18 @@ class SeniorYoutubeTrendsExcel {
         const sorter = sorters[sortBy] || sorters.viral_score;
     
         allVideos.forEach(v => {
-          v.viralScore = this.calculateViralScore(v);
-          v.rank = 0; // 후속 할당
+          v.viralScore = this.calculateViralScore ? this.calculateViralScore(v) : 0;
+          v.rank = 0;
         });
         allVideos.sort(sorter);
         allVideos.forEach((v,i)=> v.rank = i+1);
     
-        // 4) 상위 N개 선택 → 표 렌더 + 정보 텍스트 + 엑셀 버튼
+        // 상위 N개 확정
         this.currentData = allVideos.slice(0, limit);
-        this.renderResultsTable(this.currentData);
-        this.updateResultInfo(allVideos.length, limit, timeRange, format);
     
-        // (선택) 카드/차트는 비활성화
-        // this.displayResults();   // 카드가 필요 없으면 호출 안 함
-        // this.updateCharts();     // 그래프 사용 안 함
-        this.showDownloadSection?.(); // 있으면 유지, 없어도 무방
+        // 표 렌더 + 정보 텍스트
+        this.renderResultsTable(this.currentData);
+        this.updateResultInfo(allVideos.length, this.currentData.length, timeRange, format);
     
         this.hideLoading();
         console.log('✅ 전수 탐색 완료:', allVideos.length, '건 중 상위', this.currentData.length, '건 출력');
@@ -284,6 +290,7 @@ class SeniorYoutubeTrendsExcel {
         this.showError?.();
       }
     }
+
 
 
 
@@ -2310,21 +2317,30 @@ async fetchRealYoutubeData(category, count) {
       '어르신', '실버세대', '실버 생활', '시니어 브이로그'
     ];
     
-    async collectSeniorVideosKR({ publishedAfter, format = 'shorts', minViews = 0 }) {
+    async collectSeniorVideosKR({ publishedAfter, format = 'shorts', minViews = 0, maxNeeded = 200 }) {
       const base = this.baseUrl || 'https://www.googleapis.com/youtube/v3';
       const foundIds = new Set();
       const videoIds = [];
+      const results  = [];
     
-      // 1) 한국어 시니어 키워드 전수 검색 (type=video, 페이지네이션)
+      // 키워드 세트
       const keywords = Array.isArray(this.seniorKeywords) && this.seniorKeywords.length
         ? this.seniorKeywords
         : ['시니어', '노년', '실버', '시니어 건강', '시니어 운동', '시니어 라이프'];
     
+      // 요청량에 따라 키워드당 최대 페이지 동적 확대 (기본 5 → 최대 50)
+      const maxPagesPerKw = (maxNeeded >= 10000) ? 50
+                          : (maxNeeded >= 1000)  ? 20
+                          : (maxNeeded >= 500)   ? 10
+                          : 5;
+    
+      // 1) Search API로 videoId 전수 수집 (필요량 도달 시 조기 종료)
+      outer:
       for (const kw of keywords) {
         let nextPageToken = undefined;
         let pageCount = 0;
     
-        while (pageCount < 5) { // 키워드당 최대 5 페이지 (튜닝 가능)
+        while (pageCount < maxPagesPerKw) {
           const sp = new URLSearchParams({
             key: this.apiKey,
             part: 'snippet',
@@ -2344,22 +2360,26 @@ async fetchRealYoutubeData(category, count) {
     
           const items = j.items || [];
           for (const it of items) {
-            const id = it && it.id ? it.id.videoId : undefined;
+            const id = it?.id?.videoId;
             if (!id || foundIds.has(id)) continue;
             foundIds.add(id);
             videoIds.push(id);
+            // video 상세 필터까지 고려하면 실제 결과는 줄어듭니다. 넉넉히 모으되,
+            // 너무 과도하면 /videos 단계에서 끊습니다.
           }
     
           nextPageToken = j.nextPageToken;
           pageCount += 1;
+    
+          // Search 단계에서 너무 많이 모였으면 /videos에서 자를 수 있도록 break
           if (!nextPageToken) break;
+          // (여기서는 조기 종료를 하지 않고 /videos 단계에서 실제 필터 후 조기 종료)
         }
       }
     
       if (videoIds.length === 0) return [];
     
-      // 2) Videos API로 상세(통계/길이/채널/게시일) 조회
-      const results = [];
+      // 2) Videos API: 상세 조회 + 필터 + 조기 종료
       for (let i = 0; i < videoIds.length; i += 50) {
         const chunk = videoIds.slice(i, i + 50);
         const vp = new URLSearchParams({
@@ -2372,7 +2392,7 @@ async fetchRealYoutubeData(category, count) {
         const j = await r.json();
     
         for (const v of (j.items || [])) {
-          const s = v.statistics || {};
+          const s  = v.statistics || {};
           const sn = v.snippet || {};
           const cd = v.contentDetails || {};
     
@@ -2406,15 +2426,22 @@ async fetchRealYoutubeData(category, count) {
             publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
             engagement,
             isShorts,
-            viewsPerSubNumeric: 0 // (채널 구독자 미조회 시 0)
+            viewsPerSubNumeric: 0
           };
           out.viralScore = this.calculateViralScore ? this.calculateViralScore(out) : 0;
+    
           results.push(out);
+    
+          // ✅ 필요 개수 도달 시 즉시 종료
+          if (results.length >= maxNeeded) {
+            return results;
+          }
         }
       }
     
       return results;
     }
+
 
     
     // (c) ISO 8601 PT 포맷 → 초 (보조)
