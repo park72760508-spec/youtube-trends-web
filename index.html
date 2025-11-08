@@ -109,39 +109,75 @@
                         </div>
                         
                         <!-- 두 번째 행: 고급 설정 -->
+                        <!-- 두 번째 행: 고급 설정 -->
                         <div class="form-row">
-                            <div class="form-group">
-                                <label for="sortBy">🎯 분석 기준</label>
-                                <select id="sortBy" class="form-control">
-                                    <option value="viral_score" selected>🚀 바이럴 점수 (종합)</option>
-                                    <option value="growth_rate">📈 성장률 높은 순</option>
-                                    <option value="engagement_rate">💬 참여율 높은 순</option>
-                                    <option value="views_per_sub">👑 구독자 대비 조회수</option>
-                                    <option value="recent_popular">🕐 최신 인기 영상</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="minViews">🎬 최소 조회수</label>
-                                <select id="minViews" class="form-control">
-                                    <option value="0">제한 없음</option>
-                                    <option value="1000">1천 이상</option>
-                                    <option value="5000" selected>5천 이상</option>
-                                    <option value="10000">1만 이상</option>
-                                    <option value="50000">5만 이상</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="videoCount">영상 개수</label>
-                                <select id="videoCount" class="form-control">
-                                    <option value="20">20개</option>
-                                    <option value="50" selected>50개</option>
-                                    <option value="100">100개</option>
-                                    <option value="200">200개</option>
-                                </select>
-                            </div>
+                          <div class="form-group">
+                            <label for="rankingMode">🏆 선정 방식</label>
+                            <select id="rankingMode" class="form-control">
+                              <option value="channel" selected>채널 우선 (권장)</option>
+                              <option value="video">영상 우선 (현재 방식)</option>
+                            </select>
+                          </div>
+                        
+                          <div class="form-group">
+                            <label for="sortBy">🎯 분석 기준</label>
+                            <select id="sortBy" class="form-control">
+                              <option value="viral_score" selected>🚀 바이럴 점수 (종합)</option>
+                              <option value="growth_rate">📈 성장률 높은 순</option>
+                              <option value="engagement_rate">💬 참여율 높은 순</option>
+                              <option value="views_per_sub">👑 구독자 대비 조회수</option>
+                              <option value="recent_popular">🕐 최신 인기 영상</option>
+                            </select>
+                          </div>
+                        
+                          <div class="form-group">
+                            <label for="minViews">🎬 최소 조회수</label>
+                            <select id="minViews" class="form-control">
+                              <option value="0">제한 없음</option>
+                              <option value="1000">1천 이상</option>
+                              <option value="5000" selected>5천 이상</option>
+                              <option value="10000">1만 이상</option>
+                              <option value="50000">5만 이상</option>
+                            </select>
+                          </div>
+                        
+                          <div class="form-group">
+                            <label for="videoCount">영상 개수</label>
+                            <select id="videoCount" class="form-control">
+                              <option value="20">20개</option>
+                              <option value="50" selected>50개</option>
+                              <option value="100">100개</option>
+                              <option value="200">200개</option>
+                            </select>
+                          </div>
                         </div>
+                        
+                        <!-- ▼ 채널 랭킹 & 트렌드 표 섹션 (신규) -->
+                        <section class="charts-section" id="rankingSection" style="display:none; margin-top:24px;">
+                          <div class="chart-row">
+                            <div class="chart-container">
+                              <h3>📋 채널 랭킹 & 트렌드 표</h3>
+                              <div class="table-responsive">
+                                <table id="rankingTable" class="table-pro">
+                                  <thead>
+                                    <tr>
+                                      <th>#</th>
+                                      <th>채널명</th>
+                                      <th>구독자</th>
+                                      <th>최근 업로드수</th>
+                                      <th>최근 조회 합계</th>
+                                      <th>평균 조회/구독</th>
+                                      <th>참여율(평균)</th>
+                                      <th>바이럴 점수</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody><!-- JS 렌더링 --></tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+
                         
                         <!-- 검색 버튼 -->
                         <div class="search-buttons">
