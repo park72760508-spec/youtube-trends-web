@@ -5,34 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- 🔒 Content Security Policy 설정 (모든 CSP 오류 해결) -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self';
-        script-src 'self' 'unsafe-eval' 'unsafe-inline' 
-            https://cdnjs.cloudflare.com 
-            https://cdn.jsdelivr.net 
-            https://cdn.sheetjs.com
-            https://www.googleapis.com 
-            https://youtube.googleapis.com;
-        style-src 'self' 'unsafe-inline' 
-            https://cdnjs.cloudflare.com 
-            https://fonts.googleapis.com;
-        font-src 'self' 
-            https://cdnjs.cloudflare.com 
-            https://fonts.gstatic.com;
-        img-src 'self' data: https: blob:;
-        connect-src 'self' 
-            https://cdnjs.cloudflare.com
-            https://cdn.jsdelivr.net
-            https://cdn.sheetjs.com
-            https://www.googleapis.com 
-            https://youtube.googleapis.com 
-            https://content-youtube.googleapis.com;
-        worker-src 'self' blob:;
-        child-src 'self' blob:;
-        object-src 'none';
-        base-uri 'self';
-        form-action 'self';
-    ">
+    <!-- 🔒 Content Security Policy 설정 (eval 허용, 한 줄 형식) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.sheetjs.com https://www.googleapis.com https://youtube.googleapis.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.sheetjs.com https://www.googleapis.com https://youtube.googleapis.com https://content-youtube.googleapis.com; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';">
     
     <title>🎯 시니어 YouTube 트렌드 분석기 Pro | CSP 완전 해결</title>
     
@@ -81,8 +55,8 @@
     <meta property="og:description" content="시니어 특화 YouTube 트렌드 분석 및 Excel 다운로드 도구 (CSP 완전 해결)">
     
     <!-- 추가 보안 헤더 -->
+    <!-- 추가 보안 헤더 (X-Frame-Options 제거) -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 </head>
