@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- CSP-safe SheetJS (XLSX) ESM -->
+    <!-- ✅ XLSX ESM만 사용 (CSP-safe) -->
     <script type="module">
       import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
-      window.XLSX = XLSX; // 기존 코드에서 window.XLSX 사용 가능
+      window.XLSX = XLSX;
     </script>
 
 
@@ -19,20 +19,6 @@
     <!-- CSS 파일 -->
     <link rel="stylesheet" href="styles.css">
     
-    <!-- 🔧 eval을 사용하지 않는 라이브러리 버전 -->
-    <!-- XLSX 라이브러리 (구버전 - eval 사용 안함) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" 
-            integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" 
-            crossorigin="anonymous" 
-            referrerpolicy="no-referrer">
-    </script>
-    
-    <!-- Chart.js 라이브러리 (구버전 - eval 사용 안함) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js" 
-            integrity="sha512-ElRFoEQdI5Ht6kZvyzXhYG9NqjtkmlkfYk0wr6wHxU9JEHakS7UJZNeml5ALk+8IKlU6jDgMabC3vkumRokgJA==" 
-            crossorigin="anonymous" 
-            referrerpolicy="no-referrer">
-    </script>
     
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" 
@@ -377,11 +363,13 @@
                 <div class="results-header">
                     <h3>🔥 핫한 트렌드 영상 분석 결과</h3>
                     <div class="results-controls">
-                        <select id="viewMode" class="form-control">
-                            <option value="card">카드 보기</option>
-                            <option value="table">표 보기</option>
-                        </select>
+                      <label for="viewMode" class="sr-only">결과 보기 방식</label>
+                      <select id="viewMode" class="form-control" aria-label="결과 보기 방식">
+                        <option value="card">카드 보기</option>
+                        <option value="table">표 보기</option>
+                      </select>
                     </div>
+
                 </div>
 
 
