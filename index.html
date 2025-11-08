@@ -249,13 +249,33 @@
             <section class="results-section" id="resultsSection" style="display: none;">
                 <div class="results-header">
                     <h2>🏆 최상위 핫한 영상 순위</h2>
-                    <div class="view-controls">
-                        <button id="cardViewBtn" class="view-btn active">
-                            <i class="fas fa-th-large"></i> 카드 보기
-                        </button>
-                        <button id="tableViewBtn" class="view-btn">
-                            <i class="fas fa-table"></i> 테이블 보기
-                        </button>
+                    <div class="results-controls">
+                        <div class="sort-controls">
+                            <label for="sortBy">📊 정렬 기준:</label>
+                            <select id="sortBy" class="sort-select">
+                                <option value="viralScore" selected>🔥 바이럴 점수</option>
+                                <option value="viewCount">👁️ 조회수</option>
+                                <option value="subscriberCount">👥 구독자수</option>
+                                <option value="engagementRate">💬 참여율</option>
+                                <option value="growthRate">📈 성장률</option>
+                                <option value="publishedAt">📅 업로드일</option>
+                            </select>
+                            <select id="sortOrder" class="sort-select">
+                                <option value="desc" selected>📉 높은순</option>
+                                <option value="asc">📈 낮은순</option>
+                            </select>
+                            <button id="applySortBtn" class="btn-sort">
+                                <i class="fas fa-sort"></i> 정렬 적용
+                            </button>
+                        </div>
+                        <div class="view-controls">
+                            <button id="cardViewBtn" class="view-btn active">
+                                <i class="fas fa-th-large"></i> 카드 보기
+                            </button>
+                            <button id="tableViewBtn" class="view-btn">
+                                <i class="fas fa-table"></i> 테이블 보기
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -270,13 +290,14 @@
                         <thead>
                             <tr>
                                 <th class="rank-col">순위</th>
-                                <th class="video-col">영상 정보</th>
+                                <th class="video-col">영상 정보 <small>(제목 클릭시 링크)</small></th>
                                 <th class="viral-col">바이럴 점수</th>
                                 <th class="stats-col">조회수</th>
                                 <th class="engagement-col">참여율</th>
                                 <th class="growth-col">성장률</th>
                                 <th class="format-col">형식</th>
                                 <th class="date-col">업로드일</th>
+                                <th class="action-col">액션</th>
                             </tr>
                         </thead>
                         <tbody id="videoTableBody">
