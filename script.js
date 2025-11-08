@@ -523,63 +523,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         };
     }
     
-    // 기존 YouTube API 호출 메서드들 (변경 없음)
-    async searchVideosForKeyword(keyword, format, timeRange) {
-        try {
-            const timeFilter = this.getTimeFilter(timeRange);
-            const durationFilter = this.getDurationFilter(format);
-            
-            const url = `${this.baseUrl}/search?` + new URLSearchParams({
-                part: 'snippet',
-                q: keyword,
-                type: 'video',
-                order: 'relevance',
-                maxResults: '25', // 결과 수 감소로 할당량 절약
-                publishedAfter: timeFilter,
-                videoDuration: durationFilter,
-                regionCode: 'KR',
-                relevanceLanguage: 'ko',
-                key: this.apiKey
-            });
-            
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`API 오류: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (!data.items || data.items.length === 0) {
-                return [];
-            }
-            
-            // 비디오 세부 정보 가져오기
-            const videoIds = data.items.map(item => item.id.videoId).join(',');
-            const detailsUrl = `${this.baseUrl}/videos?` + new URLSearchParams({
-                part: 'statistics,contentDetails,snippet',
-                id: videoIds,
-                key: this.apiKey
-            });
-            
-            const detailsResponse = await fetch(detailsUrl);
-            const detailsData = await detailsResponse.json();
-            
-            if (!detailsData.items) {
-                return [];
-            }
-            
-            // 채널 정보는 캐시 또는 추정으로 대체하여 할당량 절약
-            const videos = detailsData.items.map(video => 
-                this.transformVideoDataOptimized(video, keyword)
-            );
-            
-            return videos;
-            
-        } catch (error) {
-            console.warn(`키워드 "${keyword}" 검색 오류:`, error);
-            throw error;
-        }
-    }
     
     // 최적화된 비디오 데이터 변환 (채널 정보 API 호출 생략)
     transformVideoDataOptimized(video, searchKeyword) {
@@ -1457,8 +1400,8 @@ class OptimizedYoutubeTrendsAnalyzer {
                         this.updateQuotaUsage(100);
                         this.saveToCache(cacheKey, videos);
                     } else {
-                        console.warn(`⚠️ 할당량 부족으로 ${keyword} 스킵`);
-                        continue;
+                        console.warn(`⚠️ 할당량 부족으로 ${keyword}를 모의 데이터로 대체합니다.`);
+                        videos = this.mockDataGenerator.generateForKeyword(keyword, 5);
                     }
                 }
                 
@@ -1550,6 +1493,11 @@ class OptimizedYoutubeTrendsAnalyzer {
             const data = await response.json();
             
             if (data.error) {
+                // 할당량 초과 시 특별 처리
+                if (data.error.message.includes('quota') || data.error.message.includes('exceeded')) {
+                    console.warn(`⚠️ API 할당량 초과 (${keyword}). 모의 데이터로 대체합니다.`);
+                    return this.mockDataGenerator.generateForKeyword(keyword, 10);
+                }
                 throw new Error(data.error.message);
             }
             
