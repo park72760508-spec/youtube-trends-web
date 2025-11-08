@@ -2310,18 +2310,21 @@ async fetchRealYoutubeData(category, count) {
       '어르신', '실버세대', '실버 생활', '시니어 브이로그'
     ];
     
-    // (b) 기간 내 모든 시니어 영상 수집 → 상세 통계 매핑
-    async collectSeniorVideosKR({ publishedAfter, format='shorts', minViews=0 }) {
+    async collectSeniorVideosKR({ publishedAfter, format = 'shorts', minViews = 0 }) {
       const base = this.baseUrl || 'https://www.googleapis.com/youtube/v3';
       const foundIds = new Set();
       const videoIds = [];
     
-      // Search API: type=video, 다중 키워드 페이징
-      for (const kw of ) {
-        let nextPageToken;
+      // 1) 한국어 시니어 키워드 전수 검색 (type=video, 페이지네이션)
+      const keywords = Array.isArray(this.seniorKeywords) && this.seniorKeywords.length
+        ? this.seniorKeywords
+        : ['시니어', '노년', '실버', '시니어 건강', '시니어 운동', '시니어 라이프'];
+    
+      for (const kw of keywords) {
+        let nextPageToken = undefined;
         let pageCount = 0;
     
-        while (pageCount < 5) { // 키워드당 최대 5페이지(튜닝 가능)
+        while (pageCount < 5) { // 키워드당 최대 5 페이지 (튜닝 가능)
           const sp = new URLSearchParams({
             key: this.apiKey,
             part: 'snippet',
@@ -2338,13 +2341,15 @@ async fetchRealYoutubeData(category, count) {
           const r = await fetch(`${base}/search?${sp.toString()}`);
           if (!r.ok) break;
           const j = await r.json();
+    
           const items = j.items || [];
           for (const it of items) {
-            const id = it?.id?.videoId;
+            const id = it && it.id ? it.id.videoId : undefined;
             if (!id || foundIds.has(id)) continue;
             foundIds.add(id);
             videoIds.push(id);
           }
+    
           nextPageToken = j.nextPageToken;
           pageCount += 1;
           if (!nextPageToken) break;
@@ -2353,10 +2358,10 @@ async fetchRealYoutubeData(category, count) {
     
       if (videoIds.length === 0) return [];
     
-      // Videos API: 통계/길이/채널/게시일 가져오기
+      // 2) Videos API로 상세(통계/길이/채널/게시일) 조회
       const results = [];
-      for (let i=0; i<videoIds.length; i+=50) {
-        const chunk = videoIds.slice(i, i+50);
+      for (let i = 0; i < videoIds.length; i += 50) {
+        const chunk = videoIds.slice(i, i + 50);
         const vp = new URLSearchParams({
           key: this.apiKey,
           part: 'statistics,contentDetails,snippet',
@@ -2366,42 +2371,51 @@ async fetchRealYoutubeData(category, count) {
         if (!r.ok) continue;
         const j = await r.json();
     
-        for (const v of (j.items||[])) {
-          const s=v.statistics||{}, sn=v.snippet||{}, cd=v.contentDetails||{};
-          const views = Number(s.viewCount||0);
+        for (const v of (j.items || [])) {
+          const s = v.statistics || {};
+          const sn = v.snippet || {};
+          const cd = v.contentDetails || {};
     
-          // (1) 최소 조회수 필터
+          const views = Number(s.viewCount || 0);
           if (views < minViews) continue;
     
-          // (2) 포맷 필터(쇼츠)
-          const durSec = this.parseDuration ? this.parseDuration(cd.duration||'PT0S') : this._parseISODuration(cd.duration||'PT0S');
+          // 길이(쇼츠 필터)
+          const durSec = (this.parseDuration
+            ? this.parseDuration(cd.duration || 'PT0S')
+            : this._parseISODuration(cd.duration || 'PT0S'));
           const isShorts = durSec <= 60;
           if (format === 'shorts' && !isShorts) continue;
     
-          // (3) 기본 지표 매핑
-          const engagement = (s.likeCount && views) ? ((Number(s.likeCount)/views)*100).toFixed(1) : (Math.random()*5+2).toFixed(1);
+          // 지표 계산
+          const engagement = (s.likeCount && views)
+            ? ((Number(s.likeCount) / views) * 100).toFixed(1)
+            : (Math.random() * 5 + 2).toFixed(1);
+    
           const out = {
             id: v.id,
             videoId: v.id,
-            title: sn.title||'(제목 없음)',
-            channel: sn.channelTitle||'-',
-            channelId: sn.channelId||'',
+            title: sn.title || '(제목 없음)',
+            channel: sn.channelTitle || '-',
+            channelId: sn.channelId || '',
             views: views.toLocaleString(),
             viewsNumeric: views,
-            likes: Number(s.likeCount||0).toLocaleString(),
-            comments: Number(s.commentCount||0).toLocaleString(),
-            duration: (cd.duration||'PT0S'),
+            likes: Number(s.likeCount || 0).toLocaleString(),
+            comments: Number(s.commentCount || 0).toLocaleString(),
+            duration: cd.duration || 'PT0S',
             publishedAt: sn.publishedAt || '',
-            publishTime: new Date(sn.publishedAt||Date.now()).toLocaleDateString('ko-KR'),
+            publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
             engagement,
             isShorts,
-            viewsPerSubNumeric: 0 // 채널 구독자수 미조회 시 0
+            viewsPerSubNumeric: 0 // (채널 구독자 미조회 시 0)
           };
+          out.viralScore = this.calculateViralScore ? this.calculateViralScore(out) : 0;
           results.push(out);
         }
       }
+    
       return results;
     }
+
     
     // (c) ISO 8601 PT 포맷 → 초 (보조)
     _parseISODuration(iso='PT0S') {
