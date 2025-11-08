@@ -1442,7 +1442,11 @@ class OptimizedYoutubeTrendsAnalyzer {
             try {
                 console.log(`🔍 스마트 검색: ${keyword}`);
                 
-                const cacheKey = this.getCacheKey(keyword, format, 'week');
+                // 스마트 모드에서는 더 짧은 기간 사용 (API 효율성)
+                const smartTimeRange = timeRange === '2weeks' ? '1week' : 
+                                      timeRange === '1week' ? '3days' : 
+                                      timeRange === '3days' ? '1day' : '1day';
+                const cacheKey = this.getCacheKey(keyword, format, smartTimeRange);
                 let videos = this.getFromCache(cacheKey);
                 
                 if (!videos) {
@@ -1585,12 +1589,14 @@ class OptimizedYoutubeTrendsAnalyzer {
     getPublishedAfterDate(timeRange) {
         const now = new Date();
         switch (timeRange) {
-            case 'week':
+            case '1day':
+                return new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString();
+            case '3days':
+                return new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+            case '1week':
                 return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            case 'month':
-                return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-            case '3months':
-                return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            case '2weeks':
+                return new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
             default:
                 return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
         }
@@ -1929,10 +1935,24 @@ class OptimizedYoutubeTrendsAnalyzer {
         video.growthRate = growthRate;
         const growthScore = Math.min(growthRate * 0.5, 25);
         
-        // 최신성 점수 (0-20점)
+        // 최신성 점수 (0-20점) - 기간별 가중치 적용
         const daysSincePublish = video.daysSincePublish || 1;
-        const freshnessScore = Math.max(20 - (daysSincePublish * 2), 0);
-        video.freshnessScore = freshnessScore;
+        let freshnessScore = 0;
+        
+        // 분석 기간에 따른 최신성 점수 계산
+        if (daysSincePublish <= 1) {
+            freshnessScore = 20; // 1일 이내: 최고점
+        } else if (daysSincePublish <= 3) {
+            freshnessScore = Math.max(18 - (daysSincePublish - 1) * 2, 12); // 3일 이내: 12-18점
+        } else if (daysSincePublish <= 7) {
+            freshnessScore = Math.max(12 - (daysSincePublish - 3) * 1, 8); // 1주 이내: 8-12점
+        } else if (daysSincePublish <= 14) {
+            freshnessScore = Math.max(8 - (daysSincePublish - 7) * 0.5, 4); // 2주 이내: 4-8점
+        } else {
+            freshnessScore = Math.max(4 - (daysSincePublish - 14) * 0.1, 0); // 2주 초과: 0-4점
+        }
+        
+        video.freshnessScore = Math.round(freshnessScore);
         
         // 쇼츠 보너스
         const formatBonus = video.isShorts ? 10 : 0;
