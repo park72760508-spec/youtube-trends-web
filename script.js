@@ -10,20 +10,10 @@
     
     // 라이브러리 로딩 상태 확인
     const checkLibraries = () => {
-        const missing = [];
-        
-        if (typeof XLSX === 'undefined') {
-            missing.push('XLSX (Excel 라이브러리)');
-        }
-        
-        if (typeof Chart === 'undefined') {
-            missing.push('Chart.js (차트 라이브러리)');
-        }
-        
-        if (missing.length > 0) {
-            console.error('❌ 필수 라이브러리 로딩 실패:', missing);
-            return false;
-        }
+    const missing = [];
+    if (typeof XLSX === 'undefined') missing.push('XLSX (Excel 라이브러리)');
+    if (missing.length > 0) { console.error('...', missing); return false; }
+
         
         console.log('✅ 모든 라이브러리 로딩 완료');
         return true;
@@ -43,7 +33,7 @@ class SeniorYoutubeTrendsExcel {
         this.baseUrl = 'https://www.googleapis.com/youtube/v3';
         this.currentData = [];
         this.charts = {};
-        this.init();
+        
         
         // 시니어 특화 키워드 데이터베이스
         this.seniorKeywords = {
@@ -80,7 +70,7 @@ class SeniorYoutubeTrendsExcel {
             ]
         };
         
-        this.init();
+       this.init();
     }
     
     // 초기화
@@ -2302,7 +2292,7 @@ async fetchRealYoutubeData(category, count) {
       const videoIds = [];
     
       // Search API: type=video, 다중 키워드 페이징
-      for (const kw of this.seniorKeywords) {
+      for (const kw of ) {
         let nextPageToken;
         let pageCount = 0;
     
