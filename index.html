@@ -70,15 +70,7 @@
                     <div class="search-form">
                         <!-- 첫 번째 행: 기본 설정 -->
                         <div class="form-row">
-                            <div class="form-group">
-                                <label for="videoFormat">📺 영상 형식</label>
-                                <select id="videoFormat" class="form-control">
-                                    <option value="all">🌟 전체 형식</option>
-                                    <option value="shorts">📱 쇼츠 (60초 이하)</option>
-                                    <option value="long">🎬 롱폼 (60초 초과)</option>
-                                </select>
-                            </div>
-                            
+
                             <div class="form-group">
                                 <label for="categorySelect">카테고리 선택</label>
                                 <select id="categorySelect" class="form-control">
@@ -363,8 +355,8 @@
                 <div class="results-header">
                     <h3>🔥 핫한 트렌드 영상 분석 결과</h3>
                     <div class="results-controls">
-                      <label for="viewMode" class="sr-only">결과 보기 방식</label>
-                      <select id="viewMode" class="form-control" aria-label="결과 보기 방식">
+                      <label for="viewMode" class="visually-hidden">보기 방식</label>
+                      <select id="viewMode" class="form-control" aria-label="보기 방식">
                         <option value="card">카드 보기</option>
                         <option value="table">표 보기</option>
                       </select>
@@ -458,45 +450,31 @@
     </footer>
 
     <!-- JavaScript 라이브러리 로딩 확인 (eval 방지) -->
+    <!-- JavaScript 라이브러리 로딩 확인 (Chart 검사 제거) -->
     <script>
-    console.log('🔍 eval 오류 완전 해결 - 라이브러리 확인 시작');
+    console.log('🔍 라이브러리 로딩 상태 확인 시작');
     
-    // 안전한 로딩 확인 (eval 사용 안함)
     function checkLibrariesSafely() {
+      try {
         console.log('📦 라이브러리 로딩 상태 확인:');
-        
-        // XLSX 확인
         if (typeof XLSX !== 'undefined' && XLSX.version) {
-            console.log('✅ XLSX 라이브러리 정상 로딩 (버전:', XLSX.version, ')');
+          console.log('✅ XLSX 로딩 OK (v' + XLSX.version + ')');
         } else {
-            console.error('❌ XLSX 라이브러리 로딩 실패');
+          console.error('❌ XLSX 로딩 실패');
         }
-        
-        // Chart.js 확인
-        if (typeof Chart !== 'undefined' && Chart.version) {
-            console.log('✅ Chart.js 라이브러리 정상 로딩 (버전:', Chart.version, ')');
-        } else {
-            console.error('❌ Chart.js 라이브러리 로딩 실패');
-        }
-        
-        // 완료 메시지
-        if (typeof XLSX !== 'undefined' && typeof Chart !== 'undefined') {
-            console.log('🎉 모든 라이브러리 정상 로딩! eval 오류 해결 성공!');
-        }
+      } catch (e) {
+        console.error('⚠️ 라이브러리 확인 중 오류:', e);
+      }
     }
     
-    // DOM 로딩 완료 후 확인
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', checkLibrariesSafely);
+      document.addEventListener('DOMContentLoaded', checkLibrariesSafely);
     } else {
-        checkLibrariesSafely();
+      checkLibrariesSafely();
     }
-    
-    // 추가 안전 확인 (모든 리소스 로딩 후)
-    window.addEventListener('load', function() {
-        setTimeout(checkLibrariesSafely, 500);
-    });
+    window.addEventListener('load', () => setTimeout(checkLibrariesSafely, 300));
     </script>
+
     
     <!-- 메인 스크립트 -->
     <script src="script.js"></script>
