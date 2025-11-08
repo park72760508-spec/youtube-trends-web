@@ -43,6 +43,7 @@ class SeniorYoutubeTrendsExcel {
         this.baseUrl = 'https://www.googleapis.com/youtube/v3';
         this.currentData = [];
         this.charts = {};
+        this.init();
         
         // 시니어 특화 키워드 데이터베이스
         this.seniorKeywords = {
@@ -1070,25 +1071,34 @@ async fetchRealYoutubeData(category, count) {
     
     // 차트 업데이트
     // Pro 버전 HTML과 완전 일치하는 차트 시스템
+    // (클래스 내부)
     updateCharts() {
-        // 🔒 Chart.js 라이브러리 확인
-        if (typeof Chart === 'undefined') {
-            console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
-            return;
-        }
-        
-        this.createFormatChart();     // 📱 쇼츠/롱폼 비율 차트
-        this.createViralChart();      // 🚀 바이럴 점수 분포 차트  
-        this.createCategoryChart();   // 📊 카테고리별 트렌드 차트
-        this.createTimeChart();       // ⏰ 시간대별 업로드 차트
-        
-        // 차트 섹션 표시
-        const chartsSection = document.getElementById('chartsSection');
-        if (chartsSection) {
-            chartsSection.style.display = 'block';
-        }
+      // 0) 라이브러리/데이터 가드
+      if (typeof Chart === 'undefined') {
+        console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
+        return;
+      }
+      if (!this.currentData || this.currentData.length === 0) {
+        console.warn('차트에 표시할 데이터가 없습니다.');
+        return;
+      }
+    
+      // 1) 각 차트 생성 메서드 호출 (클래스 내부 메서드로 보장)
+      this.createFormatChart();
+      this.createViralChart();
+      this.createCategoryChart();
+      this.createTimeChart();
+    
+      // 2) 섹션 표시
+      const chartsSection = document.getElementById('chartsSection');
+      if (chartsSection) chartsSection.style.display = 'block';
     }
 
+
+
+
+
+    
     // 쇼츠/롱폼 비율 차트 (Chart.js 3.x 호환)
     createFormatChart() {
         const canvas = document.getElementById('formatChart');
@@ -1940,7 +1950,96 @@ async fetchRealYoutubeData(category, count) {
     }
 
 
-}
+
+    // 📱 쇼츠/롱폼 비율 차트
+    createFormatChart() {
+      const canvas = document.getElementById('formatChart');
+      if (!canvas) { console.warn('formatChart 캔버스를 찾을 수 없습니다.'); return; }
+      const ctx = canvas.getContext('2d');
+    
+      const shorts = this.currentData.filter(v => (this.parseDuration(v.duration || 'PT0S') <= 60)).length;
+      const longForm = this.currentData.length - shorts;
+    
+      if (this.charts.formatChart) this.charts.formatChart.destroy();
+      this.charts.formatChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: ['📱 쇼츠', '🎬 롱폼'], datasets: [{ data: [shorts, longForm] }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+    
+    // 🚀 바이럴 점수 분포 차트(간단 버킷)
+    createViralChart() {
+      const canvas = document.getElementById('viralChart');
+      if (!canvas) { console.warn('viralChart 캔버스를 찾을 수 없습니다.'); return; }
+      const ctx = canvas.getContext('2d');
+    
+      const buckets = { '0-100': 0, '100-200': 0, '200-500': 0, '500+': 0 };
+      (this.currentData || []).forEach(v => {
+        const s = v.viralScore || this.calculateViralScore?.(v) || 0;
+        if (s >= 500) buckets['500+']++;
+        else if (s >= 200) buckets['200-500']++;
+        else if (s >= 100) buckets['100-200']++;
+        else buckets['0-100']++;
+      });
+    
+      if (this.charts.viralChart) this.charts.viralChart.destroy();
+      this.charts.viralChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: Object.keys(buckets), datasets: [{ label: '영상 수', data: Object.values(buckets) }] },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+    
+    // 📊 카테고리별 개수 차트
+    createCategoryChart() {
+      const canvas = document.getElementById('categoryChart');
+      if (!canvas) { console.warn('categoryChart 캔버스를 찾을 수 없습니다.'); return; }
+      const ctx = canvas.getContext('2d');
+    
+      const agg = (this.currentData || []).reduce((acc, v) => {
+        const k = v.categoryName || v.category || '기타';
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+    
+      if (this.charts.categoryChart) this.charts.categoryChart.destroy();
+      this.charts.categoryChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: Object.keys(agg), datasets: [{ data: Object.values(agg) }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+    
+    // ⏰ 업로드 시간대 분포 차트
+    createTimeChart() {
+      const canvas = document.getElementById('timeChart');
+      if (!canvas) { console.warn('timeChart 캔버스를 찾을 수 없습니다.'); return; }
+      const ctx = canvas.getContext('2d');
+    
+      const hours = Array.from({ length: 24 }, (_, h) => h);
+      const dist = hours.map(() => 0);
+      (this.currentData || []).forEach(v => {
+        const ts = v.publishedAt || v.publishTime;
+        const d = ts ? new Date(ts) : null;
+        const h = d ? d.getHours() : NaN;
+        if (!Number.isNaN(h)) dist[h]++;
+      });
+    
+      if (this.charts.timeChart) this.charts.timeChart.destroy();
+      this.charts.timeChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: hours.map(h => `${h}시`), datasets: [{ label: '업로드 수', data: dist }] },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+
+    
+}  
+// class SeniorYoutubeTrendsExcel  끝부분
+
+
 
 // 앱 초기화
 document.addEventListener('DOMContentLoaded', () => {
