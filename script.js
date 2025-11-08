@@ -1,7 +1,41 @@
 /**
  * 시니어 YouTube 트렌드 분석기 - 엑셀 다운로드 중심
  * Excel/CSV/JSON/PDF 다운로드 기능 구현
+ * CSP (Content Security Policy) 완전 호환
  */
+
+// 🔒 CSP 호환성 확인
+(function() {
+    'use strict';
+    
+    // 라이브러리 로딩 상태 확인
+    const checkLibraries = () => {
+        const missing = [];
+        
+        if (typeof XLSX === 'undefined') {
+            missing.push('XLSX (Excel 라이브러리)');
+        }
+        
+        if (typeof Chart === 'undefined') {
+            missing.push('Chart.js (차트 라이브러리)');
+        }
+        
+        if (missing.length > 0) {
+            console.error('❌ 필수 라이브러리 로딩 실패:', missing);
+            return false;
+        }
+        
+        console.log('✅ 모든 라이브러리 로딩 완료');
+        return true;
+    };
+    
+    // DOM 로딩 완료 시 확인
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkLibraries);
+    } else {
+        checkLibraries();
+    }
+})();
 
 class SeniorYoutubeTrendsExcel {
     constructor() {
@@ -1037,10 +1071,22 @@ async fetchRealYoutubeData(category, count) {
     // 차트 업데이트
     // Pro 버전 HTML과 완전 일치하는 차트 시스템
     updateCharts() {
+        // 🔒 Chart.js 라이브러리 확인
+        if (typeof Chart === 'undefined') {
+            console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
+            return;
+        }
+        
         this.createFormatChart();     // 📱 쇼츠/롱폼 비율 차트
         this.createViralChart();      // 🚀 바이럴 점수 분포 차트  
         this.createCategoryChart();   // 📊 카테고리별 트렌드 차트
         this.createTimeChart();       // ⏰ 시간대별 업로드 차트
+        
+        // 차트 섹션 표시
+        const chartsSection = document.getElementById('chartsSection');
+        if (chartsSection) {
+            chartsSection.style.display = 'block';
+        }
     }
     
     // 카테고리 차트 생성
@@ -1201,6 +1247,12 @@ async fetchRealYoutubeData(category, count) {
     
     // Excel 다운로드 - 핵심 기능!
         downloadExcel() {
+          // 🔒 XLSX 라이브러리 확인
+          if (typeof XLSX === 'undefined') {
+            alert('❌ Excel 라이브러리가 로딩되지 않았습니다. 페이지를 새로고침해주세요.');
+            return;
+          }
+          
           if (!this.currentData || !this.currentData.length) {
             alert('다운로드할 데이터가 없습니다.');
             return;
