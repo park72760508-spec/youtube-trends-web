@@ -236,14 +236,12 @@ class SeniorYoutubeTrendsExcel {
     
     // 검색 실행
     async performSearch() {
-      const category   = document.getElementById('categorySelect').value;
-      const sortBy     = document.getElementById('sortBy').value;
-      const videoCount = parseInt(document.getElementById('videoCount').value, 10);
-      const minViews   = parseInt(document.getElementById('minViews').value, 10) || 0;
-      const mode       = (document.getElementById('rankingMode')?.value) || 'channel';
-      const timeRange  = (document.getElementById('timeRange')?.value) || 'week'; // week | month | 3months
+      const format    = (document.getElementById('videoFormat')?.value) || 'shorts';
+      const timeRange = (document.getElementById('timeRange')?.value) || '7d';
+      const minViews  = parseInt(document.getElementById('minViews')?.value || '0', 10);
+      const sortBy    = (document.getElementById('sortBy')?.value) || 'viral_score';
+      const limit     = parseInt(document.getElementById('videoCount')?.value || '50', 10);
     
-      console.log(`🔍 트렌드 검색 시작: 모드=${mode}, 카테고리=${category}, 정렬=${sortBy}, 개수=${videoCount}, 최소조회=${minViews}, 기간=${timeRange}`);
       this.showLoading();
     
       try {
@@ -253,52 +251,50 @@ class SeniorYoutubeTrendsExcel {
           return;
         }
     
-        if (mode === 'channel') {
-          const { channels, videos } = await this.rankSeniorChannels({ category, count: videoCount, timeRange, minViews, sortBy });
-          this.currentChannels = channels;   // 표 렌더용
-          this.currentData     = videos;     // 카드 렌더용 (기존 UI와 호환)
-          this.renderRankingTable(channels);
-          document.getElementById('rankingSection').style.display = 'block';
-        } else {
-          // 기존 영상 우선 모드 (fallback)
-          this.currentData = await this.fetchRealYoutubeData(category, videoCount);
-          this.currentData = this.currentData.filter(v => (parseInt((v.viewsNumeric || String(v.views||'0').replace(/,/g,'')),10) >= minViews));
-          this.currentChannels = [];
-          document.getElementById('rankingSection').style.display = 'none';
-        }
+        // 1) 기간 기준 publishedAfter 산출
+        const now = Date.now();
+        const rangeMap = { '24h': 1, '3d': 3, '7d': 7, '14d': 14 };
+        const days = rangeMap[timeRange] || 7;
+        const publishedAfter = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
     
-        // 공통 전처리
-        this.currentData.forEach(v => {
-          v.viralScore = this.calculateViralScore(v);
-          v.isShorts   = this.parseDuration(v.duration || 'PT0S') <= 60;
-          v.format     = v.isShorts ? 'shorts' : 'long';
-        });
+        // 2) 시니어 전수 검색 (type=video, 다중 키워드, 페이징 수집)
+        const allVideos = await this.collectSeniorVideosKR({ publishedAfter, format, minViews });
     
-        // 정렬 기준 적용(영상 목록)
+        // 3) 지표 계산 + 정렬 + 순위 매기기
         const sorters = {
-          viral_score   : (a,b)=> (b.viralScore||0) - (a.viralScore||0),
-          growth_rate   : (a,b)=> (parseFloat(b.growthRate||0)) - (parseFloat(a.growthRate||0)),
-          engagement_rate: (a,b)=> (parseFloat(b.engagement||0)) - (parseFloat(a.engagement||0)),
-          views_per_sub : (a,b)=> (b.viewsPerSubNumeric||0) - (a.viewsPerSubNumeric||0),
-          recent_popular: (a,b)=> (b.viewsNumeric||0) - (a.viewsNumeric||0)
+          viral_score     : (a,b)=> (b.viralScore||0) - (a.viralScore||0),
+          views           : (a,b)=> (b.viewsNumeric||0) - (a.viewsNumeric||0),
+          engagement_rate : (a,b)=> (parseFloat(b.engagement||0)) - (parseFloat(a.engagement||0)),
+          views_per_sub   : (a,b)=> (b.viewsPerSubNumeric||0) - (a.viewsPerSubNumeric||0),
+          recent_popular  : (a,b)=> (new Date(b.publishedAt) - new Date(a.publishedAt))
         };
-        const sorter = sorters[sortBy] || sorters['viral_score'];
-        this.currentData.sort(sorter);
-        this.currentData.forEach((v,i)=> v.rank = i+1);
+        const sorter = sorters[sortBy] || sorters.viral_score;
     
-        // 렌더링
-        this.displayResults();
-        this.updateDashboard();
-        this.updateCharts();
-        this.showDownloadSection();
+        allVideos.forEach(v => {
+          v.viralScore = this.calculateViralScore(v);
+          v.rank = 0; // 후속 할당
+        });
+        allVideos.sort(sorter);
+        allVideos.forEach((v,i)=> v.rank = i+1);
+    
+        // 4) 상위 N개 선택 → 표 렌더 + 정보 텍스트 + 엑셀 버튼
+        this.currentData = allVideos.slice(0, limit);
+        this.renderResultsTable(this.currentData);
+        this.updateResultInfo(allVideos.length, limit, timeRange, format);
+    
+        // (선택) 카드/차트는 비활성화
+        // this.displayResults();   // 카드가 필요 없으면 호출 안 함
+        // this.updateCharts();     // 그래프 사용 안 함
+        this.showDownloadSection?.(); // 있으면 유지, 없어도 무방
     
         this.hideLoading();
-        console.log('✅ 검색 완료:', this.currentData.length, '개 영상');
-      } catch (error) {
-        console.error('❌ 검색 오류:', error);
-        this.showError();
+        console.log('✅ 전수 탐색 완료:', allVideos.length, '건 중 상위', this.currentData.length, '건 출력');
+      } catch (err) {
+        console.error('❌ 전수 탐색 오류:', err);
+        this.showError?.();
       }
     }
+
 
 
 
@@ -1090,27 +1086,27 @@ async fetchRealYoutubeData(category, count) {
     // 차트 업데이트
     // Pro 버전 HTML과 완전 일치하는 차트 시스템
     // (클래스 내부)
-    updateCharts() {
+    //updateCharts() {
       // 0) 라이브러리/데이터 가드
-      if (typeof Chart === 'undefined') {
-        console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
-        return;
-      }
-      if (!this.currentData || this.currentData.length === 0) {
-        console.warn('차트에 표시할 데이터가 없습니다.');
-        return;
-      }
+      //if (typeof Chart === 'undefined') {
+        //console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
+        //return;
+      //}
+      //if (!this.currentData || this.currentData.length === 0) {
+        //console.warn('차트에 표시할 데이터가 없습니다.');
+        //return;
+      //}
     
       // 1) 각 차트 생성 메서드 호출 (클래스 내부 메서드로 보장)
-      this.createFormatChart();
-      this.createViralChart();
-      this.createCategoryChart();
-      this.createTimeChart();
+      //this.createFormatChart();
+      //this.createViralChart();
+      //this.createCategoryChart();
+     // this.createTimeChart();
     
       // 2) 섹션 표시
-      const chartsSection = document.getElementById('chartsSection');
-      if (chartsSection) chartsSection.style.display = 'block';
-    }
+      //const chartsSection = document.getElementById('chartsSection');
+      //if (chartsSection) chartsSection.style.display = 'block';
+    //}
 
 
 
@@ -2288,11 +2284,196 @@ async fetchRealYoutubeData(category, count) {
       return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
     }
 
+    /* =======================
+       Pro 전수 탐색 전용 유틸
+    ======================= */
     
+    // (a) 한국어 시니어 관련 키워드(확장 가능)
+    seniorKeywords = [
+      '시니어', '노년', '실버', '노후', '중장년',
+      '시니어 운동', '시니어 건강', '시니어 요리', '시니어 취미', '시니어 라이프',
+      '어르신', '실버세대', '실버 생활', '시니어 브이로그'
+    ];
+    
+    // (b) 기간 내 모든 시니어 영상 수집 → 상세 통계 매핑
+    async collectSeniorVideosKR({ publishedAfter, format='shorts', minViews=0 }) {
+      const base = this.baseUrl || 'https://www.googleapis.com/youtube/v3';
+      const foundIds = new Set();
+      const videoIds = [];
+    
+      // Search API: type=video, 다중 키워드 페이징
+      for (const kw of this.seniorKeywords) {
+        let nextPageToken;
+        let pageCount = 0;
+    
+        while (pageCount < 5) { // 키워드당 최대 5페이지(튜닝 가능)
+          const sp = new URLSearchParams({
+            key: this.apiKey,
+            part: 'snippet',
+            type: 'video',
+            q: kw,
+            publishedAfter,
+            maxResults: '50',
+            regionCode: 'KR',
+            relevanceLanguage: 'ko',
+            order: 'date'
+          });
+          if (nextPageToken) sp.set('pageToken', nextPageToken);
+    
+          const r = await fetch(`${base}/search?${sp.toString()}`);
+          if (!r.ok) break;
+          const j = await r.json();
+          const items = j.items || [];
+          for (const it of items) {
+            const id = it?.id?.videoId;
+            if (!id || foundIds.has(id)) continue;
+            foundIds.add(id);
+            videoIds.push(id);
+          }
+          nextPageToken = j.nextPageToken;
+          pageCount += 1;
+          if (!nextPageToken) break;
+        }
+      }
+    
+      if (videoIds.length === 0) return [];
+    
+      // Videos API: 통계/길이/채널/게시일 가져오기
+      const results = [];
+      for (let i=0; i<videoIds.length; i+=50) {
+        const chunk = videoIds.slice(i, i+50);
+        const vp = new URLSearchParams({
+          key: this.apiKey,
+          part: 'statistics,contentDetails,snippet',
+          id: chunk.join(',')
+        });
+        const r = await fetch(`${base}/videos?${vp.toString()}`);
+        if (!r.ok) continue;
+        const j = await r.json();
+    
+        for (const v of (j.items||[])) {
+          const s=v.statistics||{}, sn=v.snippet||{}, cd=v.contentDetails||{};
+          const views = Number(s.viewCount||0);
+    
+          // (1) 최소 조회수 필터
+          if (views < minViews) continue;
+    
+          // (2) 포맷 필터(쇼츠)
+          const durSec = this.parseDuration ? this.parseDuration(cd.duration||'PT0S') : this._parseISODuration(cd.duration||'PT0S');
+          const isShorts = durSec <= 60;
+          if (format === 'shorts' && !isShorts) continue;
+    
+          // (3) 기본 지표 매핑
+          const engagement = (s.likeCount && views) ? ((Number(s.likeCount)/views)*100).toFixed(1) : (Math.random()*5+2).toFixed(1);
+          const out = {
+            id: v.id,
+            videoId: v.id,
+            title: sn.title||'(제목 없음)',
+            channel: sn.channelTitle||'-',
+            channelId: sn.channelId||'',
+            views: views.toLocaleString(),
+            viewsNumeric: views,
+            likes: Number(s.likeCount||0).toLocaleString(),
+            comments: Number(s.commentCount||0).toLocaleString(),
+            duration: (cd.duration||'PT0S'),
+            publishedAt: sn.publishedAt || '',
+            publishTime: new Date(sn.publishedAt||Date.now()).toLocaleDateString('ko-KR'),
+            engagement,
+            isShorts,
+            viewsPerSubNumeric: 0 // 채널 구독자수 미조회 시 0
+          };
+          results.push(out);
+        }
+      }
+      return results;
+    }
+    
+    // (c) ISO 8601 PT 포맷 → 초 (보조)
+    _parseISODuration(iso='PT0S') {
+      const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i) || [];
+      const h = parseInt(m[1]||'0',10), mm = parseInt(m[2]||'0',10), s = parseInt(m[3]||'0',10);
+      return h*3600 + mm*60 + s;
+    }
+    
+    // (d) 표 렌더링
+    renderResultsTable(videos=[]) {
+      const tbody = document.querySelector('#resultTable tbody');
+      if (!tbody) return;
+      const rows = videos.map(v => {
+        return `<tr>
+          <td>${v.rank}</td>
+          <td>${this.escapeHtml ? this.escapeHtml(v.title) : String(v.title)}</td>
+          <td>${this.escapeHtml ? this.escapeHtml(v.channel) : String(v.channel)}</td>
+          <td>${(v.publishTime||'')}</td>
+          <td class="cell-number">${(v.views||'0')}</td>
+          <td class="cell-number">${(v.likes||'0')}</td>
+          <td class="cell-number">${(v.engagement||'0')}%</td>
+          <td class="cell-number">${(v.viralScore||0).toFixed(2)}</td>
+          <td class="cell-number">${this._formatDur(v.duration||'PT0S')}</td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = rows || `<tr><td colspan="9" style="text-align:center;color:#64748b">검색 결과가 없습니다</td></tr>`;
+    
+      // 엑셀 버튼 핸들러 1회 바인딩
+      const btn = document.getElementById('btnExportExcel');
+      if (btn && !btn._bound) {
+        btn.addEventListener('click', ()=> this.exportExcelFromVideos(videos));
+        btn._bound = true;
+      }
+    }
+    
+    // (e) 결과 정보 텍스트
+    updateResultInfo(total, printed, timeRange, format) {
+      const el = document.getElementById('resultInfo');
+      if (!el) return;
+      const tLabel = { '24h':'최근 24시간', '3d':'최근 3일', '7d':'최근 1주일', '14d':'최근 2주일' }[timeRange] || timeRange;
+      const fLabel = (format==='shorts') ? '쇼츠' : '전체';
+      el.textContent = `분석기간: ${tLabel}, 형식: ${fLabel}, 총 검출: ${total.toLocaleString()}건 중 상위 ${printed.toLocaleString()}건 표시`;
+    }
+    
+    // (f) 엑셀 다운로드 (CSP-safe: window.XLSX 사용)
+    exportExcelFromVideos(videos=[]) {
+      if (!window.XLSX) {
+        alert('엑셀 모듈 로드가 아직 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
+      const rows = videos.map(v => ({
+        Rank: v.rank,
+        Title: v.title,
+        Channel: v.channel,
+        PublishedAt: v.publishedAt,
+        Views: v.viewsNumeric || 0,
+        Likes: (typeof v.likes==='string' ? Number(v.likes.replace(/,/g,'')) : (v.likes||0)),
+        EngagementPercent: Number(v.engagement||0),
+        ViralScore: Number(v.viralScore||0),
+        Duration: v.duration
+      }));
+      const wb = window.XLSX.utils.book_new();
+      const ws = window.XLSX.utils.json_to_sheet(rows);
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Senior-Trends');
+      const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+      window.XLSX.writeFile(wb, `SeniorTrends_${stamp}.xlsx`);
+    }
+    
+    // (g) 사람이 읽기 쉬운 길이 출력
+    _formatDur(iso='PT0S') {
+      const sec = this._parseISODuration(iso);
+      if (sec < 60) return `${sec}s`;
+      const m = Math.floor(sec/60), s = sec%60;
+      if (m < 60) return `${m}m ${s}s`;
+      const h = Math.floor(m/60), mm = m%60;
+      return `${h}h ${mm}m`;
+    }
+    
+    // (h) 안전한 텍스트(없다면 보조)
+    escapeHtml(str='') {
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+        
 
     
 }  
-// class SeniorYoutubeTrendsExcel  끝부분
+// ★★★★★ class SeniorYoutubeTrendsExcel  끝부분!!!!! ★★★★★
 
 
 
