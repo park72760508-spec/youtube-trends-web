@@ -1214,3 +1214,275 @@ body {
         margin-top: 8px;
     }
 }
+
+
+
+/* 키워드 선택 UI 스타일 */
+.keyword-selection-group {
+    grid-column: 1 / -1; /* 전체 너비 사용 */
+    margin-bottom: 24px;
+}
+
+.keyword-selection-container {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-top: 12px;
+}
+
+/* 키워드 컨트롤 버튼들 */
+.keyword-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.keyword-control-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.keyword-control-btn:hover {
+    background: #1e40af;
+    transform: translateY(-1px);
+}
+
+.keyword-control-btn:nth-child(3) {
+    background: #ef4444;
+}
+
+.keyword-control-btn:nth-child(3):hover {
+    background: #dc2626;
+}
+
+.selected-count {
+    background: #f3f4f6;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-left: auto;
+}
+
+/* 키워드 티어 스타일 */
+.keyword-tiers {
+    display: grid;
+    gap: 24px;
+}
+
+.keyword-tier {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.tier-header {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.tier-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.tier-description {
+    margin: 4px 0 0 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    opacity: 0.8;
+}
+
+.tier-toggle {
+    padding: 6px 12px;
+    background: transparent;
+    border: 2px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tier-toggle:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.tier-toggle.all-selected {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* 키워드 그리드 */
+.keyword-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    padding: 20px;
+}
+
+.keyword-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.keyword-item:hover {
+    background: #f1f5f9;
+    border-color: var(--primary-color);
+}
+
+.keyword-item.selected {
+    background: #eff6ff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.keyword-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.keyword-label {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex: 1;
+}
+
+.keyword-cost {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+/* API 비용 예상 */
+.api-cost-estimate {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 1px solid #f59e0b;
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.cost-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+}
+
+.cost-label {
+    font-weight: 600;
+    color: #92400e;
+}
+
+.cost-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #f59e0b;
+}
+
+.cost-unit {
+    color: #92400e;
+}
+
+.cost-warning {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* 티어별 색상 구분 */
+.keyword-tier[data-tier="tier1"] .tier-header {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border-bottom-color: #f87171;
+}
+
+.keyword-tier[data-tier="tier2"] .tier-header {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-bottom-color: #fbbf24;
+}
+
+.keyword-tier[data-tier="tier3"] .tier-header {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border-bottom-color: #34d399;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .keyword-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .keyword-control-btn {
+        justify-content: center;
+    }
+    
+    .selected-count {
+        margin-left: 0;
+        text-align: center;
+    }
+    
+    .tier-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .keyword-grid {
+        grid-template-columns: 1fr;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .keyword-selection-container {
+        padding: 16px;
+    }
+    
+    .keyword-grid {
+        gap: 6px;
+    }
+    
+    .keyword-item {
+        padding: 10px;
+    }
+}
