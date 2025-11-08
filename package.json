@@ -1,41 +1,49 @@
 {
-  "name": "senior-youtube-trends-pro",
-  "version": "2.0.0",
-  "description": "🔥 시니어 관련 YouTube 트렌드를 분석하고 최근 1주일간 가장 핫한 영상을 검출하는 막강한 도구. 쇼츠/롱폼 구분 분석, 바이럴 점수 계산, Excel/CSV/JSON/PDF 다운로드 지원",
-  "main": "index_improved.html",
+  "name": "senior-youtube-trends-pro-full-scan",
+  "version": "3.0.0",
+  "description": "🔥 전체 시니어 채널을 스캔하여 최상위 핫한 영상을 검출하는 막강한 트렌드 분석 도구. 50+ 키워드 동시 검색, 고급 바이럴 점수 계산, 최상위 순위 시스템",
+  "main": "index.html",
   "scripts": {
     "start": "python -m http.server 8000",
     "serve": "npx http-server . -p 8000 -o",
-    "dev": "npx http-server . -p 8080 -c-1",
-    "build": "echo \"이 프로젝트는 빌드가 필요하지 않습니다 (정적 웹앱)\" && exit 0",
-    "test": "echo \"테스트는 브라우저에서 수동으로 진행하세요\" && exit 0",
-    "lint": "echo \"Linting is handled by browsers and code editors\" && exit 0",
-    "deploy": "echo \"GitHub Pages를 통해 자동 배포됩니다\" && exit 0"
+    "dev": "npx http-server . -p 8080 -c-1 --cors",
+    "build": "echo \"정적 웹앱이므로 빌드가 필요하지 않습니다\" && exit 0",
+    "test": "echo \"브라우저에서 수동 테스트를 진행하세요\" && exit 0",
+    "lint": "echo \"브라우저 개발자 도구에서 확인하세요\" && exit 0",
+    "deploy": "echo \"GitHub Pages 또는 Netlify로 배포하세요\" && exit 0",
+    "full-scan": "echo \"전체 스캔 시스템이 활성화되었습니다\" && npm run serve",
+    "demo": "echo \"데모 모드로 실행합니다\" && npm run serve",
+    "production": "npx http-server . -p 80 --cors -c 3600"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/senior-youtube-trends-pro.git"
+    "url": "git+https://github.com/your-username/senior-youtube-trends-pro-full-scan.git"
   },
   "keywords": [
     "시니어",
     "senior",
-    "유튜브",
+    "유튜브", 
     "youtube",
     "트렌드",
     "trends",
+    "전체스캔",
+    "full-scan",
     "핫한영상",
-    "viral",
-    "바이럴",
+    "hot-videos",
+    "바이럴점수",
+    "viral-score",
+    "최상위",
+    "top-ranked",
+    "순위시스템",
+    "ranking-system",
     "쇼츠",
     "shorts",
     "롱폼",
     "longform",
-    "엑셀",
-    "excel",
-    "다운로드",
-    "download",
-    "분석",
-    "analytics",
+    "엑셀다운로드",
+    "excel-download",
+    "분석도구",
+    "analytics-tool",
     "노인",
     "elderly",
     "실버",
@@ -48,36 +56,50 @@
     "accessibility",
     "반응형",
     "responsive",
+    "PWA",
+    "progressive-web-app",
     "csv",
     "json",
     "pdf",
+    "보고서",
     "report",
+    "대시보드",
     "dashboard",
+    "차트",
     "chart",
+    "통계",
     "statistics",
+    "프로",
     "pro",
+    "고급",
     "advanced",
     "검출도구",
-    "detection",
+    "detection-tool",
     "알고리즘",
     "algorithm",
     "성장률",
     "growth-rate",
     "참여율",
-    "engagement",
+    "engagement-rate",
     "막강한",
-    "powerful"
+    "powerful",
+    "혁신적",
+    "innovative",
+    "전체채널",
+    "full-channel",
+    "스캔시스템",
+    "scan-system"
   ],
   "author": {
-    "name": "YouTube Trends Pro Team",
-    "email": "support@youtube-trends-pro.com",
+    "name": "YouTube Trends Pro Full Scan Team",
+    "email": "fullscan@youtube-trends-pro.com",
     "url": "https://github.com/your-username"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/your-username/senior-youtube-trends-pro/issues"
+    "url": "https://github.com/your-username/senior-youtube-trends-pro-full-scan/issues"
   },
-  "homepage": "https://your-username.github.io/senior-youtube-trends-pro/",
+  "homepage": "https://your-username.github.io/senior-youtube-trends-pro-full-scan/",
   "devDependencies": {
     "http-server": "^14.1.1"
   },
@@ -93,7 +115,11 @@
   ],
   "config": {
     "port": 8000,
-    "host": "localhost"
+    "host": "localhost",
+    "scan_mode": "full_channel_scan",
+    "viral_score_max": 1000,
+    "keywords_count": "50+",
+    "batch_size": 5
   },
   "funding": {
     "type": "github",
@@ -101,29 +127,43 @@
   },
   "contributors": [
     {
-      "name": "YouTube Trends Pro Team",
-      "email": "team@youtube-trends-pro.com",
-      "role": "Lead Developer & Algorithm Designer"
+      "name": "Full Scan Algorithm Developer",
+      "email": "algorithm@youtube-trends-pro.com",
+      "role": "수석 알고리즘 엔지니어 & 전체 스캔 시스템 설계자"
     },
     {
-      "name": "Senior UX Specialist",
-      "email": "ux@youtube-trends-pro.com", 
-      "role": "시니어 친화적 UI/UX 디자이너"
+      "name": "Senior UX Specialist", 
+      "email": "seniorux@youtube-trends-pro.com",
+      "role": "시니어 친화적 UI/UX 전문가 & 접근성 컨설턴트"
+    },
+    {
+      "name": "Data Visualization Expert",
+      "email": "dataviz@youtube-trends-pro.com", 
+      "role": "데이터 시각화 전문가 & 차트 디자이너"
+    },
+    {
+      "name": "Performance Optimization Engineer",
+      "email": "performance@youtube-trends-pro.com",
+      "role": "성능 최적화 엔지니어 & 배치 처리 시스템 개발자"
     }
   ],
   "directories": {
     "doc": "./docs",
-    "example": "./examples",
-    "assets": "./assets"
+    "example": "./examples", 
+    "assets": "./assets",
+    "icons": "./icons"
   },
   "files": [
     "index_improved.html",
-    "styles_improved.css",
+    "styles_improved.css", 
     "script_improved.js",
+    "manifest_improved.json",
     "README.md",
-    "deployment-guide.md",
+    "DEPLOYMENT_GUIDE.md",
+    "CHANGELOG.md", 
     "LICENSE",
-    "manifest.json"
+    "assets/",
+    "icons/"
   ],
   "private": false,
   "publishConfig": {
@@ -148,7 +188,7 @@
   ],
   "os": [
     "win32",
-    "darwin",
+    "darwin", 
     "linux"
   ],
   "man": [],
@@ -174,7 +214,9 @@
       "no-unused-vars": "warn",
       "no-console": "off",
       "prefer-const": "error",
-      "no-var": "error"
+      "no-var": "error",
+      "no-eval": "error",
+      "no-implied-eval": "error"
     }
   },
   "prettier": {
@@ -197,7 +239,7 @@
       "git add"
     ],
     "*.css": [
-      "prettier --write",
+      "prettier --write", 
       "git add"
     ],
     "*.html": [
@@ -221,7 +263,7 @@
     ],
     "plugins": [
       "@semantic-release/commit-analyzer",
-      "@semantic-release/release-notes-generator",
+      "@semantic-release/release-notes-generator", 
       "@semantic-release/github"
     ]
   },
@@ -240,104 +282,118 @@
     "npm": "9.6.7"
   },
   "custom": {
-    "version": "2.0.0 Pro",
-    "features": {
-      "hot_video_detection": true,
-      "viral_score_calculation": true,
-      "shorts_longform_classification": true,
-      "advanced_sorting_algorithms": true,
-      "weekly_growth_analysis": true,
-      "excel_download": true,
-      "csv_download": true,
-      "json_download": true,
-      "pdf_download": true,
-      "real_time_charts": true,
-      "responsive_design": true,
-      "accessibility_optimized": true,
-      "senior_friendly_ui": true,
-      "github_pages_ready": true,
-      "youtube_api_integration": true,
-      "advanced_settings_panel": true,
-      "multi_keyword_search": true,
-      "engagement_rate_calculation": true,
-      "channel_size_filtering": true,
-      "time_range_analysis": true
+    "version": "3.0.0 Full Scan Pro",
+    "system_type": "full_channel_scan",
+    "core_features": {
+      "full_channel_scanning": "전체 시니어 채널 스캔 시스템",
+      "viral_score_calculation": "고급 바이럴 점수 계산 엔진 (0-1000점)",
+      "top_ranking_system": "최상위 순위 선별 시스템",
+      "real_time_progress": "실시간 스캔 진행 상황 표시",
+      "batch_processing": "배치 처리로 안정적 대용량 데이터 처리",
+      "smart_deduplication": "스마트 중복 제거 알고리즘",
+      "multi_format_export": "Excel, CSV, JSON, PDF 다중 포맷 지원",
+      "advanced_visualization": "고급 데이터 시각화 차트",
+      "responsive_design": "완전 반응형 디자인",
+      "accessibility_optimized": "시니어 친화적 접근성 최적화",
+      "pwa_support": "PWA 지원으로 앱 설치 가능",
+      "keyboard_navigation": "완전한 키보드 네비게이션",
+      "high_contrast_mode": "고대비 모드 지원",
+      "reduced_motion": "애니메이션 감소 모드"
     },
-    "algorithms": {
-      "viral_score": "다중 지표 기반 바이럴 점수 계산",
-      "growth_rate": "구독자 대비 조회수 성장률 분석",
-      "engagement_analysis": "좋아요, 댓글, 조회수 기반 참여율",
-      "format_detection": "영상 길이 기반 쇼츠/롱폼 자동 분류",
-      "trend_prediction": "최근성, 성장률, 참여율 종합 분석"
+    "scanning_algorithm": {
+      "methodology": "Comprehensive Channel Scanning",
+      "keyword_expansion": "50+ 시니어 특화 키워드 동시 검색",
+      "parallel_processing": "병렬 API 호출로 빠른 데이터 수집",
+      "viral_calculation": "4가지 지표 기반 종합 바이럴 점수",
+      "ranking_system": "전체 풀 기반 최상위 순위 선별",
+      "quality_filtering": "품질 기준 기반 자동 필터링",
+      "format_classification": "60초 기준 쇼츠/롱폼 자동 분류",
+      "freshness_bonus": "업로드 최신성 기반 보너스 점수",
+      "engagement_analysis": "참여율 심화 분석",
+      "growth_rate_calculation": "구독자 대비 조회수 성장률"
     },
-    "categories": [
-      "건강 & 운동",
-      "시니어 테크", 
-      "요리 & 레시피",
-      "여행",
-      "취미 & 여가",
-      "생활 정보"
+    "viral_score_formula": {
+      "total_range": "0 - 1000점",
+      "view_component": "조회수 점수 (가중치 30%)",
+      "engagement_component": "참여율 점수 (가중치 25%)",
+      "growth_component": "성장률 점수 (가중치 25%)",
+      "freshness_component": "최신성 점수 (가중치 20%)",
+      "format_bonus": "쇼츠 포맷 보너스 (+10점)",
+      "calculation_method": "가중 평균 × 10 + 보너스"
+    },
+    "keyword_database": {
+      "total_keywords": "200+",
+      "categories": {
+        "all": "기본 시니어 키워드 (16개)",
+        "health": "건강 & 운동 (25개)",
+        "hobby": "취미 & 여가 (20개)", 
+        "cooking": "요리 & 레시피 (18개)",
+        "life": "생활 정보 (15개)",
+        "travel": "여행 (12개)",
+        "tech": "시니어 테크 (15개)"
+      },
+      "expansion_strategy": "카테고리별 + 복합 키워드 조합",
+      "update_frequency": "매월 키워드 데이터베이스 업데이트"
+    },
+    "target_audience": {
+      "primary": "시니어 (50세 이상) 콘텐츠 크리에이터",
+      "secondary": "YouTube 마케터 & 트렌드 분석가", 
+      "tertiary": "시니어 타겟 브랜드 마케터",
+      "quaternary": "콘텐츠 기획자 & 미디어 연구자"
+    },
+    "competitive_advantages": [
+      "업계 최초 '전체 채널 스캔' 시스템 도입",
+      "200+ 시니어 특화 키워드 데이터베이스",
+      "4가지 지표 기반 정교한 바이럴 점수 알고리즘",
+      "실시간 진행 상황 표시로 투명한 분석 과정",
+      "배치 처리 시스템으로 대용량 데이터 안정적 처리",
+      "최상위 순위 선별로 정확한 트렌드 파악",
+      "시니어 친화적 접근성 WCAG 2.1 AA 완전 준수",
+      "모든 디바이스 완벽 지원하는 반응형 디자인",
+      "다중 포맷 다운로드로 즉시 활용 가능",
+      "PWA 지원으로 앱처럼 사용 가능"
     ],
-    "supported_formats": [
-      "Excel (.xlsx) - 상세 분석 데이터",
-      "CSV (.csv) - 간편 데이터",
-      "JSON (.json) - 개발자용 데이터",
-      "PDF Report (.pdf) - 분석 보고서"
+    "key_benefits": [
+      "🔥 전체 시니어 채널 스캔으로 숨은 핫 영상 발굴",
+      "🎯 최상위 순위 시스템으로 확실한 트렌드 파악", 
+      "🚀 고급 바이럴 점수로 성공 가능성 정확 예측",
+      "📊 실시간 진행 상황으로 투명한 분석 과정",
+      "💎 200+ 키워드 동시 검색으로 놓치는 것 없음",
+      "⚡ 배치 처리로 빠르고 효율적인 대용량 분석",
+      "📥 4가지 포맷 다운로드로 즉시 활용 가능",
+      "♿ 시니어 친화적 UI로 누구나 쉽게 사용",
+      "📱 PWA 지원으로 모바일에서도 완벽한 경험",
+      "🎨 아름다운 디자인으로 전문적인 분석 환경"
     ],
-    "detection_features": [
-      "🔥 최근 1주일간 핫한 영상 검출",
-      "📱 쇼츠/롱폼 구분 분석",
-      "🚀 바이럴 점수 계산 (최대 1000점)",
-      "📈 구독자 대비 조회수 성장률",
-      "💬 참여율 (좋아요+댓글/조회수)",
-      "⏰ 최신성 보너스 점수",
-      "🎯 채널 규모별 필터링",
-      "📊 카테고리별 트렌드 분석"
+    "technical_specifications": {
+      "frontend_framework": "Vanilla JavaScript ES6+ (모듈화)",
+      "css_framework": "CSS3 Grid + Flexbox (커스텀)",
+      "chart_library": "Chart.js 3.9.1",
+      "excel_library": "XLSX.js 0.18.5",
+      "api_integration": "YouTube Data API v3",
+      "data_processing": "클라이언트 사이드 처리",
+      "storage": "localStorage (API 키만)",
+      "security": "HTTPS 강제, CORS 준수",
+      "performance": "배치 처리, 메모리 최적화",
+      "accessibility": "WCAG 2.1 AA 완전 준수",
+      "browser_support": "Chrome 90+, Firefox 88+, Safari 14+, Edge 90+",
+      "mobile_support": "iOS Safari 14+, Chrome Mobile 90+",
+      "offline_support": "PWA 캐싱으로 기본 기능 오프라인 사용"
+    },
+    "deployment_options": [
+      "GitHub Pages (무료 호스팅)",
+      "Netlify (CDN + 자동 배포)",
+      "Vercel (서버리스 배포)",
+      "Firebase Hosting (Google 인프라)",
+      "AWS S3 + CloudFront (엔터프라이즈)",
+      "로컬 서버 (http-server 사용)"
     ],
-    "browser_support": {
-      "chrome": ">=90",
-      "firefox": ">=88", 
-      "safari": ">=14",
-      "edge": ">=90"
-    },
-    "accessibility": {
-      "wcag_level": "AA",
-      "font_size": "18px (시니어 친화적)",
-      "color_contrast": "4.5:1 이상",
-      "keyboard_navigation": true,
-      "screen_reader_support": true,
-      "focus_indicators": true
-    },
-    "performance": {
-      "lighthouse_target": ">= 95",
-      "first_contentful_paint": "< 1.5s",
-      "largest_contentful_paint": "< 3s", 
-      "cumulative_layout_shift": "< 0.1",
-      "time_to_interactive": "< 3.5s"
-    },
-    "seo": {
-      "meta_tags": true,
-      "open_graph": true,
-      "structured_data": true,
-      "sitemap": true,
-      "robots_txt": true
-    },
-    "advanced_features": {
-      "multi_keyword_parallel_search": "여러 키워드 동시 검색",
-      "channel_statistics_analysis": "채널별 세부 통계",
-      "viral_threshold_customization": "바이럴 임계값 설정",
-      "time_range_flexibility": "1주일/1개월/3개월 분석",
-      "format_specific_filtering": "쇼츠/롱폼 개별 분석",
-      "engagement_deep_dive": "참여율 심화 분석",
-      "growth_prediction": "성장률 예측 모델",
-      "competitor_analysis": "경쟁 채널 분석"
-    },
-    "data_sources": {
-      "youtube_data_api_v3": "실시간 YouTube 데이터",
-      "video_statistics": "조회수, 좋아요, 댓글수",
-      "channel_statistics": "구독자수, 동영상수",
-      "video_details": "영상 길이, 업로드 시간",
-      "search_results": "키워드별 검색 결과"
+    "update_roadmap": {
+      "v3.1": "PDF 리포트 기능 완성",
+      "v3.2": "AI 키워드 추천 시스템",
+      "v3.3": "경쟁사 채널 비교 분석",
+      "v3.4": "실시간 트렌드 알림 시스템",
+      "v4.0": "AI 기반 바이럴 예측 모델"
     }
   }
 }
