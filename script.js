@@ -1088,23 +1088,170 @@ async fetchRealYoutubeData(category, count) {
             chartsSection.style.display = 'block';
         }
     }
-    
-    // 카테고리 차트 생성
-    createCategoryChart() {
-        // 안전한 요소 확인 후 접근
+
+    // 쇼츠/롱폼 비율 차트 (Chart.js 3.x 호환)
+    createFormatChart() {
         const canvas = document.getElementById('formatChart');
         if (!canvas) {
             console.warn('formatChart 캔버스를 찾을 수 없습니다.');
             return;
         }
-        const ctx = canvas.getContext('2d');  // ✅ 안전함
+
+        const ctx = canvas.getContext('2d');
+        const shortsCount = this.currentData.filter(v => {
+            const duration = this.parseDuration(v.duration || 'PT0S');
+            return duration <= 60;
+        }).length;
+        const longFormCount = this.currentData.length - shortsCount;
+
+        if (this.charts.formatChart) {
+            this.charts.formatChart.destroy();
+        }
+
+        this.charts.formatChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['📱 쇼츠', '🎬 롱폼'],
+                datasets: [{
+                    data: [shortsCount, longFormCount],
+                    backgroundColor: ['#ff6b6b', '#4ecdc4'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // 바이럴 점수 분포 차트 (Chart.js 3.x 호환)
+    createViralChart() {
+        const canvas = document.getElementById('viralChart');
+        if (!canvas) {
+            console.warn('viralChart 캔버스를 찾을 수 없습니다.');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        
+        const ranges = {
+            '0-100': 0,
+            '100-200': 0,
+            '200-500': 0,
+            '500+': 0
+        };
+        
+        this.currentData.forEach(video => {
+            const score = video.viralScore || this.calculateViralScore(video) || 0;
+            if (score >= 500) ranges['500+']++;
+            else if (score >= 200) ranges['200-500']++;
+            else if (score >= 100) ranges['100-200']++;
+            else ranges['0-100']++;
+        });
+
+        if (this.charts.viralChart) {
+            this.charts.viralChart.destroy();
+        }
+
+        this.charts.viralChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(ranges),
+                datasets: [{
+                    label: '영상 수',
+                    data: Object.values(ranges),
+                    backgroundColor: [
+                        '#94a3b8',
+                        '#fbbf24',
+                        '#f59e0b',
+                        '#ef4444'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // 시간대별 업로드 차트 (Chart.js 3.x 호환)
+    createTimeChart() {
+        const canvas = document.getElementById('timeChart');
+        if (!canvas) {
+            console.warn('timeChart 캔버스를 찾을 수 없습니다.');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        
+        // 시간대별 업로드 분포 계산
+        const timeDistribution = {};
+        for (let hour = 0; hour < 24; hour++) {
+            timeDistribution[hour] = 0;
+        }
+        
+        this.currentData.forEach(video => {
+            if (video.publishedAt) {
+                const publishHour = new Date(video.publishedAt).getHours();
+                timeDistribution[publishHour]++;
+            }
+        });
+
+        if (this.charts.timeChart) {
+            this.charts.timeChart.destroy();
+        }
+
+        this.charts.timeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Object.keys(timeDistribution).map(h => `${h}시`),
+                datasets: [{
+                    label: '업로드 수',
+                    data: Object.values(timeDistribution),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // 카테고리 차트 생성 (Chart.js 3.x 호환)
+    createCategoryChart() {
+        // 올바른 캔버스 요소 참조
+        const canvas = document.getElementById('categoryChart');
+        if (!canvas) {
+            console.warn('categoryChart 캔버스를 찾을 수 없습니다.');
+            return;
+        }
+        const ctx = canvas.getContext('2d');
         
         if (this.charts.categoryChart) {
             this.charts.categoryChart.destroy();
         }
         
         const categoryData = this.currentData.reduce((acc, video) => {
-            acc[video.categoryName] = (acc[video.categoryName] || 0) + 1;
+            const category = video.categoryName || video.category || '기타';
+            acc[category] = (acc[category] || 0) + 1;
             return acc;
         }, {});
         
@@ -1130,48 +1277,6 @@ async fetchRealYoutubeData(category, count) {
                             padding: 20,
                             font: { size: 14 },
                             usePointStyle: true
-                        }
-                    }
-                }
-            }
-        });
-    }
-    
-    // 성장률 차트 생성
-    createGrowthChart() {
-        const ctx = document.getElementById('growthChart').getContext('2d');
-        
-        if (this.charts.growthChart) {
-            this.charts.growthChart.destroy();
-        }
-        
-        const topVideos = this.currentData.slice(0, 10);
-        
-        this.charts.growthChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: topVideos.map((v, i) => `#${i + 1}`),
-                datasets: [{
-                    label: '성장률 (%)',
-                    data: topVideos.map(v => parseFloat(v.growthRate)),
-                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                    borderColor: '#10b981',
-                    borderWidth: 2,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
                         }
                     }
                 }
