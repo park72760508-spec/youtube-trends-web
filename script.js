@@ -1514,6 +1514,259 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
 
+
+    // runFullScan 메서드 추가 (클래스 내부에)
+    async runFullScan(keywords, format, timeRange, count) {
+        console.log('🚀 전체 스캔 시작:', { keywords: keywords.length, format, timeRange, count });
+        
+        const totalKeywords = keywords.length;
+        let processedKeywords = 0;
+        let foundVideos = 0;
+        
+        for (const keyword of keywords) {
+            if (!this.isScanning) break; // 중지 버튼 체크
+            
+            try {
+                console.log(`🔍 키워드 검색 중: ${keyword}`);
+                
+                // 캐시 확인
+                const cacheKey = this.getCacheKey(keyword, format, timeRange);
+                let videos = this.getFromCache(cacheKey);
+                
+                if (!videos) {
+                    // API 호출
+                    if (this.canUseQuota(100)) {
+                        videos = await this.searchVideosForKeyword(keyword, format, timeRange);
+                        this.updateQuotaUsage(100);
+                        this.saveToCache(cacheKey, videos);
+                    } else {
+                        console.warn(`⚠️ 할당량 부족으로 ${keyword} 스킵`);
+                        continue;
+                    }
+                }
+                
+                if (videos && videos.length > 0) {
+                    this.allVideos.push(...videos);
+                    foundVideos += videos.length;
+                }
+                
+                processedKeywords++;
+                
+                // 진행 상황 업데이트
+                this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+                
+                // API 요청 간 지연
+                await this.delay(500);
+                
+            } catch (error) {
+                console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
+            }
+        }
+        
+        // 바이럴 점수 계산 및 결과 정리
+        await this.processAndDisplayResults(count);
+    }
+    
+    // runSmartMode 메서드 추가
+    async runSmartMode(category, format, count, limitedKeywords) {
+        console.log('🧠 스마트 모드 실행:', { category, format, count, keywords: limitedKeywords.length });
+        
+        // 제한된 키워드로만 검색
+        const totalKeywords = limitedKeywords.length;
+        let processedKeywords = 0;
+        let foundVideos = 0;
+        
+        for (const keyword of limitedKeywords) {
+            if (!this.isScanning) break;
+            
+            try {
+                console.log(`🔍 스마트 검색: ${keyword}`);
+                
+                const cacheKey = this.getCacheKey(keyword, format, 'week');
+                let videos = this.getFromCache(cacheKey);
+                
+                if (!videos) {
+                    if (this.canUseQuota(100)) {
+                        videos = await this.searchVideosForKeyword(keyword, format, 'week');
+                        this.updateQuotaUsage(100);
+                        this.saveToCache(cacheKey, videos);
+                    } else {
+                        break; // 할당량 부족시 중단
+                    }
+                }
+                
+                if (videos && videos.length > 0) {
+                    this.allVideos.push(...videos);
+                    foundVideos += videos.length;
+                }
+                
+                processedKeywords++;
+                this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+                
+                await this.delay(300);
+                
+            } catch (error) {
+                console.error(`❌ 스마트 모드 검색 실패:`, error);
+            }
+        }
+        
+        // 부족한 데이터는 모의 데이터로 보충
+        const remainingCount = Math.max(0, count - this.allVideos.length);
+        if (remainingCount > 0) {
+            console.log(`📊 모의 데이터 ${remainingCount}개 생성`);
+            const mockVideos = this.mockDataGenerator.generateRealisticData(category, remainingCount);
+            this.allVideos.push(...mockVideos);
+        }
+        
+        await this.processAndDisplayResults(count);
+    }
+    
+    // searchVideosForKeyword 메서드 추가 (실제 API 호출)
+    async searchVideosForKeyword(keyword, format, timeRange) {
+        const videos = [];
+        
+        try {
+            const publishedAfter = this.getPublishedAfterDate(timeRange);
+            const url = `${this.baseUrl}/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=50&key=${this.apiKey}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+            
+            if (data.items) {
+                for (const item of data.items) {
+                    const video = await this.enrichVideoData(item, keyword);
+                    if (video && this.matchesFormat(video, format)) {
+                        videos.push(video);
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error(`❌ API 검색 실패 (${keyword}):`, error);
+        }
+        
+        return videos;
+    }
+    
+    // enrichVideoData 메서드 추가
+    async enrichVideoData(item, searchKeyword) {
+        try {
+            // 비디오 상세 정보 가져오기
+            const detailUrl = `${this.baseUrl}/videos?part=statistics,contentDetails&id=${item.id.videoId}&key=${this.apiKey}`;
+            const detailResponse = await fetch(detailUrl);
+            const detailData = await detailResponse.json();
+            
+            if (detailData.items && detailData.items.length > 0) {
+                const videoDetail = detailData.items[0];
+                const statistics = videoDetail.statistics;
+                const contentDetails = videoDetail.contentDetails;
+                
+                // 채널 정보 가져오기
+                const channelUrl = `${this.baseUrl}/channels?part=statistics&id=${item.snippet.channelId}&key=${this.apiKey}`;
+                const channelResponse = await fetch(channelUrl);
+                const channelData = await channelResponse.json();
+                
+                let subscriberCount = 0;
+                if (channelData.items && channelData.items.length > 0) {
+                    subscriberCount = parseInt(channelData.items[0].statistics.subscriberCount) || 0;
+                }
+                
+                const duration = this.parseDuration(contentDetails.duration);
+                const isShorts = duration <= 60;
+                
+                return {
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    channel: item.snippet.channelTitle,
+                    channelId: item.snippet.channelId,
+                    thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
+                    description: item.snippet.description,
+                    
+                    viewCount: parseInt(statistics.viewCount) || 0,
+                    likeCount: parseInt(statistics.likeCount) || 0,
+                    commentCount: parseInt(statistics.commentCount) || 0,
+                    subscriberCount: subscriberCount,
+                    
+                    duration: duration,
+                    isShorts: isShorts,
+                    format: isShorts ? 'shorts' : 'long',
+                    
+                    publishedAt: item.snippet.publishedAt,
+                    publishDate: new Date(item.snippet.publishedAt).toLocaleDateString('ko-KR'),
+                    daysSincePublish: Math.floor((Date.now() - new Date(item.snippet.publishedAt)) / (1000 * 60 * 60 * 24)),
+                    
+                    searchKeyword: searchKeyword,
+                    
+                    viralScore: 0,
+                    engagementRate: 0,
+                    growthRate: 0,
+                    freshnessScore: 0,
+                    
+                    isSimulated: false
+                };
+            }
+        } catch (error) {
+            console.error('❌ 비디오 상세 정보 가져오기 실패:', error);
+        }
+        
+        return null;
+    }
+    
+    // 헬퍼 메서드들 추가
+    getPublishedAfterDate(timeRange) {
+        const now = new Date();
+        switch (timeRange) {
+            case 'week':
+                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            case 'month':
+                return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            case '3months':
+                return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            default:
+                return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+    }
+    
+    parseDuration(duration) {
+        const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+        const hours = parseInt(match[1]) || 0;
+        const minutes = parseInt(match[2]) || 0;
+        const seconds = parseInt(match[3]) || 0;
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+    
+    matchesFormat(video, format) {
+        if (format === 'all') return true;
+        if (format === 'shorts') return video.isShorts;
+        if (format === 'long') return !video.isShorts;
+        return true;
+    }
+    
+    processAndDisplayResults(maxCount) {
+        // 중복 제거
+        const uniqueVideos = this.removeDuplicates(this.allVideos);
+        
+        // 바이럴 점수 계산
+        uniqueVideos.forEach(video => {
+            this.calculateViralScore(video);
+        });
+        
+        // 정렬 및 제한
+        this.scanResults = uniqueVideos
+            .sort((a, b) => b.viralScore - a.viralScore)
+            .slice(0, maxCount);
+        
+        // 결과 표시
+        this.displayResults();
+        this.updateSummaryCards();
+        this.showResultsSections();
+    }
+
+    
   
 }  // ★★★★★ Class 모듈 끝 부분 ★★★★★
 
