@@ -2,7 +2,7 @@
   "name": "senior-youtube-trends-pro-full-scan",
   "version": "3.0.0",
   "description": "🔥 전체 시니어 채널을 스캔하여 최상위 핫한 영상을 검출하는 막강한 트렌드 분석 도구. 50+ 키워드 동시 검색, 고급 바이럴 점수 계산, 최상위 순위 시스템",
-  "main": "index.html",
+  "main": "index_improved.html",
   "scripts": {
     "start": "python -m http.server 8000",
     "serve": "npx http-server . -p 8000 -o",
