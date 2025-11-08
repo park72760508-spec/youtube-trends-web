@@ -750,40 +750,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // UI 관련 메서드들 (기존과 대부분 동일)
-    displayResults() {
-        const resultsSection = document.getElementById('resultsSection');
-        if (resultsSection) {
-            resultsSection.style.display = 'block';
-        }
-        
-        const downloadSection = document.getElementById('downloadSection');
-        if (downloadSection) {
-            downloadSection.style.display = 'block';
-        }
-        
-        this.switchView('card');
-    }
-    
-    switchView(viewType) {
-        const cardView = document.getElementById('cardView');
-        const tableView = document.getElementById('tableView');
-        const cardBtn = document.getElementById('cardViewBtn');
-        const tableBtn = document.getElementById('tableViewBtn');
-        
-        if (viewType === 'card') {
-            if (cardView) cardView.style.display = 'grid';
-            if (tableView) tableView.style.display = 'none';
-            if (cardBtn) cardBtn.classList.add('active');
-            if (tableBtn) tableBtn.classList.remove('active');
-            this.renderCardView();
-        } else {
-            if (cardView) cardView.style.display = 'none';
-            if (tableView) tableView.style.display = 'block';
-            if (cardBtn) cardBtn.classList.remove('active');
-            if (tableBtn) tableBtn.classList.add('active');
-            this.renderTableView();
-        }
-    }
+   
     
     renderCardView() {
         const container = document.getElementById('cardView');
@@ -1049,38 +1016,13 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // API 키 관련 메서드들 (기존과 동일)
-    async loadApiKeyFromFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        try {
-            const text = await file.text();
-            const apiKey = text.trim();
-            
-            if (apiKey.startsWith('AIza') && apiKey.length > 30) {
-                this.setApiKey(apiKey);
-                alert('✅ API 키가 성공적으로 로드되었습니다!');
-                this.displayQuotaStatus();
-            } else {
-                alert('❌ 올바른 YouTube API 키가 아닙니다.');
-            }
-        } catch (error) {
-            alert('❌ 파일을 읽는 중 오류가 발생했습니다.');
-        }
-        
-        event.target.value = '';
-    }
     
     setApiKey(key) {
         localStorage.setItem('youtube_api_key', key);
         this.apiKey = key;
     }
     
-    clearApiKey() {
-        localStorage.removeItem('youtube_api_key');
-        this.apiKey = null;
-        alert('✅ API 키가 초기화되었습니다.');
-    }
+
     
     // 다운로드 메서드들 (기존과 동일)
     downloadExcel() {
@@ -1210,26 +1152,8 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 기타 유틸리티 메서드들
-    stopScan() {
-        this.isScanning = false;
-        this.hideScanProgress();
-        this.updateScanButton(false);
-        console.log('🛑 스캔이 중지되었습니다.');
-    }
     
-    showScanProgress() {
-        const progressSection = document.getElementById('scanProgress');
-        if (progressSection) {
-            progressSection.style.display = 'block';
-        }
-    }
     
-    hideScanProgress() {
-        const progressSection = document.getElementById('scanProgress');
-        if (progressSection) {
-            progressSection.style.display = 'none';
-        }
-    }
     
     updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
         const progressBar = document.getElementById('progressBar');
@@ -1260,18 +1184,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
     
-    updateScanButton(isScanning) {
-        const fullScanBtn = document.getElementById('fullScanBtn');
-        const stopScanBtn = document.getElementById('stopScanBtn');
-        
-        if (fullScanBtn) {
-            fullScanBtn.style.display = isScanning ? 'none' : 'flex';
-        }
-        
-        if (stopScanBtn) {
-            stopScanBtn.style.display = isScanning ? 'flex' : 'none';
-        }
-    }
     
     downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
@@ -1284,14 +1196,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         URL.revokeObjectURL(url);
     }
     
-    formatNumber(num) {
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M';
-        } else if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K';
-        }
-        return num.toLocaleString();
-    }
     
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -1304,21 +1208,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (element) element.textContent = value;
     }
     
-    showError(message) {
-        const errorContainer = document.getElementById('errorMessage');
-        const errorText = document.getElementById('errorText');
-        
-        if (errorContainer && errorText) {
-            errorText.textContent = message;
-            errorContainer.style.display = 'block';
-            
-            setTimeout(() => {
-                errorContainer.style.display = 'none';
-            }, 5000);
-        } else {
-            alert(message);
-        }
-    }
+
     
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -2029,6 +1919,299 @@ class OptimizedYoutubeTrendsAnalyzer {
         return keywords;
     }
 
+
+// ===== 누락된 핵심 메서드들 추가 =====
+    
+    // 스캔 진행 상황 업데이트
+    updateScanProgress(processedKeywords, totalKeywords, foundVideos) {
+        const scannedKeywordsElement = document.getElementById('scannedKeywords');
+        const foundVideosElement = document.getElementById('foundVideos');
+        const calculatedScoresElement = document.getElementById('calculatedScores');
+        const progressBar = document.querySelector('.progress-bar');
+        
+        if (scannedKeywordsElement) {
+            scannedKeywordsElement.textContent = `${processedKeywords} / ${totalKeywords}`;
+        }
+        
+        if (foundVideosElement) {
+            foundVideosElement.textContent = foundVideos;
+        }
+        
+        if (calculatedScoresElement) {
+            calculatedScoresElement.textContent = processedKeywords;
+        }
+        
+        if (progressBar) {
+            const progress = (processedKeywords / totalKeywords) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        console.log(`📊 진행률: ${processedKeywords}/${totalKeywords} (${((processedKeywords/totalKeywords)*100).toFixed(1)}%)`);
+    }
+    
+    // 중복 제거 메서드
+    removeDuplicates(videos) {
+        const uniqueVideos = [];
+        const seenIds = new Set();
+        
+        for (const video of videos) {
+            if (!seenIds.has(video.id)) {
+                seenIds.add(video.id);
+                uniqueVideos.push(video);
+            }
+        }
+        
+        console.log(`🔄 중복 제거: ${videos.length} → ${uniqueVideos.length}`);
+        return uniqueVideos;
+    }
+    
+    // 바이럴 점수 계산
+    calculateViralScore(video) {
+        // 조회수 점수 (0-30점)
+        const viewScore = Math.min((video.viewCount / 100000) * 30, 30);
+        
+        // 참여율 점수 (0-25점)
+        const totalEngagement = video.likeCount + video.commentCount;
+        const engagementRate = (totalEngagement / video.viewCount) * 100;
+        video.engagementRate = engagementRate;
+        const engagementScore = Math.min(engagementRate * 5, 25);
+        
+        // 성장률 점수 (0-25점)
+        const growthRate = (video.viewCount / Math.max(video.subscriberCount, 1000)) * 100;
+        video.growthRate = growthRate;
+        const growthScore = Math.min(growthRate * 0.5, 25);
+        
+        // 최신성 점수 (0-20점)
+        const daysSincePublish = video.daysSincePublish || 1;
+        const freshnessScore = Math.max(20 - (daysSincePublish * 2), 0);
+        video.freshnessScore = freshnessScore;
+        
+        // 쇼츠 보너스
+        const formatBonus = video.isShorts ? 10 : 0;
+        
+        // 최종 바이럴 점수 (0-1000점)
+        video.viralScore = Math.round((viewScore + engagementScore + growthScore + freshnessScore) * 10 + formatBonus);
+        
+        return video.viralScore;
+    }
+    
+    // 숫자 포맷팅
+    formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+    
+    // 스캔 진행 상황 표시
+    showScanProgress() {
+        const scanProgress = document.getElementById('scanProgress');
+        if (scanProgress) {
+            scanProgress.style.display = 'block';
+        }
+    }
+    
+    // 스캔 진행 상황 숨기기
+    hideScanProgress() {
+        const scanProgress = document.getElementById('scanProgress');
+        if (scanProgress) {
+            scanProgress.style.display = 'none';
+        }
+    }
+    
+    // 스캔 버튼 상태 업데이트
+    updateScanButton(isScanning) {
+        const fullScanBtn = document.getElementById('fullScanBtn');
+        const stopScanBtn = document.getElementById('stopScanBtn');
+        
+        if (fullScanBtn) {
+            if (isScanning) {
+                fullScanBtn.style.display = 'none';
+            } else {
+                fullScanBtn.style.display = 'inline-flex';
+            }
+        }
+        
+        if (stopScanBtn) {
+            if (isScanning) {
+                stopScanBtn.style.display = 'inline-flex';
+            } else {
+                stopScanBtn.style.display = 'none';
+            }
+        }
+    }
+    
+    // 뷰 전환
+    switchView(viewType) {
+        const cardView = document.getElementById('cardView');
+        const tableView = document.getElementById('tableView');
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        
+        if (viewType === 'card') {
+            if (cardView) cardView.style.display = 'grid';
+            if (tableView) tableView.style.display = 'none';
+            if (cardViewBtn) cardViewBtn.classList.add('active');
+            if (tableViewBtn) tableViewBtn.classList.remove('active');
+        } else if (viewType === 'table') {
+            if (cardView) cardView.style.display = 'none';
+            if (tableView) tableView.style.display = 'block';
+            if (cardViewBtn) cardViewBtn.classList.remove('active');
+            if (tableViewBtn) tableViewBtn.classList.add('active');
+            
+            // 테이블 뷰 업데이트
+            this.displayTableView();
+        }
+    }
+    
+    // 결과 표시
+    displayResults() {
+        this.displayCardView();
+        this.displayTableView();
+    }
+    
+    // 카드 뷰 표시
+    displayCardView() {
+        const cardContainer = document.getElementById('cardView');
+        if (!cardContainer) return;
+        
+        cardContainer.innerHTML = '';
+        
+        this.scanResults.forEach((video, index) => {
+            const card = document.createElement('div');
+            card.className = `video-card ${video.isSimulated ? 'simulated-data' : ''}`;
+            
+            const titleLink = this.createVideoTitleLink(video);
+            
+            card.innerHTML = `
+                <div class="video-rank">#${index + 1}</div>
+                <div class="video-thumbnail">
+                    <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
+                    <div class="video-duration">${this.formatDuration(video.duration)}</div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${titleLink}</h3>
+                    <p class="video-channel">${video.channel}</p>
+                    <div class="video-stats">
+                        <span>👁️ ${this.formatNumber(video.viewCount)}</span>
+                        <span>👍 ${this.formatNumber(video.likeCount)}</span>
+                        <span>💬 ${this.formatNumber(video.commentCount)}</span>
+                    </div>
+                    <div class="video-meta">
+                        <span class="publish-date">📅 ${video.publishDate}</span>
+                        <span class="keyword-tag">🏷️ ${video.searchKeyword}</span>
+                    </div>
+                </div>
+                <div class="viral-score ${video.isSimulated ? 'simulated' : ''}">${video.viralScore}</div>
+            `;
+            
+            cardContainer.appendChild(card);
+        });
+    }
+    
+    // 요약 카드 업데이트
+    updateSummaryCards() {
+        const totalVideos = this.scanResults.length;
+        const avgViralScore = totalVideos > 0 ? 
+            Math.round(this.scanResults.reduce((sum, v) => sum + v.viralScore, 0) / totalVideos) : 0;
+        const shortsCount = this.scanResults.filter(v => v.isShorts).length;
+        const shortsRatio = totalVideos > 0 ? Math.round((shortsCount / totalVideos) * 100) : 0;
+        const avgGrowthRate = totalVideos > 0 ? 
+            (this.scanResults.reduce((sum, v) => sum + v.growthRate, 0) / totalVideos).toFixed(1) : 0;
+        
+        const totalVideosEl = document.getElementById('totalVideos');
+        const avgViralScoreEl = document.getElementById('avgViralScore');
+        const shortsRatioEl = document.getElementById('shortsRatio');
+        const avgGrowthRateEl = document.getElementById('avgGrowthRate');
+        
+        if (totalVideosEl) totalVideosEl.textContent = totalVideos;
+        if (avgViralScoreEl) avgViralScoreEl.textContent = avgViralScore;
+        if (shortsRatioEl) shortsRatioEl.textContent = `${shortsRatio}%`;
+        if (avgGrowthRateEl) avgGrowthRateEl.textContent = `${avgGrowthRate}%`;
+    }
+    
+    // 결과 섹션 표시
+    showResultsSections() {
+        const resultsSection = document.getElementById('resultsSection');
+        const downloadSection = document.getElementById('downloadSection');
+        const chartsSection = document.getElementById('chartsSection');
+        
+        if (resultsSection) resultsSection.style.display = 'block';
+        if (downloadSection) downloadSection.style.display = 'block';
+        if (chartsSection) chartsSection.style.display = 'block';
+    }
+    
+    // 지속시간 포맷팅
+    formatDuration(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
+    
+    // 에러 메시지 표시
+    showError(message) {
+        const errorContainer = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        
+        if (errorContainer && errorText) {
+            errorText.textContent = message;
+            errorContainer.style.display = 'block';
+            
+            setTimeout(() => {
+                errorContainer.style.display = 'none';
+            }, 5000);
+        } else {
+            alert(message);
+        }
+    }
+    
+    // API 키 파일에서 로드
+    async loadApiKeyFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        try {
+            const text = await file.text();
+            const apiKey = text.trim();
+            
+            if (apiKey) {
+                localStorage.setItem('youtube_api_key', apiKey);
+                this.apiKey = apiKey;
+                console.log('✅ API 키가 성공적으로 로드되었습니다.');
+                this.showError('API 키가 성공적으로 설정되었습니다.');
+            }
+        } catch (error) {
+            console.error('❌ API 키 로드 실패:', error);
+            this.showError('API 키 파일을 읽을 수 없습니다.');
+        }
+    }
+    
+    // API 키 초기화 x
+    clearApiKey() {
+        localStorage.removeItem('youtube_api_key');
+        this.apiKey = null;
+        console.log('🔄 API 키가 초기화되었습니다.');
+        this.showError('API 키가 초기화되었습니다.');
+    }
+    
+    // 스캔 중지
+    stopScan() {
+        this.isScanning = false;
+        console.log('⏹️ 스캔이 중지되었습니다.');
+        this.updateScanButton(false);
+        this.hideScanProgress();
+    }
+    
+    
+    
     
     
   
