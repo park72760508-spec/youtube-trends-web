@@ -1298,6 +1298,54 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
+    // displayTableView 메서드 수정 (기존 메서드 대체)
+    displayTableView() {
+        const tableBody = document.getElementById('videoTableBody');
+        if (!tableBody) return;
+        
+        tableBody.innerHTML = '';
+        
+        this.scanResults.forEach((video, index) => {
+            const row = document.createElement('tr');
+            if (video.isSimulated) {
+                row.classList.add('simulated-row');
+            }
+            
+            const titleLink = this.createVideoTitleLink(video);
+            const actionButton = video.isSimulated ? 
+                '<button class="action-btn" onclick="alert(\'모의 데이터입니다\')" title="모의 데이터"><i class="fas fa-info"></i></button>' :
+                `<a href="${this.generateYouTubeLink(video.id)}" target="_blank" class="action-btn external" title="YouTube에서 보기"><i class="fas fa-external-link-alt"></i></a>`;
+            
+            row.innerHTML = `
+                <td class="rank-cell">
+                    <span class="rank-number">${index + 1}</span>
+                    ${video.isSimulated ? '<span class="simulated-tag">모의</span>' : ''}
+                </td>
+                <td class="video-info-cell">
+                    <div class="video-title">${titleLink}</div>
+                    <div class="video-channel">${video.channel}</div>
+                    <div class="video-keyword">키워드: ${video.searchKeyword}</div>
+                </td>
+                <td class="viral-score-cell">
+                    <span class="table-viral-score ${video.isSimulated ? 'simulated' : ''}">${video.viralScore}</span>
+                </td>
+                <td class="stats-cell">${this.formatNumber(video.viewCount)}</td>
+                <td class="engagement-cell">${video.engagementRate.toFixed(1)}%</td>
+                <td class="growth-cell">${video.growthRate.toFixed(1)}%</td>
+                <td class="format-cell">
+                    <span class="format-badge ${video.format}">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
+                </td>
+                <td class="date-cell">${video.publishDate}</td>
+                <td class="action-cell">${actionButton}</td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+        
+        console.log(`📋 테이블 뷰 업데이트 완료: ${this.scanResults.length}개 영상`);
+    }
+    
+
     // OptimizedYoutubeTrendsAnalyzer 클래스에 추가할 메서드들
     
     // 키워드 티어별 선택 메서드
@@ -1466,7 +1514,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
 
-    
+  
 }  // ★★★★★ Class 모듈 끝 부분 ★★★★★
 
 // 모의 데이터 생성기 클래스
