@@ -1383,6 +1383,55 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
+    // 성공 메시지 표시
+    showSuccess(message, title = '작업 완료') {
+        const successContainer = document.getElementById('successMessage');
+        const successTitle = document.getElementById('successTitle');
+        const successText = document.getElementById('successText');
+        
+        if (successContainer && successTitle && successText) {
+            successTitle.textContent = title;
+            successText.textContent = message;
+            successContainer.style.display = 'block';
+            
+            // 3초 후 자동 숨김
+            setTimeout(() => {
+                successContainer.style.display = 'none';
+            }, 3000);
+        }
+    }
+    
+    // API 상태 배너 표시
+    showApiStatusBanner(message, isSuccess = true) {
+        const banner = document.getElementById('apiStatusBanner');
+        const text = document.getElementById('apiStatusText');
+        const icon = banner?.querySelector('i');
+        
+        if (banner && text) {
+            text.textContent = message;
+            
+            if (isSuccess) {
+                banner.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                if (icon) {
+                    icon.className = 'fas fa-check-circle';
+                }
+            } else {
+                banner.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                if (icon) {
+                    icon.className = 'fas fa-exclamation-triangle';
+                }
+            }
+            
+            banner.classList.add('show');
+            
+            // 5초 후 자동 숨김
+            setTimeout(() => {
+                banner.classList.remove('show');
+            }, 5000);
+        }
+    }
+    
+
     // runFullScan 메서드 추가 (클래스 내부에)
     async runFullScan(keywords, format, timeRange, count, viewCountFilter = 'all') {
         console.log('🚀 전체 스캔 시작:', { 
@@ -2176,7 +2225,12 @@ class OptimizedYoutubeTrendsAnalyzer {
                 localStorage.setItem('youtube_api_key', apiKey);
                 this.apiKey = apiKey;
                 console.log('✅ API 키가 성공적으로 로드되었습니다.');
-                this.showError('API 키가 성공적으로 설정되었습니다.');
+                
+                // 성공 메시지 표시
+                this.showSuccess('API 키가 성공적으로 설정되었습니다.', 'API 키 설정 완료');
+                
+                // 상단 배너로도 표시
+                this.showApiStatusBanner('YouTube API 키가 정상적으로 연결되었습니다', true);
             }
         } catch (error) {
             console.error('❌ API 키 로드 실패:', error);
@@ -2189,7 +2243,15 @@ class OptimizedYoutubeTrendsAnalyzer {
         localStorage.removeItem('youtube_api_key');
         this.apiKey = null;
         console.log('🔄 API 키가 초기화되었습니다.');
-        this.showError('API 키가 초기화되었습니다.');
+        
+        // 성공 메시지 표시
+        this.showSuccess('API 키가 초기화되었습니다.', 'API 키 초기화 완료');
+        
+        // 상단 배너 숨김
+        const banner = document.getElementById('apiStatusBanner');
+        if (banner) {
+            banner.classList.remove('show');
+        }
     }
     
     // 스캔 중지
