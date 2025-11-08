@@ -96,6 +96,83 @@
                                     <option value="tech">📱 시니어 테크</option>
                                 </select>
                             </div>
+
+                            <div class="form-group keyword-selection-group">
+                                <label>🎯 검색 키워드 선택 (API 할당량 절약)</label>
+                                <div class="keyword-selection-container">
+                                    <!-- 전체 선택/해제 컨트롤 -->
+                                    <div class="keyword-controls">
+                                        <button type="button" id="selectAllKeywords" class="keyword-control-btn">
+                                            <i class="fas fa-check-square"></i> 전체 선택
+                                        </button>
+                                        <button type="button" id="deselectAllKeywords" class="keyword-control-btn">
+                                            <i class="fas fa-square"></i> 전체 해제
+                                        </button>
+                                        <button type="button" id="selectTier1Only" class="keyword-control-btn">
+                                            🔥 핵심만
+                                        </button>
+                                        <span class="selected-count">선택된 키워드: <span id="selectedKeywordCount">0</span>개</span>
+                                    </div>
+                                    
+                                    <!-- 키워드 티어별 섹션 -->
+                                    <div class="keyword-tiers">
+                                        <!-- Tier 1: 핵심 키워드 -->
+                                        <div class="keyword-tier" data-tier="tier1">
+                                            <div class="tier-header">
+                                                <h4>🔥 핵심 키워드 (Tier 1)</h4>
+                                                <p class="tier-description">가장 중요한 시니어 관련 키워드</p>
+                                                <button type="button" class="tier-toggle" data-tier="tier1">
+                                                    <i class="fas fa-check-square"></i> 전체 선택/해제
+                                                </button>
+                                            </div>
+                                            <div class="keyword-grid" id="tier1Keywords">
+                                                <!-- 동적으로 생성 -->
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Tier 2: 확장 키워드 -->
+                                        <div class="keyword-tier" data-tier="tier2">
+                                            <div class="tier-header">
+                                                <h4>⭐ 확장 키워드 (Tier 2)</h4>
+                                                <p class="tier-description">중요한 확장 검색 키워드</p>
+                                                <button type="button" class="tier-toggle" data-tier="tier2">
+                                                    <i class="fas fa-square"></i> 전체 선택/해제
+                                                </button>
+                                            </div>
+                                            <div class="keyword-grid" id="tier2Keywords">
+                                                <!-- 동적으로 생성 -->
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Tier 3: 세부 키워드 -->
+                                        <div class="keyword-tier" data-tier="tier3">
+                                            <div class="tier-header">
+                                                <h4>🌟 세부 키워드 (Tier 3)</h4>
+                                                <p class="tier-description">선택적 세부 검색 키워드</p>
+                                                <button type="button" class="tier-toggle" data-tier="tier3">
+                                                    <i class="fas fa-square"></i> 전체 선택/해제
+                                                </button>
+                                            </div>
+                                            <div class="keyword-grid" id="tier3Keywords">
+                                                <!-- 동적으로 생성 -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 예상 API 비용 표시 -->
+                                    <div class="api-cost-estimate">
+                                        <div class="cost-info">
+                                            <span class="cost-label">예상 API 비용:</span>
+                                            <span class="cost-value" id="estimatedCost">0</span>
+                                            <span class="cost-unit">할당량</span>
+                                        </div>
+                                        <div class="cost-warning" id="costWarning" style="display: none;">
+                                            ⚠️ 선택한 키워드가 많아 할당량이 부족할 수 있습니다.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             
                             <div class="form-group">
                                 <label for="videoFormat">📺 영상 형식</label>
