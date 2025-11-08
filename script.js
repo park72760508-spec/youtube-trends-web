@@ -2425,31 +2425,43 @@ async fetchRealYoutubeData(category, count) {
     }
     
     // (d) 표 렌더링
-    renderResultsTable(videos=[]) {
+    // (개선) 표 렌더링 — 제목에 링크 적용
+    renderResultsTable(videos = []) {
       const tbody = document.querySelector('#resultTable tbody');
       if (!tbody) return;
-      const rows = videos.map(v => {
+    
+      const rows = (videos || []).map(v => {
+        const titleText = this.escapeHtml ? this.escapeHtml(v.title) : String(v.title || '');
+        const url = v && v.videoId ? this.makeVideoUrl(v.videoId) : '';
+        const titleCell = url
+          ? `<a class="title-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="YouTube에서 영상 열기: ${titleText}">${titleText}</a>`
+          : titleText;
+    
+        const channelText = this.escapeHtml ? this.escapeHtml(v.channel) : String(v.channel || '');
+    
         return `<tr>
-          <td>${v.rank}</td>
-          <td>${this.escapeHtml ? this.escapeHtml(v.title) : String(v.title)}</td>
-          <td>${this.escapeHtml ? this.escapeHtml(v.channel) : String(v.channel)}</td>
-          <td>${(v.publishTime||'')}</td>
-          <td class="cell-number">${(v.views||'0')}</td>
-          <td class="cell-number">${(v.likes||'0')}</td>
-          <td class="cell-number">${(v.engagement||'0')}%</td>
-          <td class="cell-number">${(v.viralScore||0).toFixed(2)}</td>
-          <td class="cell-number">${this._formatDur(v.duration||'PT0S')}</td>
+          <td>${v.rank ?? ''}</td>
+          <td>${titleCell}</td>
+          <td>${channelText}</td>
+          <td>${v.publishTime || ''}</td>
+          <td class="cell-number">${v.views || '0'}</td>
+          <td class="cell-number">${v.likes || '0'}</td>
+          <td class="cell-number">${(v.engagement || '0')}%</td>
+          <td class="cell-number">${(Number(v.viralScore) || 0).toFixed(2)}</td>
+          <td class="cell-number">${this._formatDur(v.duration || 'PT0S')}</td>
         </tr>`;
       }).join('');
+    
       tbody.innerHTML = rows || `<tr><td colspan="9" style="text-align:center;color:#64748b">검색 결과가 없습니다</td></tr>`;
     
       // 엑셀 버튼 핸들러 1회 바인딩
       const btn = document.getElementById('btnExportExcel');
       if (btn && !btn._bound) {
-        btn.addEventListener('click', ()=> this.exportExcelFromVideos(videos));
+        btn.addEventListener('click', () => this.exportExcelFromVideos(videos));
         btn._bound = true;
       }
     }
+
     
     // (e) 결과 정보 텍스트
     updateResultInfo(total, printed, timeRange, format) {
@@ -2499,6 +2511,12 @@ async fetchRealYoutubeData(category, count) {
       return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
     }
         
+    // 유튜브 영상 URL 생성
+    makeVideoUrl(videoId = '') {
+      const id = String(videoId || '').trim();
+      if (!id) return '';
+      return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+    }
 
     
 }  
