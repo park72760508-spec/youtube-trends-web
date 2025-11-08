@@ -1,7 +1,7 @@
 {
-  "name": "시니어 YouTube 트렌드 분석기 Pro - 막강한 핫한 영상 검출 도구",
+  "name": "시니어 YouTube 트렌드 분석기 Pro - 전체 채널 스캔 시스템",
   "short_name": "시니어트렌드Pro",
-  "description": "🔥 최근 1주일간 가장 핫한 영상을 검출하는 막강한 도구. 쇼츠/롱폼 구분, 바이럴 점수 계산, 고급 분석 기능 제공",
+  "description": "🔥 전체 시니어 채널을 스캔하여 최상위 핫한 영상을 검출하는 막강한 트렌드 분석 도구. 50+ 키워드 동시 검색, 바이럴 점수 계산, 고급 순위 시스템",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -15,87 +15,88 @@
     "utilities", 
     "business",
     "analytics",
-    "social"
+    "social",
+    "education"
   ],
-"screenshots": [],
-"icons": [
+  "screenshots": [],
+  "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "72x72",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "96x96",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "128x128",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "144x144",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "152x152",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "384x384",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%233b82f6'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' style='stop-color:%233b82f6;stop-opacity:1' /><stop offset='100%' style='stop-color:%231e40af;stop-opacity:1' /></linearGradient></defs><rect width='100' height='100' fill='url(%23grad)'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>🔥</text></svg>",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
-"shortcuts": [
+  "shortcuts": [
     {
-      "name": "🔥 핫한 영상 검출",
-      "short_name": "핫한검출",
-      "description": "최근 1주일간 가장 핫한 영상을 즉시 검출",
-      "url": "./index.html?action=hot_search"
+      "name": "🔥 전체 채널 스캔",
+      "short_name": "전체스캔",
+      "description": "모든 시니어 채널을 스캔하여 최상위 핫한 영상 검출",
+      "url": "./index_improved.html?action=full_scan"
     },
     {
-      "name": "📱 쇼츠 분석",
-      "short_name": "쇼츠분석", 
-      "description": "쇼츠 영상만 골라서 트렌드 분석",
-      "url": "./index.html?format=shorts"
+      "name": "📊 바이럴 점수 분석",
+      "short_name": "바이럴분석", 
+      "description": "고급 바이럴 점수 알고리즘으로 트렌드 분석",
+      "url": "./index_improved.html?mode=viral_analysis"
     },
     {
-      "name": "🎬 롱폼 분석",
-      "short_name": "롱폼분석",
-      "description": "롱폼 영상 트렌드 심화 분석", 
-      "url": "./index.html?format=long"
+      "name": "🏆 최상위 순위",
+      "short_name": "최상위",
+      "description": "전체 풀에서 최상위 핫한 영상만 선별 표시", 
+      "url": "./index_improved.html?view=top_ranked"
     },
     {
-      "name": "📊 Excel 다운로드",
+      "name": "📥 Excel 다운로드",
       "short_name": "Excel",
-      "description": "분석 데이터를 Excel로 바로 다운로드",
-      "url": "./index.html?action=download"
+      "description": "전체 스캔 결과를 Excel로 바로 다운로드",
+      "url": "./index_improved.html?action=download_excel"
     }
   ],
   "share_target": {
-    "action": "./share.html",
+    "action": "./analyze.html",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {
@@ -116,7 +117,8 @@
       "accept": {
         "text/csv": [".csv"],
         "application/vnd.ms-excel": [".xls"],
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "application/json": [".json"]
       }
     }
   ],
@@ -124,7 +126,7 @@
     "client_mode": ["navigate-existing", "auto"]
   },
   "edge_side_panel": {
-    "preferred_width": 400
+    "preferred_width": 450
   },
   "display_override": [
     "window-controls-overlay",
@@ -141,38 +143,99 @@
   ],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "custom": {
-    "pro_features": {
-      "viral_score_algorithm": "고급 바이럴 점수 계산 엔진",
-      "hot_video_detection": "최근 1주일간 핫한 영상 자동 검출",
-      "format_classification": "쇼츠/롱폼 자동 분류 시스템",
-      "growth_rate_analysis": "구독자 대비 조회수 성장률 분석",
-      "engagement_metrics": "참여율 심화 분석",
-      "advanced_filtering": "채널 규모별, 업로드 빈도별 필터링",
+    "full_scan_features": {
+      "comprehensive_keyword_scanning": "50+ 시니어 관련 키워드 동시 검색",
+      "viral_score_algorithm": "다중 지표 기반 고급 바이럴 점수 계산 엔진",
+      "top_ranking_system": "전체 풀에서 최상위 핫한 영상만 선별",
+      "real_time_progress": "실시간 스캔 진행 상황 표시",
+      "advanced_filtering": "채널 규모별, 업로드 빈도별 고급 필터링",
       "multi_format_export": "Excel, CSV, JSON, PDF 다중 포맷 지원",
-      "real_time_charts": "실시간 데이터 시각화",
-      "senior_optimized_ui": "시니어 친화적 대형 폰트 & 고대비",
-      "accessibility_compliant": "WCAG 2.1 AA 접근성 준수"
+      "senior_optimized_ui": "시니어 친화적 대형 폰트 & 고대비 디자인",
+      "accessibility_compliant": "WCAG 2.1 AA 접근성 완전 준수",
+      "responsive_design": "모든 디바이스 최적화",
+      "batch_processing": "대용량 데이터 배치 처리 시스템"
+    },
+    "scanning_algorithm": {
+      "phase_1": "키워드 확장 및 전처리",
+      "phase_2": "병렬 채널 검색 및 데이터 수집", 
+      "phase_3": "바이럴 점수 계산 (조회수, 참여율, 성장률, 최신성)",
+      "phase_4": "중복 제거 및 품질 필터링",
+      "phase_5": "최상위 순위 선별 및 정렬",
+      "phase_6": "시각화 및 분석 리포트 생성"
+    },
+    "viral_score_components": {
+      "view_score": "조회수 기반 점수 (가중치 30%)",
+      "engagement_score": "참여율 기반 점수 (가중치 25%)",
+      "growth_score": "성장률 기반 점수 (가중치 25%)",
+      "freshness_score": "최신성 기반 점수 (가중치 20%)",
+      "format_bonus": "쇼츠 포맷 보너스 (+10점)",
+      "total_range": "0-1000점 범위"
     },
     "target_audience": {
-      "primary": "시니어 (50세 이상)",
-      "secondary": "YouTube 크리에이터",
-      "tertiary": "콘텐츠 마케터"
+      "primary": "시니어 (50세 이상) 콘텐츠 크리에이터",
+      "secondary": "YouTube 마케터 & 트렌드 분석가",
+      "tertiary": "시니어 타겟 브랜드 마케터"
     },
     "key_benefits": [
-      "🔥 핫한 영상 즉시 검출로 트렌드 선점",
-      "📈 바이럴 점수로 성공 확률 예측",
-      "📱 쇼츠/롱폼별 맞춤 전략 수립", 
-      "📊 Excel 다운로드로 심화 분석",
-      "🎯 시니어 특화 콘텐츠 발굴",
-      "⚡ 실시간 데이터로 빠른 의사결정"
+      "🔥 전체 시니어 채널 스캔으로 숨은 핫 영상 발굴",
+      "🎯 최상위 순위 시스템으로 확실한 트렌드 파악",
+      "🚀 고급 바이럴 점수로 성공 가능성 예측",
+      "📊 실시간 진행 상황으로 투명한 분석 과정",
+      "💎 50+ 키워드 동시 검색으로 놓치는 것 없음",
+      "⚡ 배치 처리로 빠르고 효율적인 대용량 분석",
+      "📥 다중 포맷 다운로드로 즉시 활용 가능",
+      "♿ 시니어 친화적 UI로 누구나 쉽게 사용"
     ],
     "competitive_advantages": [
-      "업계 최고 수준의 바이럴 예측 알고리즘",
-      "시니어 친화적 UI/UX 설계",
-      "쇼츠/롱폼 구분 자동화",
-      "다중 키워드 병렬 검색",
-      "실시간 성장률 분석",
-      "고급 참여율 계산 엔진"
-    ]
+      "업계 최초 '전체 채널 스캔' 시스템",
+      "다중 지표 기반 정교한 바이럴 점수 알고리즘",
+      "시니어 특화 키워드 데이터베이스 (200+ 키워드)",
+      "실시간 진행 상황 표시로 투명한 분석 과정",
+      "배치 처리 시스템으로 대용량 데이터 안정적 처리",
+      "최상위 순위 선별로 정확한 트렌드 파악",
+      "시니어 친화적 접근성 완전 준수",
+      "모든 디바이스 완벽 지원"
+    ],
+    "technical_specs": {
+      "scan_capacity": "동시 50+ 키워드 검색",
+      "data_processing": "실시간 중복 제거 및 품질 필터링",
+      "viral_calculation": "4가지 지표 기반 종합 점수",
+      "ranking_system": "1000점 만점 바이럴 점수 순위",
+      "export_formats": "Excel, CSV, JSON, PDF",
+      "api_optimization": "할당량 최적화 배치 처리",
+      "performance": "대용량 데이터 안정적 처리",
+      "accessibility": "WCAG 2.1 AA 완전 준수"
+    },
+    "browser_support": {
+      "chrome": ">=90 (권장)",
+      "firefox": ">=88", 
+      "safari": ">=14",
+      "edge": ">=90",
+      "mobile": "iOS Safari 14+, Chrome Mobile 90+"
+    },
+    "accessibility": {
+      "wcag_level": "AA (완전 준수)",
+      "font_size": "18px+ (시니어 최적화)",
+      "color_contrast": "4.5:1 이상",
+      "keyboard_navigation": "완전 지원",
+      "screen_reader": "NVDA, JAWS, VoiceOver 지원",
+      "focus_indicators": "고대비 포커스 표시",
+      "reduced_motion": "애니메이션 감소 모드 지원"
+    },
+    "performance": {
+      "lighthouse_score": ">= 95점 목표",
+      "first_contentful_paint": "< 1.2초",
+      "largest_contentful_paint": "< 2.5초", 
+      "cumulative_layout_shift": "< 0.1",
+      "time_to_interactive": "< 3초",
+      "bundle_size": "최적화된 경량 번들"
+    },
+    "seo": {
+      "meta_tags": "완전 최적화",
+      "open_graph": "소셜 미디어 최적화",
+      "structured_data": "Schema.org 적용",
+      "sitemap": "자동 생성",
+      "robots_txt": "SEO 친화적 설정"
+    }
   }
 }
