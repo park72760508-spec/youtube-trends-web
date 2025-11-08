@@ -1,871 +1,661 @@
 /**
- * 시니어 YouTube 트렌드 분석기 - 엑셀 다운로드 중심
- * Excel/CSV/JSON/PDF 다운로드 기능 구현
- * CSP (Content Security Policy) 완전 호환
+ * 시니어 YouTube 트렌드 분석기 Pro - 전체 채널 스캔 시스템
+ * 모든 시니어 관련 키워드로 전체 채널을 스캔하여 최상위 핫한 영상 검출
  */
 
-// 🔒 CSP 호환성 확인
-(function() {
-    'use strict';
-    
-    // 라이브러리 로딩 상태 확인
-    const checkLibraries = () => {
-    const missing = [];
-    if (typeof XLSX === 'undefined') missing.push('XLSX (Excel 라이브러리)');
-    if (missing.length > 0) { console.error('...', missing); return false; }
-
-        
-        console.log('✅ 모든 라이브러리 로딩 완료');
-        return true;
-    };
-    
-    // DOM 로딩 완료 시 확인
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', checkLibraries);
-    } else {
-        checkLibraries();
-    }
-})();
-
-class SeniorYoutubeTrendsExcel {
+class FullScanYoutubeTrendsAnalyzer {
     constructor() {
         this.apiKey = this.getApiKey();
         this.baseUrl = 'https://www.googleapis.com/youtube/v3';
-        this.currentData = [];
+        this.allVideos = []; // 전체 스캔 결과 저장
+        this.scanResults = []; // 최종 정렬된 결과
+        this.isScanning = false;
         this.charts = {};
         
-        
-        // 시니어 특화 키워드 데이터베이스
+        // 확장된 시니어 키워드 데이터베이스 (카테고리별)
         this.seniorKeywords = {
-            all: ['시니어', '노인', '중년', '50대', '60대', '70대', '실버', '어르신', '부모님'],
+            all: [
+                // 기본 시니어 키워드
+                '시니어', '노인', '중년', '50대', '60대', '70대', '80대', 
+                '실버', '어르신', '부모님', '할머니', '할아버지',
+                '노년', '중년층', '실버세대', '황혼기', '노후',
+                
+                // 복합 키워드
+                '시니어 라이프', '노년 생활', '실버 문화', '중년의 품격',
+                '인생 2막', '세컨드 라이프', '은퇴 생활', '황금기'
+            ],
             health: [
-                '시니어 운동', '실버 체조', '노인 건강', '중년 건강', '시니어 요가', '노년 운동',
-                '관절 건강', '혈압 관리', '당뇨 관리', '치매 예방', '건강식품', '한방치료',
-                '실버 피트니스', '노인 재활', '시니어 스트레칭', '무릎 건강', '척추 건강'
+                '시니어 운동', '실버 체조', '노인 건강', '중년 건강', '시니어 요가',
+                '노년 운동', '관절 건강', '혈압 관리', '당뇨 관리', '치매 예방',
+                '건강식품', '한방치료', '실버 피트니스', '노인 재활', '시니어 스트레칭',
+                '무릎 건강', '척추 건강', '골다공증', '근력 운동', '유산소 운동',
+                '실버 헬스', '노인 운동법', '건강 관리', '면역력', '혈관 건강',
+                '심혈관 질환', '고혈압', '당뇨병', '관절염', '허리 건강'
             ],
             hobby: [
                 '시니어 취미', '노년 여가', '실버 문화', '시니어 댄스', '노인 악기',
                 '시니어 그림', '서예', '원예', '실버 합창', '노년 학습', '평생교육',
-                '시니어 독서', '실버 봉사', '노인 동호회'
+                '시니어 독서', '실버 봉사', '노인 동호회', '시니어 클럽',
+                '노년 취미', '실버 아트', '시니어 문화활동', '중년 취미',
+                '시니어 음악', '노인 미술', '실버 댄스', '시니어 사진',
+                '중년 악기', '노년 서예', '시니어 도예', '실버 원예'
             ],
             cooking: [
                 '시니어 요리', '간편 요리', '건강 레시피', '노인 식단', '실버 쿠킹',
                 '중년 요리', '한식 요리', '건강식', '당뇨식단', '고혈압 식단',
-                '시니어 영양', '노인 반찬', '건강 간식'
+                '시니어 영양', '노인 반찬', '건강 간식', '실버 레시피',
+                '시니어 밑반찬', '노년 영양식', '건강한 식단', '시니어 도시락',
+                '혈당 관리 요리', '염분 줄인 요리', '소화 잘 되는 음식',
+                '시니어 홈쿠킹', '노인 급식', '실버 푸드'
             ],
             life: [
                 '시니어 라이프', '노년 생활', '실버 정보', '시니어 팁', '노인 생활용품',
                 '연금 정보', '실버타운', '노후 준비', '중년 라이프스타일', '은퇴 생활',
-                '시니어 패션', '노인 돌봄', '명언'
+                '시니어 패션', '노인 돌봄', '시니어 라이프스타일', '노년 준비',
+                '실버 금융', '시니어 보험', '노후 설계', '중년 재정관리',
+                '시니어 주거', '노인 복지', '실버 서비스', '시니어 안전',
+                '노년 인간관계', '시니어 상담', '실버 케어'
             ],
             travel: [
                 '시니어 여행', '실버 여행', '노년 여행', '시니어 투어', '중년 여행',
                 '실버 패키지', '효도 여행', '국내 여행', '해외 여행', '시니어 캠핑',
-                '노인 버스여행'
+                '노인 버스여행', '실버 크루즈', '시니어 배낭여행', '중년 부부여행',
+                '시니어 자유여행', '노년 관광', '실버 힐링여행', '시니어 문화여행',
+                '온천 여행', '시니어 트레킹', '노년 여행지', '실버 리조트'
             ],
             tech: [
                 '시니어 스마트폰', '노인 컴퓨터', '실버 디지털', '시니어 앱',
                 '중년 IT', 'AI 활용', '스마트워치', '디지털 교육', '온라인 쇼핑',
-                '시니어 SNS', '유튜브 사용법'
+                '시니어 SNS', '유튜브 사용법', '카카오톡', '네이버', '구글',
+                '시니어 인터넷', '노인 디지털', '실버 테크', '시니어 온라인',
+                '디지털 리터러시', '스마트 기기', '시니어 IT교육', '노년 디지털',
+                '시니어 화상통화', '온라인 뱅킹', '디지털 헬스케어'
             ]
         };
         
-       this.init();
+        this.init();
     }
     
     // 초기화
     init() {
-        console.log('🎯 시니어 YouTube 트렌드 분석기 (엑셀 다운로드) 시작');
+        console.log('🔥 시니어 YouTube 트렌드 분석기 Pro - 전체 스캔 시스템 시작');
         this.setupEventListeners();
-        this.showInitialMessage();
+        this.showWelcomeMessage();
     }
     
     // API 키 확인
     getApiKey() {
-        return localStorage.getItem('youtube_api_key') || 'DEMO_MODE';
+        return localStorage.getItem('youtube_api_key') || null;
+    }
+    
+    // API 키 설정
+    setApiKey(key) {
+        localStorage.setItem('youtube_api_key', key);
+        this.apiKey = key;
     }
     
     // 이벤트 리스너 설정
     setupEventListeners() {
-      // 검색 버튼
-      document.getElementById('searchBtn').addEventListener('click', () => this.performSearch());
-    
-      // 새로고침 버튼
-      document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
-    
-      // 다운로드 버튼들
-      document.getElementById('downloadExcel').addEventListener('click', () => this.downloadExcel());
-      document.getElementById('downloadCSV').addEventListener('click', () => this.downloadCSV());
-      document.getElementById('downloadJSON').addEventListener('click', () => this.downloadJSON());
-      document.getElementById('downloadPDF').addEventListener('click', () => this.downloadPDF());
-    
-      // 보기 모드 변경
-      document.getElementById('viewMode').addEventListener('change', (e) => this.changeViewMode(e.target.value));
-    
-      // 엔터 키 검색
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          this.performSearch();
-        }
-      });
-    
-      // API 키 불러오기/초기화 버튼 연결
-        // API 키 불러오기/초기화 버튼 연결
-        const loadBtn = document.getElementById('loadApiKeyBtn');
-        const clearBtn = document.getElementById('clearApiKeyBtn');
-        const fileInput = document.getElementById('apiKeyFile');
-        if (loadBtn && fileInput) {
-          loadBtn.addEventListener('click', () => fileInput.click());
-          fileInput.addEventListener('change', handleApiKeyFile); // 전역 함수 사용
-        }
-        if (clearBtn) {
-          clearBtn.addEventListener('click', clearSavedApiKey); // 전역 함수 사용
+        // 전체 스캔 버튼
+        const fullScanBtn = document.getElementById('fullScanBtn');
+        if (fullScanBtn) {
+            fullScanBtn.addEventListener('click', () => this.startFullScan());
         }
         
-        // ⬇️ 아래에 있었던 handleApiKeyFile / clearSavedApiKey / isValidYouTubeApiKey
-        // "메서드 정의 블럭"은 전부 삭제하세요. (전역 함수 버전이 이미 하단에 존재)
-
-    }
-
-
-    
-    // 초기 메시지 표시
-    showInitialMessage() {
-        const videoResults = document.getElementById('videoResults');
-        videoResults.style.display = 'block';
+        // 스캔 중지 버튼
+        const stopScanBtn = document.getElementById('stopScanBtn');
+        if (stopScanBtn) {
+            stopScanBtn.addEventListener('click', () => this.stopScan());
+        }
         
-        document.getElementById('videosList').innerHTML = `
-            <div class="initial-message">
-                <div class="welcome-card">
-                    <i class="fas fa-rocket"></i>
-                    <h3>시니어 YouTube 트렌드 분석기에 오신 것을 환영합니다!</h3>
-                    <p>원하는 카테고리를 선택하고 <strong>"트렌드 분석하기"</strong> 버튼을 클릭하세요.</p>
-                    <div class="feature-list">
-                        <div class="feature-item">
-                            <i class="fas fa-file-excel"></i>
-                            <span>Excel 다운로드로 상세한 데이터 분석</span>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>시각적 차트와 통계</span>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-filter"></i>
-                            <span>시니어 특화 콘텐츠 필터링</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <style>
-                .initial-message {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 300px;
-                }
-                .welcome-card {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 48px;
-                    border-radius: 20px;
-                    text-align: center;
-                    max-width: 600px;
-                    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
-                }
-                .welcome-card i {
-                    font-size: 4rem;
-                    margin-bottom: 24px;
-                    opacity: 0.9;
-                }
-                .welcome-card h3 {
-                    font-size: 1.8rem;
-                    margin-bottom: 16px;
-                    font-weight: 700;
-                }
-                .welcome-card p {
-                    font-size: 1.1rem;
-                    margin-bottom: 32px;
-                    opacity: 0.9;
-                    line-height: 1.6;
-                }
-                .feature-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                    margin-top: 24px;
-                }
-                .feature-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    background: rgba(255,255,255,0.1);
-                    padding: 16px;
-                    border-radius: 10px;
-                    backdrop-filter: blur(10px);
-                }
-                .feature-item i {
-                    font-size: 1.5rem;
-                    color: #fbbf24;
-                }
-                .feature-item span {
-                    font-size: 1rem;
-                    font-weight: 500;
-                }
-                @media (max-width: 768px) {
-                    .welcome-card {
-                        padding: 32px 24px;
-                        margin: 16px;
-                    }
-                    .welcome-card h3 {
-                        font-size: 1.5rem;
-                    }
-                }
-            </style>
-        `;
+        // API 키 관련
+        const loadApiKeyBtn = document.getElementById('loadApiKeyBtn');
+        const apiKeyFile = document.getElementById('apiKeyFile');
+        const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
+        
+        if (loadApiKeyBtn && apiKeyFile) {
+            loadApiKeyBtn.addEventListener('click', () => apiKeyFile.click());
+            apiKeyFile.addEventListener('change', (e) => this.loadApiKeyFromFile(e));
+        }
+        
+        if (clearApiKeyBtn) {
+            clearApiKeyBtn.addEventListener('click', () => this.clearApiKey());
+        }
+        
+        // 뷰 전환 버튼
+        const cardViewBtn = document.getElementById('cardViewBtn');
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        
+        if (cardViewBtn && tableViewBtn) {
+            cardViewBtn.addEventListener('click', () => this.switchView('card'));
+            tableViewBtn.addEventListener('click', () => this.switchView('table'));
+        }
+        
+        // 다운로드 버튼들
+        this.setupDownloadButtons();
     }
     
-    // 검색 실행
-    async performSearch() {
-      const format    = (document.getElementById('videoFormat')?.value) || 'shorts';
-      const timeRange = (document.getElementById('timeRange')?.value) || '7d';
-      const minViews  = parseInt(document.getElementById('minViews')?.value || '0', 10);
-      const sortBy    = (document.getElementById('sortBy')?.value) || 'viral_score';
-      const rawLimit  = parseInt(document.getElementById('videoCount')?.value || '50', 10);
-    
-      // 10000 선택 시 대용량 모드
-      const MAX_ALL   = 10000;
-      const limit     = (rawLimit === 10000) ? MAX_ALL : rawLimit;
-    
-      this.showLoading();
-    
-      try {
-        if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
-          alert('YouTube API 키가 필요합니다. 상단의 "API 키 불러오기" 버튼으로 키를 저장해 주세요.');
-          this.hideLoading();
-          return;
-        }
-    
-        // 기간 변환
-        const now = Date.now();
-        const rangeMap = { '24h': 1, '3d': 3, '7d': 7, '14d': 14 };
-        const days = rangeMap[timeRange] || 7;
-        const publishedAfter = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
-    
-        // 전수 수집(최대 필요 개수 전달 → 내부에서 조기 종료)
-        const allVideos = await this.collectSeniorVideosKR({
-          publishedAfter,
-          format,
-          minViews,
-          maxNeeded: limit   // ⬅️ 추가
-        });
-    
-        // 정렬
-        const sorters = {
-          viral_score     : (a,b)=> (b.viralScore||0) - (a.viralScore||0),
-          views           : (a,b)=> (b.viewsNumeric||0) - (a.viewsNumeric||0),
-          engagement_rate : (a,b)=> (parseFloat(b.engagement||0)) - (parseFloat(a.engagement||0)),
-          views_per_sub   : (a,b)=> (b.viewsPerSubNumeric||0) - (a.viewsPerSubNumeric||0),
-          recent_popular  : (a,b)=> (new Date(b.publishedAt) - new Date(a.publishedAt))
-        };
-        const sorter = sorters[sortBy] || sorters.viral_score;
-    
-        allVideos.forEach(v => {
-          v.viralScore = this.calculateViralScore ? this.calculateViralScore(v) : 0;
-          v.rank = 0;
-        });
-        allVideos.sort(sorter);
-        allVideos.forEach((v,i)=> v.rank = i+1);
-    
-        // 상위 N개 확정
-        this.currentData = allVideos.slice(0, limit);
-    
-        // 표 렌더 + 정보 텍스트
-        this.renderResultsTable(this.currentData);
-        this.updateResultInfo(allVideos.length, this.currentData.length, timeRange, format);
-    
-        this.hideLoading();
-        console.log('✅ 전수 탐색 완료:', allVideos.length, '건 중 상위', this.currentData.length, '건 출력');
-      } catch (err) {
-        console.error('❌ 전수 탐색 오류:', err);
-        this.showError?.();
-      }
+    // 다운로드 버튼 설정
+    setupDownloadButtons() {
+        const downloadExcel = document.getElementById('downloadExcel');
+        const downloadCSV = document.getElementById('downloadCSV');
+        const downloadJSON = document.getElementById('downloadJSON');
+        const downloadPDF = document.getElementById('downloadPDF');
+        
+        if (downloadExcel) downloadExcel.addEventListener('click', () => this.downloadExcel());
+        if (downloadCSV) downloadCSV.addEventListener('click', () => this.downloadCSV());
+        if (downloadJSON) downloadJSON.addEventListener('click', () => this.downloadJSON());
+        if (downloadPDF) downloadPDF.addEventListener('click', () => this.downloadPDF());
     }
-
-
-
-
-
-
-    // 반환: displayResults()에서 그대로 사용할 수 있는 객체 배열
-    // 조회기간: 최근 7일, 페이지네이션, 채널 구독자수 반영, 조회수/구독자수 정규화 지표 계산
-// 최근 7일 + 조회수 내림차순 + 페이지네이션 + 채널 구독자수 포함
-async fetchRealYoutubeData(category, count) {
-  if (!this.apiKey || this.apiKey === 'DEMO_MODE') {
-    throw new Error('API 키가 없습니다. (현재 데모 모드)');
-  }
-
-  // 0) 파라미터/필터
-  const desired = Math.max(1, Math.min(count || 25, 200)); // 안전상한
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const publishedAfter = new Date(sevenDaysAgo).toISOString();
-
-  const catMap = {
-    health: '시니어 건강',
-    hobby: '시니어 취미',
-    cooking: '시니어 요리',
-    life: '시니어 생활 정보',
-    travel: '시니어 여행',
-    tech: '시니어 스마트폰' 
-  };
-  const q = category === 'all' ? '시니어' : (catMap[category] || '시니어');
-
-  // 1) search: 조회수 순 + 페이지네이션
-  let nextPageToken;
-  const videoIds = [];
-  while (videoIds.length < desired) {
-    const perPage = Math.min(50, desired - videoIds.length);
-    const searchParams = new URLSearchParams({
-      key: this.apiKey,
-      part: 'snippet',
-      maxResults: String(perPage),
-      q,
-      type: 'video',
-      order: 'viewCount',       // 조회수 높은 순
-      publishedAfter,           // 최근 7일
-      regionCode: 'KR',
-      relevanceLanguage: 'ko'
-    });
-    if (nextPageToken) searchParams.set('pageToken', nextPageToken);
-
-    const res = await fetch(`${this.baseUrl}/search?${searchParams.toString()}`);
-    if (!res.ok) throw new Error(`search 실패: ${res.status}`);
-    const json = await res.json();
-
-    const batch = (json.items || [])
-      .map(it => it?.id?.videoId)
-      .filter(Boolean);
-
-    videoIds.push(...batch);
-    nextPageToken = json.nextPageToken;
-    if (!nextPageToken || batch.length === 0) break;
-  }
-
-  const ids = videoIds.slice(0, desired);
-  if (ids.length === 0) return [];
-
-  // 2) videos 상세/통계 (50개 단위)
-  const videos = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    const chunk = ids.slice(i, i + 50);
-    const params = new URLSearchParams({
-      key: this.apiKey,
-      part: 'statistics,contentDetails,snippet',
-      id: chunk.join(',')
-    });
-    const r = await fetch(`${this.baseUrl}/videos?${params.toString()}`);
-    if (!r.ok) throw new Error(`videos 실패: ${r.status}`);
-    const j = await r.json();
-    videos.push(...(j.items || []));
-  }
-
-  // 3) 채널 구독자수 수집 (channels API)
-  const channelIds = [...new Set(videos.map(v => v?.snippet?.channelId).filter(Boolean))];
-  const subsByChannel = {};
-  for (let i = 0; i < channelIds.length; i += 50) {
-    const chunk = channelIds.slice(i, i + 50);
-    const params = new URLSearchParams({
-      key: this.apiKey,
-      part: 'statistics',
-      id: chunk.join(',')
-    });
-    const r = await fetch(`${this.baseUrl}/channels?${params.toString()}`);
-    if (!r.ok) throw new Error(`channels 실패: ${r.status}`);
-    const j = await r.json();
-    (j.items || []).forEach(ch => {
-      const cid = ch.id;
-      const subs = Number(ch?.statistics?.subscriberCount || 0); // 숨김/비공개면 0 처리
-      subsByChannel[cid] = subs;
-    });
-  }
-
-  // 4) 매핑 + 7일 재검증 + 정렬용 숫자 보존
-  const within7d = [];
-  for (const v of videos) {
-    const s  = v.statistics || {};
-    const sn = v.snippet || {};
-    const cd = v.contentDetails || {};
-
-    const publishedAt = sn.publishedAt ? Date.parse(sn.publishedAt) : now;
-    if (!(publishedAt >= sevenDaysAgo && publishedAt <= now)) continue; // 7일 재확인
-
-    const views = Number(s.viewCount || 0);
-    const likes = Number(s.likeCount || 0);
-    const comments = Number(s.commentCount || 0);
-    const channelId = sn.channelId;
-    const subs = Number(subsByChannel[channelId] || 0);
-
-    const normCat = category === 'all' ? 'life' : category;
-
-    within7d.push({
-      id: v.id,
-      rank: 0, // 나중에 채움
-      title: sn.title || '(제목 없음)',
-      channel: sn.channelTitle || '-',
-      category: normCat,
-      categoryName: this.getCategoryName ? this.getCategoryName(normCat) : normCat,
-
-      // 표시는 문자열, 정렬은 숫자
-      views: views.toLocaleString(),
-      likes: likes.toLocaleString(),
-      comments: comments.toLocaleString(),
-      subscriberCount: subs,                              // 숫자
-      subscriberCountFormatted: subs.toLocaleString(),    // 표시용
-
-      duration: (cd.duration || 'PT0M').replace(/^PT/, '').toLowerCase(),
-      publishTime: new Date(publishedAt).toLocaleDateString('ko-KR'),
-      growthRate: (Math.random() * 20 + 5).toFixed(1),
-      thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
-      engagement: (likes && views ? ((likes / views) * 100) : (Math.random() * 5 + 2)).toFixed(1),
-      tags: sn.tags || [],
-      description: sn.description || '',
-      publishedAt: (sn.publishedAt || '').slice(0, 10),
-      videoId: v.id,
-
-      // 정렬용
-      viewsNumeric: views
-    });
-  }
-
-  // 5) 최종 정렬: 조회수 내림차순 + 상위 desired개
-  within7d.sort((a, b) => (b.viewsNumeric || 0) - (a.viewsNumeric || 0));
-  const top = within7d.slice(0, desired);
-  top.forEach((v, i) => v.rank = i + 1);
-
-  return top;
-}
-
-
-
-
     
-    // 향상된 모의 데이터 생성
-    async generateEnhancedMockData(category, count) {
-        // 로딩 시뮬레이션
-        await this.simulateLoading(2000);
+    // 웰컴 메시지 표시
+    showWelcomeMessage() {
+        console.log('🎯 전체 스캔 시스템이 준비되었습니다!');
+        console.log('📍 모든 시니어 관련 키워드로 전체 채널을 스캔합니다');
+        console.log('🚀 최상위 핫한 영상만을 선별하여 표시합니다');
+    }
+    
+    // 전체 스캔 시작
+    async startFullScan() {
+        if (!this.apiKey) {
+            this.showError('YouTube API 키가 필요합니다. API 키를 먼저 설정해주세요.');
+            return;
+        }
         
-        const videoTemplates = this.getVideoTemplatesByCategory(category);
-        const videos = [];
+        if (this.isScanning) {
+            this.showError('이미 스캔이 진행 중입니다.');
+            return;
+        }
         
-        for (let i = 0; i < count; i++) {
-            const template = videoTemplates[Math.floor(Math.random() * videoTemplates.length)];
-            const titleIndex = Math.floor(Math.random() * template.titles.length);
-            const channelIndex = Math.floor(Math.random() * template.channels.length);
+        this.isScanning = true;
+        this.allVideos = [];
+        this.scanResults = [];
+        
+        // UI 상태 변경
+        this.showScanProgress();
+        this.updateScanButton(true);
+        
+        try {
+            // 설정 값들 가져오기
+            const category = document.getElementById('scanCategory')?.value || 'all';
+            const format = document.getElementById('videoFormat')?.value || 'all';
+            const count = parseInt(document.getElementById('resultCount')?.value || '50');
+            const timeRange = document.getElementById('timeRange')?.value || 'week';
             
-            videos.push({
-                id: `video_${Date.now()}_${i}`,
-                rank: i + 1,
-                title: template.titles[titleIndex],
-                channel: template.channels[channelIndex],
-                category: template.category,
-                categoryName: this.getCategoryName(template.category),
-                views: this.generateRandomViews(),
-                likes: this.generateRandomLikes(),
-                comments: this.generateRandomComments(),
-                duration: this.generateRandomDuration(),
-                publishTime: this.generateRandomPublishTime(),
-                growthRate: this.generateGrowthRate(),
-                thumbnail: this.generateThumbnail(template.category),
-                engagement: this.calculateEngagement(),
-                tags: this.generateTags(template.category),
-                description: this.generateDescription(template.category),
-                publishedAt: this.generatePublishedDate(),
-                videoId: this.generateVideoId()
+            console.log('🔍 전체 스캔 설정:', { category, format, count, timeRange });
+            
+            // 키워드 목록 준비
+            const keywords = this.getKeywordsForCategory(category);
+            console.log(`📋 스캔할 키워드 개수: ${keywords.length}`);
+            
+            // 전체 스캔 실행
+            await this.performFullScan(keywords, format, timeRange);
+            
+            // 바이럴 점수 계산 및 정렬
+            await this.calculateViralScores();
+            
+            // 최상위 결과 선별
+            this.scanResults = this.selectTopResults(count);
+            
+            // 결과 표시
+            this.displayResults();
+            
+            // 분석 요약 표시
+            this.displayAnalysisSummary();
+            
+            // 차트 생성
+            this.createCharts();
+            
+            console.log('✅ 전체 스캔 완료!');
+            
+        } catch (error) {
+            console.error('❌ 스캔 중 오류:', error);
+            this.showError(`스캔 중 오류가 발생했습니다: ${error.message}`);
+        } finally {
+            this.isScanning = false;
+            this.hideScanProgress();
+            this.updateScanButton(false);
+        }
+    }
+    
+    // 카테고리별 키워드 가져오기
+    getKeywordsForCategory(category) {
+        if (category === 'all') {
+            // 모든 카테고리의 키워드를 합침
+            return Object.values(this.seniorKeywords).flat();
+        } else {
+            // 특정 카테고리 + 기본 시니어 키워드
+            return [
+                ...this.seniorKeywords.all,
+                ...(this.seniorKeywords[category] || [])
+            ];
+        }
+    }
+    
+    // 전체 스캔 수행
+    async performFullScan(keywords, format, timeRange) {
+        const uniqueKeywords = [...new Set(keywords)]; // 중복 제거
+        const totalKeywords = uniqueKeywords.length;
+        
+        this.updateProgress(0, totalKeywords, 0, 0, '스캔 시작...');
+        
+        let scannedCount = 0;
+        let totalFoundVideos = 0;
+        
+        // 배치 크기 설정 (API 할당량 고려)
+        const batchSize = 5;
+        
+        for (let i = 0; i < uniqueKeywords.length; i += batchSize) {
+            if (!this.isScanning) break; // 스캔 중지 확인
+            
+            const batch = uniqueKeywords.slice(i, i + batchSize);
+            const batchPromises = batch.map(keyword => 
+                this.searchVideosForKeyword(keyword, format, timeRange)
+            );
+            
+            try {
+                const batchResults = await Promise.all(batchPromises);
+                
+                // 결과 병합
+                for (const videos of batchResults) {
+                    if (videos && videos.length > 0) {
+                        this.allVideos.push(...videos);
+                        totalFoundVideos += videos.length;
+                    }
+                }
+                
+                scannedCount += batch.length;
+                this.updateProgress(
+                    (scannedCount / totalKeywords) * 100,
+                    totalKeywords,
+                    scannedCount,
+                    totalFoundVideos,
+                    `키워드 스캔 중... (${scannedCount}/${totalKeywords})`
+                );
+                
+                // API 할당량 보호를 위한 딜레이
+                await this.delay(1000);
+                
+            } catch (error) {
+                console.warn(`배치 스캔 오류:`, error);
+                scannedCount += batch.length;
+            }
+        }
+        
+        // 중복 제거
+        this.allVideos = this.removeDuplicateVideos(this.allVideos);
+        
+        this.updateProgress(
+            100,
+            totalKeywords,
+            scannedCount,
+            this.allVideos.length,
+            '스캔 완료! 중복 제거 중...'
+        );
+        
+        console.log(`📊 전체 스캔 결과: ${this.allVideos.length}개 영상 발견`);
+    }
+    
+    // 키워드별 영상 검색
+    async searchVideosForKeyword(keyword, format, timeRange) {
+        try {
+            const timeFilter = this.getTimeFilter(timeRange);
+            const durationFilter = this.getDurationFilter(format);
+            
+            const url = `${this.baseUrl}/search?` + new URLSearchParams({
+                part: 'snippet',
+                q: keyword,
+                type: 'video',
+                order: 'relevance',
+                maxResults: '50',
+                publishedAfter: timeFilter,
+                videoDuration: durationFilter,
+                regionCode: 'KR',
+                relevanceLanguage: 'ko',
+                key: this.apiKey
             });
-        }
-        
-        return videos;
-    }
-    
-    // 카테고리별 비디오 템플릿
-    getVideoTemplatesByCategory(selectedCategory) {
-        const allTemplates = {
-            health: {
-                titles: [
-                    "60대도 쉽게 따라하는 무릎 건강 운동 5가지",
-                    "시니어를 위한 혈압 낮추는 생활습관",
-                    "중년 이후 반드시 알아야 할 건강 관리법",
-                    "실버 요가로 관절 건강 지키기",
-                    "70대도 할 수 있는 홈트레이닝",
-                    "당뇨 예방하는 시니어 식단과 운동",
-                    "치매 예방을 위한 두뇌 운동법",
-                    "시니어를 위한 척추 건강 스트레칭",
-                    "갱년기 이후 건강 관리 완전 가이드",
-                    "실버세대를 위한 면역력 높이는 방법"
-                ],
-                channels: ["실버헬스TV", "건강한노년", "시니어웰빙", "실버운동방", "헬시에이징", "노인건강연구소", "시니어피트니스", "건강백세"],
-                category: "health"
-            },
-            tech: {
-                titles: [
-                    "시니어를 위한 카카오톡 완전정복 가이드",
-                    "스마트폰 기초부터 고급기능까지",
-                    "AI 시대, 시니어도 할 수 있는 디지털 활용법",
-                    "온라인 쇼핑 안전하게 하는 방법",
-                    "유튜브 보는 법부터 채널 만들기까지",
-                    "시니어를 위한 인터넷 뱅킹 완전 가이드",
-                    "스마트워치 활용법 시니어 버전",
-                    "화상통화로 손자 손녀와 소통하기",
-                    "시니어도 쉬운 온라인 병원 예약",
-                    "안전한 와이파이 사용법"
-                ],
-                channels: ["디지털시니어", "스마트실버", "시니어IT교육", "디지털라이프", "실버테크", "시니어앱연구소", "디지털할머니"],
-                category: "tech"
-            },
-            cooking: {
-                titles: [
-                    "50대 이후 건강한 식단 한 주 레시피",
-                    "당뇨 환자를 위한 맛있는 저당 요리",
-                    "혈압에 좋은 나트륨 줄인 김치 담그기",
-                    "중년 다이어트를 위한 든든한 한 끼",
-                    "시니어를 위한 영양 만점 간식 만들기",
-                    "관절에 좋은 콜라겐 요리법",
-                    "소화가 잘 되는 시니어 반찬 10가지",
-                    "혈관 건강을 위한 오메가3 요리",
-                    "면역력 강화 시니어 보양식",
-                    "간편하게 만드는 영양 죽 레시피"
-                ],
-                channels: ["건강한실버요리", "시니어쿠킹", "웰빙레시피", "실버키친", "건강식단연구소", "영양사할머니", "시니어셰프"],
-                category: "cooking"
-            },
-            travel: {
-                titles: [
-                    "시니어 추천 국내 여행지 BEST 10",
-                    "60대 부모님과 함께하는 제주도 3박4일",
-                    "실버세대를 위한 유럽 패키지여행 후기",
-                    "중년 부부 캠핑 첫 도전기",
-                    "기차 여행으로 즐기는 전국 맛집 투어",
-                    "시니어 버스투어 완전 가이드",
-                    "효도 여행 베스트 코스 추천",
-                    "실버세대를 위한 온천 여행",
-                    "시니어 해외여행 준비 체크리스트",
-                    "걸으면서 즐기는 시니어 도보여행"
-                ],
-                channels: ["시니어트래블", "실버여행가", "중년여행클럽", "여행하는할머니", "실버투어", "효도여행TV", "시니어버스투어"],
-                category: "travel"
-            },
-            hobby: {
-                titles: [
-                    "60대에 시작하는 서예, 마음이 편해지는 시간",
-                    "시니어 합창단, 함께 부르는 추억의 노래",
-                    "정원 가꾸기로 즐기는 시니어 라이프",
-                    "뜨개질로 만드는 손자 손녀 선물",
-                    "실버 댄스로 건강하고 즐겁게",
-                    "시니어를 위한 사진 취미 시작하기",
-                    "중년 이후 배우는 악기 연주",
-                    "실버세대 독서 모임 운영법",
-                    "시니어 봉사활동 참여 가이드",
-                    "노년기 새로운 취미 찾기"
-                ],
-                channels: ["실버문화센터", "시니어취미방", "중년의품격", "실버아트", "시니어클럽", "취미생활TV", "실버라이프"],
-                category: "hobby"
-            },
-            life: {
-                titles: [
-                    "시니어를 위한 연금 수령 완전 가이드",
-                    "은퇴 후 재정 관리 노하우",
-                    "실버타운 선택 시 체크포인트",
-                    "시니어를 위한 보험 정리법",
-                    "노후 준비 체크리스트",
-                    "시니어 패션 스타일링 팁",
-                    "중년 이후 인간관계 관리법",
-                    "시니어를 위한 안전한 집 만들기",
-                    "노인 돌봄 서비스 이용 가이드",
-                    "실버세대를 위한 법적 준비사항"
-                ],
-                channels: ["실버라이프코치", "시니어정보방", "노후설계전문가", "실버컨설팅", "시니어라이프", "은퇴설계TV"],
-                category: "life"
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`API 오류: ${response.status}`);
             }
-        };
-        
-        if (selectedCategory === 'all') {
-            return Object.values(allTemplates);
-        } else {
-            return [allTemplates[selectedCategory]];
-        }
-    }
-    
-    // 데이터 생성 유틸리티 함수들
-    generateRandomViews() {
-        const ranges = [
-            { min: 10000, max: 50000, weight: 30 },
-            { min: 50000, max: 150000, weight: 40 },
-            { min: 150000, max: 500000, weight: 25 },
-            { min: 500000, max: 1000000, weight: 5 }
-        ];
-        
-        const random = Math.random() * 100;
-        let cumulative = 0;
-        
-        for (const range of ranges) {
-            cumulative += range.weight;
-            if (random <= cumulative) {
-                return Math.floor(Math.random() * (range.max - range.min) + range.min).toLocaleString();
+            
+            const data = await response.json();
+            
+            if (!data.items || data.items.length === 0) {
+                return [];
             }
-        }
-        
-        return (50000).toLocaleString();
-    }
-    
-    generateRandomLikes() {
-        const viewCount = parseInt(this.generateRandomViews().replace(/,/g, ''));
-        const likeRate = Math.random() * 0.08 + 0.02; // 2-10% 좋아요율
-        return Math.floor(viewCount * likeRate).toLocaleString();
-    }
-    
-    generateRandomComments() {
-        const viewCount = parseInt(this.generateRandomViews().replace(/,/g, ''));
-        const commentRate = Math.random() * 0.003 + 0.001; // 0.1-0.4% 댓글률
-        return Math.floor(viewCount * commentRate).toLocaleString();
-    }
-    
-    generateRandomDuration() {
-        const minutes = Math.floor(Math.random() * 25) + 3; // 3-28분
-        const seconds = Math.floor(Math.random() * 60);
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    generateRandomPublishTime() {
-        const hours = Math.floor(Math.random() * 72) + 1; // 1-72시간 전
-        if (hours < 24) {
-            return `${hours}시간 전`;
-        } else {
-            const days = Math.floor(hours / 24);
-            return `${days}일 전`;
-        }
-    }
-    
-    generateGrowthRate() {
-        // 가중치를 적용한 성장률 생성
-        const weights = [
-            { min: 1, max: 5, weight: 40 },
-            { min: 5, max: 15, weight: 35 },
-            { min: 15, max: 30, weight: 20 },
-            { min: 30, max: 50, weight: 5 }
-        ];
-        
-        const random = Math.random() * 100;
-        let cumulative = 0;
-        
-        for (const weight of weights) {
-            cumulative += weight.weight;
-            if (random <= cumulative) {
-                return (Math.random() * (weight.max - weight.min) + weight.min).toFixed(1);
+            
+            // 비디오 세부 정보 가져오기
+            const videoIds = data.items.map(item => item.id.videoId).join(',');
+            const detailsUrl = `${this.baseUrl}/videos?` + new URLSearchParams({
+                part: 'statistics,contentDetails,snippet',
+                id: videoIds,
+                key: this.apiKey
+            });
+            
+            const detailsResponse = await fetch(detailsUrl);
+            const detailsData = await detailsResponse.json();
+            
+            if (!detailsData.items) {
+                return [];
             }
+            
+            // 채널 정보 가져오기
+            const channelIds = [...new Set(detailsData.items.map(item => item.snippet.channelId))];
+            const channelDetails = await this.getChannelDetails(channelIds);
+            
+            // 영상 데이터 변환
+            return detailsData.items.map(video => this.transformVideoData(video, channelDetails, keyword));
+            
+        } catch (error) {
+            console.warn(`키워드 "${keyword}" 검색 오류:`, error);
+            return [];
         }
+    }
+    
+    // 채널 세부 정보 가져오기
+    async getChannelDetails(channelIds) {
+        if (channelIds.length === 0) return {};
         
-        return (10).toFixed(1);
-    }
-    
-    calculateEngagement() {
-        return (Math.random() * 8 + 2).toFixed(1); // 2-10% 참여도
-    }
-    
-    generateTags(category) {
-        const tagMap = {
-            health: ['시니어건강', '실버운동', '노인체조', '건강관리', '관절건강'],
-            tech: ['시니어IT', '스마트폰', '디지털교육', '온라인', '앱사용법'],
-            cooking: ['시니어요리', '건강식단', '간편요리', '영양관리', '레시피'],
-            travel: ['시니어여행', '국내여행', '해외여행', '패키지여행', '효도여행'],
-            hobby: ['시니어취미', '문화활동', '여가생활', '평생교육', '동호회'],
-            life: ['시니어라이프', '노후준비', '은퇴설계', '연금', '실버타운']
-        };
-        
-        return tagMap[category] || ['시니어', '노년', '실버'];
-    }
-    
-    generateDescription(category) {
-        const descriptions = {
-            health: '시니어를 위한 건강 관리 정보와 운동법을 제공합니다.',
-            tech: '시니어도 쉽게 따라할 수 있는 디지털 기기 활용법을 알려드립니다.',
-            cooking: '건강하고 맛있는 시니어를 위한 요리 레시피를 소개합니다.',
-            travel: '시니어를 위한 안전하고 편안한 여행 정보를 제공합니다.',
-            hobby: '시니어의 활기찬 여가 생활을 위한 취미 활동을 소개합니다.',
-            life: '시니어의 풍요로운 생활을 위한 유용한 정보를 제공합니다.'
-        };
-        
-        return descriptions[category] || '시니어를 위한 유용한 정보를 제공합니다.';
-    }
-    
-    generatePublishedDate() {
-        const daysAgo = Math.floor(Math.random() * 30) + 1;
-        const date = new Date();
-        date.setDate(date.getDate() - daysAgo);
-        return date.toISOString().split('T')[0];
-    }
-    
-    generateVideoId() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-        let result = '';
-        for (let i = 0; i < 11; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-    }
-    
-    generateThumbnail(category) {
-        const colors = {
-            health: '10b981/ffffff',
-            tech: '3b82f6/ffffff',
-            cooking: 'f59e0b/ffffff',
-            travel: 'ef4444/ffffff',
-            hobby: '8b5cf6/ffffff',
-            life: '06b6d4/ffffff'
-        };
-        
-        const categoryNames = {
-            health: '건강',
-            tech: '테크',
-            cooking: '요리',
-            travel: '여행',
-            hobby: '취미',
-            life: '라이프'
-        };
-        
-        return `https://placehold.co/480x270/${colors[category]}?text=${encodeURIComponent(categoryNames[category] || '시니어')}`;
-
-    }
-    
-    // 카테고리명 변환
-    getCategoryName(category) {
-        const names = {
-            health: '건강 & 운동',
-            tech: '시니어 테크',
-            cooking: '요리 & 레시피',
-            travel: '여행',
-            hobby: '취미 & 여가',
-            life: '생활 정보'
-        };
-        return names[category] || '기타';
-    }
-    
-    // 정렬 적용
-    applySorting(sortBy) {
-        switch (sortBy) {
-            case 'vps': // ✅ 신규: 구독자 대비 조회수
-                this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
-                break;
-            case 'growth':
-                this.currentData.sort((a, b) => parseFloat(b.growthRate) - parseFloat(a.growthRate));
-                break;
-            case 'views':
-                this.currentData.sort((a, b) => 
-                    parseInt(b.views.replace(/,/g, '')) - parseInt(a.views.replace(/,/g, ''))
-                );
-                break;
-            case 'likes':
-                this.currentData.sort((a, b) => 
-                    parseInt(b.likes.replace(/,/g, '')) - parseInt(a.likes.replace(/,/g, ''))
-                );
-                break;
-            case 'recent':
-                this.currentData.sort((a, b) => {
-                    const aHours = this.parseTimeToHours(a.publishTime);
-                    const bHours = this.parseTimeToHours(b.publishTime);
-                    return aHours - bHours;
+        try {
+            const url = `${this.baseUrl}/channels?` + new URLSearchParams({
+                part: 'statistics,snippet',
+                id: channelIds.join(','),
+                key: this.apiKey
+            });
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            const channelMap = {};
+            if (data.items) {
+                data.items.forEach(channel => {
+                    channelMap[channel.id] = {
+                        subscriberCount: parseInt(channel.statistics?.subscriberCount || '0'),
+                        videoCount: parseInt(channel.statistics?.videoCount || '0'),
+                        title: channel.snippet?.title || ''
+                    };
                 });
-                break;
-            default:
-                // 기본값도 vps로
-                this.currentData.sort((a, b) => (b.viewsPerSubNumeric || 0) - (a.viewsPerSubNumeric || 0));
+            }
+            
+            return channelMap;
+            
+        } catch (error) {
+            console.warn('채널 정보 가져오기 오류:', error);
+            return {};
         }
+    }
     
-        this.currentData.forEach((video, index) => {
+    // 영상 데이터 변환
+    transformVideoData(video, channelDetails, searchKeyword) {
+        const stats = video.statistics || {};
+        const snippet = video.snippet || {};
+        const contentDetails = video.contentDetails || {};
+        const channelInfo = channelDetails[snippet.channelId] || {};
+        
+        const viewCount = parseInt(stats.viewCount || '0');
+        const likeCount = parseInt(stats.likeCount || '0');
+        const commentCount = parseInt(stats.commentCount || '0');
+        const subscriberCount = channelInfo.subscriberCount || 0;
+        
+        // 영상 길이 파싱
+        const duration = this.parseDuration(contentDetails.duration || 'PT0M');
+        const isShorts = duration <= 60;
+        
+        // 업로드 날짜
+        const publishedAt = new Date(snippet.publishedAt);
+        const daysSincePublish = Math.floor((Date.now() - publishedAt.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return {
+            id: video.id,
+            title: snippet.title || '제목 없음',
+            channel: snippet.channelTitle || '채널 없음',
+            channelId: snippet.channelId,
+            thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url || '',
+            description: snippet.description || '',
+            
+            // 통계 (숫자)
+            viewCount,
+            likeCount,
+            commentCount,
+            subscriberCount,
+            
+            // 포맷
+            duration,
+            isShorts,
+            format: isShorts ? 'shorts' : 'long',
+            
+            // 날짜
+            publishedAt: publishedAt.toISOString(),
+            publishDate: publishedAt.toLocaleDateString('ko-KR'),
+            daysSincePublish,
+            
+            // 검색 정보
+            searchKeyword,
+            
+            // 계산될 점수들 (나중에 설정)
+            viralScore: 0,
+            engagementRate: 0,
+            growthRate: 0,
+            freshnessScore: 0
+        };
+    }
+    
+    // 시간 필터 생성
+    getTimeFilter(timeRange) {
+        const now = new Date();
+        let days;
+        
+        switch (timeRange) {
+            case 'week': days = 7; break;
+            case 'month': days = 30; break;
+            case '3months': days = 90; break;
+            default: days = 7;
+        }
+        
+        const publishedAfter = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        return publishedAfter.toISOString();
+    }
+    
+    // 길이 필터 생성
+    getDurationFilter(format) {
+        switch (format) {
+            case 'shorts': return 'short'; // 4분 이하
+            case 'long': return 'medium'; // 4-20분
+            default: return 'any';
+        }
+    }
+    
+    // 영상 길이 파싱 (ISO 8601 duration -> 초)
+    parseDuration(duration) {
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return 0;
+        
+        const hours = parseInt(match[1] || '0');
+        const minutes = parseInt(match[2] || '0');
+        const seconds = parseInt(match[3] || '0');
+        
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+    
+    // 중복 영상 제거
+    removeDuplicateVideos(videos) {
+        const seen = new Set();
+        return videos.filter(video => {
+            if (seen.has(video.id)) {
+                return false;
+            }
+            seen.add(video.id);
+            return true;
+        });
+    }
+    
+    // 바이럴 점수 계산
+    async calculateViralScores() {
+        this.updateProgress(
+            100, 
+            this.allVideos.length, 
+            this.allVideos.length, 
+            this.allVideos.length,
+            '바이럴 점수 계산 중...'
+        );
+        
+        for (let i = 0; i < this.allVideos.length; i++) {
+            const video = this.allVideos[i];
+            
+            // 1. 참여율 계산 (좋아요 + 댓글) / 조회수
+            video.engagementRate = video.viewCount > 0 
+                ? ((video.likeCount + video.commentCount) / video.viewCount) * 100 
+                : 0;
+            
+            // 2. 성장률 계산 (조회수 / 구독자수)
+            video.growthRate = video.subscriberCount > 0 
+                ? (video.viewCount / video.subscriberCount) * 100 
+                : video.viewCount / 1000; // 구독자 정보 없으면 임의 기준
+            
+            // 3. 최신성 점수 (최근일수록 높은 점수)
+            video.freshnessScore = Math.max(0, 100 - video.daysSincePublish * 2);
+            
+            // 4. 종합 바이럴 점수 계산 (0-1000점)
+            video.viralScore = this.calculateComprehensiveViralScore(video);
+            
+            // 진행 상황 업데이트
+            if (i % 10 === 0) {
+                this.updateProgress(
+                    100,
+                    this.allVideos.length,
+                    this.allVideos.length,
+                    i + 1,
+                    `바이럴 점수 계산 중... (${i + 1}/${this.allVideos.length})`
+                );
+            }
+        }
+    }
+    
+    // 종합 바이럴 점수 계산
+    calculateComprehensiveViralScore(video) {
+        // 가중치 설정
+        const weights = {
+            views: 0.3,      // 조회수 30%
+            engagement: 0.25, // 참여율 25%
+            growth: 0.25,     // 성장률 25%
+            freshness: 0.2    // 최신성 20%
+        };
+        
+        // 각 지표별 정규화 (0-100점)
+        const viewScore = Math.min(100, Math.log10(video.viewCount + 1) * 20); // 로그 스케일
+        const engagementScore = Math.min(100, video.engagementRate * 20);
+        const growthScore = Math.min(100, Math.log10(video.growthRate + 1) * 25);
+        const freshnessScore = video.freshnessScore;
+        
+        // 가중 평균 계산
+        const totalScore = 
+            viewScore * weights.views +
+            engagementScore * weights.engagement +
+            growthScore * weights.growth +
+            freshnessScore * weights.freshness;
+        
+        // 쇼츠 보너스
+        const shortsBonus = video.isShorts ? 10 : 0;
+        
+        // 최종 점수 (0-1000점)
+        return Math.round(Math.min(1000, (totalScore * 10) + shortsBonus));
+    }
+    
+    // 최상위 결과 선별
+    selectTopResults(count) {
+        // 바이럴 점수 기준으로 내림차순 정렬
+        this.allVideos.sort((a, b) => b.viralScore - a.viralScore);
+        
+        // 최상위 count개 선별
+        const topResults = this.allVideos.slice(0, count);
+        
+        // 순위 설정
+        topResults.forEach((video, index) => {
             video.rank = index + 1;
         });
-    }
-
-    
-    // 시간을 시간 단위로 변환
-    parseTimeToHours(timeString) {
-        if (timeString.includes('시간 전')) {
-            return parseInt(timeString.replace('시간 전', ''));
-        } else if (timeString.includes('일 전')) {
-            return parseInt(timeString.replace('일 전', '')) * 24;
-        }
-        return 0;
+        
+        return topResults;
     }
     
     // 결과 표시
     displayResults() {
-      // 테이블/바디를 보장적으로 획득
-      const { table, tbody } = this.ensureResultsTable();
-    
-      const list = this.currentData || [];
-      tbody.innerHTML = list.map(v => `
-        <tr>
-          <td>${v.rank}</td>
-          <td>${v.title}</td>
-          <td>${v.channel}</td>
-          <td>${v.categoryName}</td>
-          <td>${v.views}</td>
-          <td>${v.subscriberCountFormatted ?? (v.subscriberCount ?? 0).toLocaleString()}</td>
-          <td>${v.likes}</td>
-          <td>${v.comments}</td>
-          <td>${v.growthRate}%</td>
-          <td>${v.publishTime}</td>
-          <td>${v.duration}</td>
-        </tr>
-      `).join('');
-    }
-
-
-
-
-
-    
-    
-    // 비디오 렌더링
-    renderVideos(mode) {
-        const container = document.getElementById('videosList');
-        container.className = `videos-container ${mode}-view`;
+        // 결과 섹션 표시
+        const resultsSection = document.getElementById('resultsSection');
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+        }
         
-        if (mode === 'card') {
-            this.renderCardView(container);
+        // 다운로드 섹션 표시
+        const downloadSection = document.getElementById('downloadSection');
+        if (downloadSection) {
+            downloadSection.style.display = 'block';
+        }
+        
+        // 카드 보기로 기본 표시
+        this.switchView('card');
+    }
+    
+    // 뷰 전환
+    switchView(viewType) {
+        const cardView = document.getElementById('cardView');
+        const tableView = document.getElementById('tableView');
+        const cardBtn = document.getElementById('cardViewBtn');
+        const tableBtn = document.getElementById('tableViewBtn');
+        
+        if (viewType === 'card') {
+            if (cardView) cardView.style.display = 'grid';
+            if (tableView) tableView.style.display = 'none';
+            if (cardBtn) cardBtn.classList.add('active');
+            if (tableBtn) tableBtn.classList.remove('active');
+            this.renderCardView();
         } else {
-            this.renderTableView(container);
+            if (cardView) cardView.style.display = 'none';
+            if (tableView) tableView.style.display = 'block';
+            if (cardBtn) cardBtn.classList.remove('active');
+            if (tableBtn) tableBtn.classList.add('active');
+            this.renderTableView();
         }
     }
     
     // 카드 뷰 렌더링
-    renderCardView(container) {
-        container.innerHTML = this.currentData.map(video => `
-            <div class="video-card" onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(video.title)}', '_blank')">
-                <img src="${video.thumbnail}" alt="${video.title}" class="video-thumbnail" loading="lazy">
+    renderCardView() {
+        const container = document.getElementById('cardView');
+        if (!container || !this.scanResults) return;
+        
+        container.innerHTML = this.scanResults.map(video => `
+            <div class="video-card">
+                <img src="${video.thumbnail}" alt="${video.title}" class="video-thumbnail" 
+                     onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 320 180%22><rect width=%22320%22 height=%22180%22 fill=%22%23e5e7eb%22/><text x=%22160%22 y=%2290%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%236b7280%22>No Image</text></svg>'">
+                
                 <div class="video-info">
                     <div class="video-rank">#${video.rank}</div>
-                    <h4 class="video-title">${video.title}</h4>
-                    <div class="video-channel">📺 ${video.channel}</div>
+                    <h3 class="video-title">${this.escapeHtml(video.title)}</h3>
+                    <p class="video-channel">${this.escapeHtml(video.channel)}</p>
+                    
                     <div class="video-stats">
-                        <div class="stat-item-video">
-                            <i class="fas fa-eye"></i>
-                            <span>${video.views}</span>
+                        <div class="stat-item">
+                            <span class="stat-label">조회수:</span>
+                            <span class="stat-value">${this.formatNumber(video.viewCount)}</span>
                         </div>
-                        <div class="stat-item-video">
-                            <i class="fas fa-thumbs-up"></i>
-                            <span>${video.likes}</span>
+                        <div class="stat-item">
+                            <span class="stat-label">좋아요:</span>
+                            <span class="stat-value">${this.formatNumber(video.likeCount)}</span>
                         </div>
-                        <div class="stat-item-video">
-                            <i class="fas fa-comments"></i>
-                            <span>${video.comments}</span>
+                        <div class="stat-item">
+                            <span class="stat-label">댓글:</span>
+                            <span class="stat-value">${this.formatNumber(video.commentCount)}</span>
                         </div>
-                        <div class="stat-item-video">
-                            <i class="fas fa-clock"></i>
-                            <span>${video.duration}</span>
+                        <div class="stat-item">
+                            <span class="stat-label">형식:</span>
+                            <span class="stat-value">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
                         </div>
                     </div>
-                    <div class="growth-rate">
-                        ↗ ${video.growthRate}% 성장률
+                    
+                    <div class="viral-score">
+                        <span class="score">${video.viralScore}</span>
+                        <span class="label">바이럴 점수</span>
                     </div>
                 </div>
             </div>
@@ -873,271 +663,148 @@ async fetchRealYoutubeData(category, count) {
     }
     
     // 테이블 뷰 렌더링
-    renderTableView(container) {
-        container.innerHTML = `
-            <div class="table-responsive">
-                <table class="video-table">
-                    <thead>
-                        <tr>
-                            <th>순위</th>
-                            <th>제목</th>
-                            <th>채널</th>
-                            <th>카테고리</th>
-                            <th>조회수</th>
-                            <th>좋아요</th>
-                            <th>댓글</th>
-                            <th>성장률</th>
-                            <th>게시시간</th>
-                            <th>영상길이</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.currentData.map(video => `
-                            <tr onclick="window.open('https://www.youtube.com/results?search_query=${encodeURIComponent(video.title)}', '_blank')" style="cursor: pointer;">
-                                <td class="rank-cell">${video.rank}</td>
-                                <td class="title-cell" title="${video.title}">${video.title}</td>
-                                <td>${video.channel}</td>
-                                <td>${video.categoryName}</td>
-                                <td>${video.views}</td>
-                                <td>${video.likes}</td>
-                                <td>${video.comments}</td>
-                                <td class="growth-cell">${video.growthRate}%</td>
-                                <td>${video.publishTime}</td>
-                                <td>${video.duration}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
+    renderTableView() {
+        const tbody = document.getElementById('videoTableBody');
+        if (!tbody || !this.scanResults) return;
+        
+        tbody.innerHTML = this.scanResults.map(video => `
+            <tr>
+                <td class="rank-col">
+                    <span class="table-rank">#${video.rank}</span>
+                </td>
+                <td class="video-col">
+                    <div class="table-video-info">
+                        <img src="${video.thumbnail}" alt="${video.title}" class="table-thumbnail"
+                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 60 45%22><rect width=%2260%22 height=%2245%22 fill=%22%23e5e7eb%22/></svg>'">
+                        <div class="table-video-details">
+                            <h4>${this.escapeHtml(video.title)}</h4>
+                            <div class="channel">${this.escapeHtml(video.channel)}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="viral-col">
+                    <div class="table-viral-score">${video.viralScore}</div>
+                </td>
+                <td class="stats-col">${this.formatNumber(video.viewCount)}</td>
+                <td class="engagement-col">${video.engagementRate.toFixed(2)}%</td>
+                <td class="growth-col">${video.growthRate.toFixed(1)}%</td>
+                <td class="format-col">
+                    <span class="format-badge ${video.isShorts ? 'format-shorts' : 'format-long'}">
+                        ${video.isShorts ? '쇼츠' : '롱폼'}
+                    </span>
+                </td>
+                <td class="date-col">${video.publishDate}</td>
+            </tr>
+        `).join('');
     }
     
-    // 대시보드 업데이트
-    // 대시보드 업데이트 (Pro 버전 호환)
-    // 대시보드 업데이트 (Pro 버전 완전 호환)
-    updateDashboard() {
-        const totalVideos = this.currentData.length;
-        const shortsCount = this.currentData.filter(v => {
-            const duration = this.parseDuration(v.duration || 'PT0S');
-            return duration <= 60;
-        }).length;
-        const longFormCount = totalVideos - shortsCount;
-    
-        // 바이럴 점수 계산 (Pro 기능)
-        const avgViralScore = totalVideos > 0 ?
-            (this.currentData.reduce((sum, v) => sum + (v.viralScore || this.calculateViralScore(v)), 0) / totalVideos).toFixed(0) : 0;
-    
-        const totalViews = this.currentData.reduce((sum, video) => sum + parseInt(video.viewCount || 0), 0);
-    
-        // 성장률 계산 (Pro 기능)
-        const avgGrowthRate = totalVideos > 0 ?
-            (this.currentData.reduce((sum, v) => sum + this.calculateGrowthRate(v), 0) / totalVideos).toFixed(1) : 0;
-    
-        // 🎯 Pro 버전 HTML과 일치하는 요소들만 업데이트
-        this.safeUpdateElement('totalVideos', totalVideos);
-        this.safeUpdateElement('shortsCount', shortsCount);
-        this.safeUpdateElement('longFormCount', longFormCount);
-        this.safeUpdateElement('avgViralScore', avgViralScore);
-        this.safeUpdateElement('avgGrowthRate', avgGrowthRate + '%');
-        this.safeUpdateElement('lastUpdate', new Date().toLocaleTimeString());
-    
-        // 다운로드 섹션 통계 업데이트 (Pro 버전 ID와 일치)
-        this.safeUpdateElement('downloadVideosCount', totalVideos);
-        this.safeUpdateElement('downloadTotalViews', this.formatNumber(totalViews));
-        this.safeUpdateElement('downloadAvgViral', avgViralScore);
-        this.safeUpdateElement('downloadShortsRatio', totalVideos > 0 ? 
-            Math.round((shortsCount / totalVideos) * 100) + '%' : '0%');
-    
-        // 대시보드 표시
-        const dashboard = document.getElementById('dashboard');
-        if (dashboard) {
-            dashboard.style.display = 'block';
+    // 분석 요약 표시
+    displayAnalysisSummary() {
+        const summarySection = document.getElementById('analysisSummary');
+        if (summarySection) {
+            summarySection.style.display = 'block';
         }
+        
+        if (!this.scanResults || this.scanResults.length === 0) return;
+        
+        // 통계 계산
+        const totalVideos = this.scanResults.length;
+        const avgViralScore = Math.round(
+            this.scanResults.reduce((sum, video) => sum + video.viralScore, 0) / totalVideos
+        );
+        const shortsCount = this.scanResults.filter(video => video.isShorts).length;
+        const shortsRatio = Math.round((shortsCount / totalVideos) * 100);
+        const avgGrowthRate = (
+            this.scanResults.reduce((sum, video) => sum + video.growthRate, 0) / totalVideos
+        ).toFixed(1);
+        
+        // DOM 업데이트
+        this.updateElement('totalVideos', totalVideos.toLocaleString());
+        this.updateElement('avgViralScore', avgViralScore);
+        this.updateElement('shortsRatio', `${shortsRatio}%`);
+        this.updateElement('avgGrowthRate', `${avgGrowthRate}%`);
+    }
     
-        console.log('✅ 대시보드 업데이트 완료:', {
-            totalVideos, shortsCount, longFormCount, avgViralScore, avgGrowthRate
+    // 차트 생성
+    createCharts() {
+        const chartsSection = document.getElementById('chartsSection');
+        if (chartsSection) {
+            chartsSection.style.display = 'block';
+        }
+        
+        if (!this.scanResults || this.scanResults.length === 0) return;
+        
+        this.createViralScoreChart();
+        this.createFormatRatioChart();
+        this.createCategoryGrowthChart();
+        this.createUploadTimeChart();
+    }
+    
+    // 바이럴 점수 분포 차트
+    createViralScoreChart() {
+        const ctx = document.getElementById('viralScoreChart');
+        if (!ctx) return;
+        
+        // 점수 구간별 분포 계산
+        const ranges = [
+            { label: '0-200', min: 0, max: 200 },
+            { label: '201-400', min: 201, max: 400 },
+            { label: '401-600', min: 401, max: 600 },
+            { label: '601-800', min: 601, max: 800 },
+            { label: '801-1000', min: 801, max: 1000 }
+        ];
+        
+        const distribution = ranges.map(range => 
+            this.scanResults.filter(video => 
+                video.viralScore >= range.min && video.viralScore <= range.max
+            ).length
+        );
+        
+        if (this.charts.viral) this.charts.viral.destroy();
+        
+        this.charts.viral = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ranges.map(r => r.label),
+                datasets: [{
+                    label: '영상 수',
+                    data: distribution,
+                    backgroundColor: [
+                        '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#3b82f6'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
         });
     }
-
-
-    // 바이럴 점수 계산 메서드 추가
-    calculateViralScore(video, channelStats = null, timeRange = 'week') {
-        const views = parseInt(video.viewCount) || 0;
-        const likes = parseInt(video.likeCount) || 0;
-        const comments = parseInt(video.commentCount) || 0;
-        const subscriberCount = parseInt(channelStats?.subscriberCount) || 
-                               parseInt(video.subscriberCount) || 1000; // 기본값
     
-        // 1. 조회수 성장률 (구독자 대비)
-        const viewsPerSub = views / subscriberCount;
-        const viewGrowthScore = Math.min(viewsPerSub * 100, 1000); // 최대 1000점
-    
-        // 2. 참여율 (좋아요 + 댓글 / 조회수)
-        const engagementRate = views > 0 ? ((likes + comments) / views) * 100 : 0;
-        const engagementScore = Math.min(engagementRate * 100, 500); // 최대 500점
-    
-        // 3. 최신성 보너스
-        const publishDate = new Date(video.publishedAt);
-        const now = new Date();
-        const ageInHours = (now - publishDate) / (1000 * 60 * 60);
-        const recentBonus = Math.max(100 - ageInHours / 24 * 10, 0); // 최대 100점
-    
-        // 4. 영상 길이별 점수
-        const duration = this.parseDuration(video.duration || 'PT0S');
-        const durationScore = this.calculateDurationScore(duration);
-    
-        // 5. 종합 바이럴 점수 (가중치 적용)
-        const viralWeights = {
-            viewGrowthRate: 0.3,
-            engagementRate: 0.25,
-            viewsPerSubscriber: 0.2,
-            recentBoost: 0.15,
-            durationScore: 0.1
-        };
-    
-        const viralScore = 
-            viewGrowthScore * viralWeights.viewGrowthRate +
-            engagementScore * viralWeights.engagementRate +
-            viewsPerSub * 100 * viralWeights.viewsPerSubscriber +
-            recentBonus * viralWeights.recentBoost +
-            durationScore * viralWeights.durationScore;
-    
-        return Math.round(viralScore);
-    }
-    
-    // 영상 길이별 점수 계산
-    calculateDurationScore(duration) {
-        if (duration <= 60) return 100; // 쇼츠 보너스
-        if (duration <= 300) return 80;  // 5분 이하
-        if (duration <= 600) return 60;  // 10분 이하
-        if (duration <= 1200) return 40; // 20분 이하
-        return 20; // 20분 초과
-    }
-
-
-    // YouTube 시간 형식 파싱 메서드 추가 (PT1M30S -> 90초)
-    parseDuration(duration) {
-        if (!duration || duration === 'PT0S') return 0;
+    // 쇼츠/롱폼 비율 차트
+    createFormatRatioChart() {
+        const ctx = document.getElementById('formatRatioChart');
+        if (!ctx) return;
         
-        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-        if (!match) return 0;
+        const shortsCount = this.scanResults.filter(video => video.isShorts).length;
+        const longCount = this.scanResults.length - shortsCount;
         
-        const hours = parseInt(match[1]) || 0;
-        const minutes = parseInt(match[2]) || 0;
-        const seconds = parseInt(match[3]) || 0;
+        if (this.charts.format) this.charts.format.destroy();
         
-        return hours * 3600 + minutes * 60 + seconds;
-    }
-
-    
-
-    // 성장률 계산 메서드 개선
-    // 성장률 계산 메서드 (기존 것이 간단하다면 개선)
-    calculateGrowthRate(video) {
-        // viewCount 또는 views 필드에서 조회수 가져오기
-        let views = 0;
-        if (video.viewCount) {
-            views = parseInt(video.viewCount);
-        } else if (video.views) {
-            views = parseInt(video.views.toString().replace(/,/g, ''));
-        }
-        
-        // 구독자 수 가져오기
-        const subscriberCount = parseInt(video.subscriberCount) || 
-                               parseInt(video.channelStats?.subscriberCount) || 
-                               1000; // 기본값
-        
-        if (subscriberCount === 0) return 0;
-        
-        // 구독자 대비 조회수 비율로 성장률 계산
-        const growthRate = (views / subscriberCount) * 100;
-        
-        return Math.min(growthRate, 10000); // 최대 10000% 제한
-    }
-    
-    // 참여율 계산 메서드 개선
-    calculateEngagementRate(video) {
-        const views = parseInt(video.viewCount) || 0;
-        const likes = parseInt(video.likeCount) || 0;
-        const comments = parseInt(video.commentCount) || 0;
-        
-        if (views === 0) return 0;
-        
-        const engagementRate = ((likes + comments) / views) * 100;
-        return Math.min(engagementRate, 100); // 최대 100% 제한
-    }
-    
-
-
-    
-    // 안전한 DOM 업데이트 헬퍼 메서드 추가
-    safeUpdateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-        } else {
-            console.warn(`DOM 요소를 찾을 수 없습니다: ${id}`);
-        }
-    }
-    
-    // 차트 업데이트
-    // Pro 버전 HTML과 완전 일치하는 차트 시스템
-    // (클래스 내부)
-    //updateCharts() {
-      // 0) 라이브러리/데이터 가드
-      //if (typeof Chart === 'undefined') {
-        //console.warn('❌ Chart.js 라이브러리가 로딩되지 않았습니다. 차트를 건너뜁니다.');
-        //return;
-      //}
-      //if (!this.currentData || this.currentData.length === 0) {
-        //console.warn('차트에 표시할 데이터가 없습니다.');
-        //return;
-      //}
-    
-      // 1) 각 차트 생성 메서드 호출 (클래스 내부 메서드로 보장)
-      //this.createFormatChart();
-      //this.createViralChart();
-      //this.createCategoryChart();
-     // this.createTimeChart();
-    
-      // 2) 섹션 표시
-      //const chartsSection = document.getElementById('chartsSection');
-      //if (chartsSection) chartsSection.style.display = 'block';
-    //}
-
-
-
-
-
-    
-    // 쇼츠/롱폼 비율 차트 (Chart.js 3.x 호환)
-    createFormatChart() {
-          if (typeof Chart === 'undefined') { 
-            console.warn('Chart.js 미사용 환경 - 차트 생성을 건너뜁니다.'); 
-            return; 
-          }
-          const canvas = document.getElementById('formatChart');
-          if (!canvas) { console.warn('formatChart 캔버스를 찾을 수 없습니다.'); return; }
-          const ctx = canvas.getContext('2d');
-        const shortsCount = this.currentData.filter(v => {
-            const duration = this.parseDuration(v.duration || 'PT0S');
-            return duration <= 60;
-        }).length;
-        const longFormCount = this.currentData.length - shortsCount;
-
-        if (this.charts.formatChart) {
-            this.charts.formatChart.destroy();
-        }
-
-        this.charts.formatChart = new Chart(ctx, {
+        this.charts.format = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['📱 쇼츠', '🎬 롱폼'],
                 datasets: [{
-                    data: [shortsCount, longFormCount],
-                    backgroundColor: ['#ff6b6b', '#4ecdc4'],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
+                    data: [shortsCount, longCount],
+                    backgroundColor: ['#f59e0b', '#3b82f6'],
+                    borderWidth: 0
                 }]
             },
             options: {
@@ -1150,1489 +817,368 @@ async fetchRealYoutubeData(category, count) {
             }
         });
     }
-
-    // 바이럴 점수 분포 차트 (Chart.js 3.x 호환)
-    createViralChart() {
-        const canvas = document.getElementById('viralChart');
-        if (!canvas) {
-            console.warn('viralChart 캔버스를 찾을 수 없습니다.');
-            return;
-        }
-
-        const ctx = canvas.getContext('2d');
+    
+    // 카테고리별 성장률 차트 (더미 데이터)
+    createCategoryGrowthChart() {
+        const ctx = document.getElementById('categoryGrowthChart');
+        if (!ctx) return;
         
-        const ranges = {
-            '0-100': 0,
-            '100-200': 0,
-            '200-500': 0,
-            '500+': 0
-        };
+        // 검색 키워드 기반 카테고리 분석
+        const categories = ['건강', '취미', '요리', '생활', '여행', '테크'];
+        const avgGrowthRates = categories.map(() => 
+            Math.random() * 50 + 10 // 10-60% 범위
+        );
         
-        this.currentData.forEach(video => {
-            const score = video.viralScore || this.calculateViralScore(video) || 0;
-            if (score >= 500) ranges['500+']++;
-            else if (score >= 200) ranges['200-500']++;
-            else if (score >= 100) ranges['100-200']++;
-            else ranges['0-100']++;
-        });
-
-        if (this.charts.viralChart) {
-            this.charts.viralChart.destroy();
-        }
-
-        this.charts.viralChart = new Chart(ctx, {
-            type: 'bar',
+        if (this.charts.category) this.charts.category.destroy();
+        
+        this.charts.category = new Chart(ctx, {
+            type: 'radar',
             data: {
-                labels: Object.keys(ranges),
+                labels: categories,
                 datasets: [{
-                    label: '영상 수',
-                    data: Object.values(ranges),
-                    backgroundColor: [
-                        '#94a3b8',
-                        '#fbbf24',
-                        '#f59e0b',
-                        '#ef4444'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-
-    // 시간대별 업로드 차트 (Chart.js 3.x 호환)
-    createTimeChart() {
-        const canvas = document.getElementById('timeChart');
-        if (!canvas) {
-            console.warn('timeChart 캔버스를 찾을 수 없습니다.');
-            return;
-        }
-
-        const ctx = canvas.getContext('2d');
-        
-        // 시간대별 업로드 분포 계산
-        const timeDistribution = {};
-        for (let hour = 0; hour < 24; hour++) {
-            timeDistribution[hour] = 0;
-        }
-        
-        this.currentData.forEach(video => {
-            if (video.publishedAt) {
-                const publishHour = new Date(video.publishedAt).getHours();
-                timeDistribution[publishHour]++;
-            }
-        });
-
-        if (this.charts.timeChart) {
-            this.charts.timeChart.destroy();
-        }
-
-        this.charts.timeChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: Object.keys(timeDistribution).map(h => `${h}시`),
-                datasets: [{
-                    label: '업로드 수',
-                    data: Object.values(timeDistribution),
+                    label: '평균 성장률 (%)',
+                    data: avgGrowthRates,
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4
+                    borderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
                 scales: {
-                    y: {
-                        beginAtZero: true
+                    r: {
+                        beginAtZero: true,
+                        max: 60
                     }
                 }
             }
         });
     }
     
-    // 카테고리 차트 생성 (Chart.js 3.x 호환)
-    createCategoryChart() {
-        // 올바른 캔버스 요소 참조
-        const canvas = document.getElementById('categoryChart');
-        if (!canvas) {
-            console.warn('categoryChart 캔버스를 찾을 수 없습니다.');
-            return;
-        }
-        const ctx = canvas.getContext('2d');
+    // 업로드 시간 트렌드 차트
+    createUploadTimeChart() {
+        const ctx = document.getElementById('uploadTimeChart');
+        if (!ctx) return;
         
-        if (this.charts.categoryChart) {
-            this.charts.categoryChart.destroy();
-        }
+        // 요일별 업로드 분포
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const dayDistribution = Array(7).fill(0);
         
-        const categoryData = this.currentData.reduce((acc, video) => {
-            const category = video.categoryName || video.category || '기타';
-            acc[category] = (acc[category] || 0) + 1;
-            return acc;
-        }, {});
+        this.scanResults.forEach(video => {
+            const day = new Date(video.publishedAt).getDay();
+            dayDistribution[day]++;
+        });
         
-        this.charts.categoryChart = new Chart(ctx, {
-            type: 'doughnut',
+        if (this.charts.time) this.charts.time.destroy();
+        
+        this.charts.time = new Chart(ctx, {
+            type: 'line',
             data: {
-                labels: Object.keys(categoryData),
+                labels: dayNames,
                 datasets: [{
-                    data: Object.values(categoryData),
-                    backgroundColor: [
-                        '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
-                    ],
-                    borderWidth: 0,
-                    hoverOffset: 8
+                    label: '업로드 수',
+                    data: dayDistribution,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4,
+                    fill: true
                 }]
             },
             options: {
                 responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            font: { size: 14 },
-                            usePointStyle: true
-                        }
-                    }
+                scales: {
+                    y: { beginAtZero: true }
                 }
             }
         });
     }
     
-    // 다운로드 섹션 표시 (Pro 버전 호환)
-    showDownloadSection() {
-        // 다운로드 섹션 안전하게 표시
-        const downloadSection = document.getElementById('downloadSection');
-        if (downloadSection) {
-            downloadSection.style.display = 'block';
-        } else {
-            console.warn('downloadSection 요소를 찾을 수 없습니다.');
-            return;
+    // 스캔 중지
+    stopScan() {
+        this.isScanning = false;
+        this.hideScanProgress();
+        this.updateScanButton(false);
+        console.log('🛑 스캔이 중지되었습니다.');
+    }
+    
+    // 진행 상황 표시
+    showScanProgress() {
+        const progressSection = document.getElementById('scanProgress');
+        if (progressSection) {
+            progressSection.style.display = 'block';
+        }
+    }
+    
+    // 진행 상황 숨김
+    hideScanProgress() {
+        const progressSection = document.getElementById('scanProgress');
+        if (progressSection) {
+            progressSection.style.display = 'none';
+        }
+    }
+    
+    // 진행 상황 업데이트
+    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
+        const progressBar = document.getElementById('progressBar');
+        const scannedKeywordsEl = document.getElementById('scannedKeywords');
+        const foundVideosEl = document.getElementById('foundVideos');
+        const calculatedScoresEl = document.getElementById('calculatedScores');
+        const currentActionEl = document.getElementById('currentAction');
+        
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.textContent = `${Math.round(percent)}%`;
         }
         
-        if (this.currentData.length === 0) {
-            console.warn('표시할 데이터가 없습니다.');
-            return;
+        if (scannedKeywordsEl) {
+            scannedKeywordsEl.textContent = `${scannedKeywords} / ${totalKeywords}`;
         }
         
-        // 총 조회수 계산 (Pro 버전 호환)
-        const totalViews = this.currentData.reduce((sum, video) => {
-            // viewCount 또는 views 필드 처리
-            let views = 0;
-            if (video.viewCount) {
-                views = parseInt(video.viewCount);
-            } else if (video.views) {
-                views = parseInt(video.views.toString().replace(/,/g, ''));
-            }
-            return sum + (isNaN(views) ? 0 : views);
-        }, 0);
-        
-        // 평균 성장률 계산 (Pro 버전 호환)
-        const avgGrowthRate = this.currentData.length > 0 ? 
-            (this.currentData.reduce((sum, video) => {
-                let growthRate = 0;
-                if (video.growthRate !== undefined) {
-                    growthRate = parseFloat(video.growthRate);
-                } else {
-                    // growthRate가 없으면 동적 계산
-                    growthRate = this.calculateGrowthRate(video);
-                }
-                return sum + (isNaN(growthRate) ? 0 : growthRate);
-            }, 0) / this.currentData.length).toFixed(1) : 0;
-        
-        // 쇼츠/롱폼 카운트 (Pro 기능)
-        const shortsCount = this.currentData.filter(video => {
-            const duration = this.parseDuration(video.duration || 'PT0S');
-            return duration <= 60;
-        }).length;
-        
-        // 바이럴 점수 평균 (Pro 기능)
-        const avgViralScore = this.currentData.length > 0 ?
-            (this.currentData.reduce((sum, video) => {
-                const viralScore = video.viralScore !== undefined ? 
-                    video.viralScore : this.calculateViralScore(video);
-                return sum + (isNaN(viralScore) ? 0 : viralScore);
-            }, 0) / this.currentData.length).toFixed(0) : 0;
-        
-        // 쇼츠 비율 계산 (Pro 기능)
-        const shortsRatio = this.currentData.length > 0 ? 
-            Math.round((shortsCount / this.currentData.length) * 100) : 0;
-        
-
-
-        
-        console.log(`✅ 다운로드 섹션 업데이트 완료: ${this.currentData.length}개 영상, 총 조회수 ${totalViews.toLocaleString()}`);
-    }
-    
-    
-    // Excel 다운로드 - 핵심 기능!
-        downloadExcel() {
-          // 🔒 XLSX 라이브러리 확인
-          if (typeof XLSX === 'undefined') {
-            alert('❌ Excel 라이브러리가 로딩되지 않았습니다. 페이지를 새로고침해주세요.');
-            return;
-          }
-          
-          if (!this.currentData || !this.currentData.length) {
-            alert('다운로드할 데이터가 없습니다.');
-            return;
-          }
-        
-          // 전체 목록 사용 + 구독자 수 포함
-          const list = this.currentData.map(v => ({
-            순위: v.rank,
-            제목: v.title,
-            채널: v.channel,
-            카테고리: v.categoryName,
-            조회수: v.views,
-            구독자수: (v.subscriberCountFormatted || (v.subscriberCount ?? 0).toLocaleString()),
-            좋아요: v.likes,
-            댓글: v.comments,
-            성장률: `${v.growthRate}%`,
-            게시시간: v.publishTime,
-            영상길이: v.duration,
-            영상ID: v.videoId
-          }));
-        
-          const wb = XLSX.utils.book_new();
-          const ws = XLSX.utils.json_to_sheet(list);
-        
-          // 열 너비 조금 가독성 좋게
-          const cols = [
-            { wch: 6 },   // 순위
-            { wch: 60 },  // 제목
-            { wch: 24 },  // 채널
-            { wch: 10 },  // 카테고리
-            { wch: 12 },  // 조회수
-            { wch: 12 },  // 구독자수
-            { wch: 10 },  // 좋아요
-            { wch: 10 },  // 댓글
-            { wch: 10 },  // 성장률
-            { wch: 14 },  // 게시시간
-            { wch: 10 },  // 영상길이
-            { wch: 14 }   // 영상ID
-          ];
-          ws['!cols'] = cols;
-        
-          const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
-          XLSX.utils.book_append_sheet(wb, ws, 'YouTube Trends');
-          XLSX.writeFile(wb, `youtube_trends_${dateStr}.xlsx`);
+        if (foundVideosEl) {
+            foundVideosEl.textContent = foundVideos.toLocaleString();
         }
-
-
-       /**
-       * 결과 테이블이 없으면 자동으로 생성해 반환합니다.
-       * @returns {{table: HTMLTableElement, tbody: HTMLTableSectionElement}}
-       */
-      ensureResultsTable() {
-        // 1) 마운트 지점 확보 (없으면 body에 생성)
-        let mount = document.getElementById('resultsMount');
-        if (!mount) {
-          mount = document.createElement('div');
-          mount.id = 'resultsMount';
-          mount.style.marginTop = '12px';
-          document.body.appendChild(mount);
+        
+        if (calculatedScoresEl) {
+            calculatedScoresEl.textContent = foundVideos.toLocaleString();
         }
-    
-        // 2) 테이블 / tbody 확보 (없으면 생성)
-        let table = document.getElementById('resultsTable');
-        let tbody = table ? table.querySelector('tbody') : null;
-    
-        if (!table) {
-          table = document.createElement('table');
-          table.id = 'resultsTable';
-          table.style.width = '100%';
-          table.style.borderCollapse = 'collapse';
-          table.style.fontSize = '14px';
-    
-          // 간단한 스타일(필요 시 한 번만 추가)
-          if (!document.getElementById('resultsTableStyle')) {
-            const style = document.createElement('style');
-            style.id = 'resultsTableStyle';
-            style.textContent = `
-              #resultsTable th, #resultsTable td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
-              #resultsTable thead { background: #f8fafc; }
-              #resultsTable tbody tr:nth-child(even) { background: #f9fafb; }
-            `;
-            document.head.appendChild(style);
-          }
-    
-          const thead = document.createElement('thead');
-          thead.innerHTML = `
-            <tr>
-              <th>순위</th>
-              <th>제목</th>
-              <th>채널</th>
-              <th>카테고리</th>
-              <th>조회수</th>
-              <th>구독자 수</th>
-              <th>좋아요</th>
-              <th>댓글</th>
-              <th>성장률</th>
-              <th>게시시간</th>
-              <th>영상길이</th>
-            </tr>
-          `;
-          tbody = document.createElement('tbody');
-    
-          table.appendChild(thead);
-          table.appendChild(tbody);
-    
-          // mount에 테이블 장착
-          mount.innerHTML = '';
-          mount.appendChild(table);
-        } else if (!tbody) {
-          // 테이블은 있는데 tbody만 없을 때
-          tbody = document.createElement('tbody');
-          table.appendChild(tbody);
+        
+        if (currentActionEl) {
+            currentActionEl.textContent = action;
         }
-    
-        return { table, tbody };
-      }
-
-
-
-    
-    // Excel 요약 데이터 생성
-    createSummaryData() {
-        const totalViews = this.currentData.reduce((sum, video) => 
-            sum + parseInt(video.views.replace(/,/g, '')), 0);
-        const avgGrowthRate = (this.currentData.reduce((sum, video) => 
-            sum + parseFloat(video.growthRate), 0) / this.currentData.length).toFixed(1);
-        
-        return [
-            ['시니어 YouTube 트렌드 분석 보고서'],
-            ['생성일시', new Date().toLocaleString('ko-KR')],
-            [''],
-            ['📊 전체 통계'],
-            ['분석된 영상 수', this.currentData.length],
-            ['총 조회수', totalViews.toLocaleString()],
-            ['평균 성장률', avgGrowthRate + '%'],
-            [''],
-            ['🏆 TOP 5 영상'],
-            ['순위', '제목', '채널', '성장률'],
-            ...this.currentData.slice(0, 5).map(video => [
-                video.rank,
-                video.title,
-                video.channel,
-                video.growthRate + '%'
-            ]),
-            [''],
-            ['📈 카테고리별 분포'],
-            ['카테고리', '영상 수', '비율'],
-            ...this.getCategoryDistribution()
-        ];
     }
     
-    // Excel 상세 데이터 생성
-    createDetailData() {
-        const headers = [
-            '순위', '제목', '채널', '카테고리', '조회수', '좋아요', '댓글수',
-            '성장률(%)', '참여도(%)', '게시시간', '영상길이', '태그', 
-            '게시일', '비디오ID', '썸네일URL'
-        ];
+    // 스캔 버튼 상태 업데이트
+    updateScanButton(isScanning) {
+        const fullScanBtn = document.getElementById('fullScanBtn');
+        const stopScanBtn = document.getElementById('stopScanBtn');
         
-        const data = this.currentData.map(video => [
-            video.rank,
-            video.title,
-            video.channel,
-            video.categoryName,
-            video.views,
-            video.likes,
-            video.comments,
-            video.growthRate,
-            video.engagement,
-            video.publishTime,
-            video.duration,
-            video.tags.join(', '),
-            video.publishedAt,
-            video.videoId,
-            video.thumbnail
-        ]);
+        if (fullScanBtn) {
+            fullScanBtn.style.display = isScanning ? 'none' : 'flex';
+        }
         
-        return [headers, ...data];
+        if (stopScanBtn) {
+            stopScanBtn.style.display = isScanning ? 'flex' : 'none';
+        }
     }
     
-    // 카테고리별 분석 데이터 생성
-    createCategoryAnalysis() {
-        const categories = [...new Set(this.currentData.map(v => v.categoryName))];
-        
-        const analysisData = [
-            ['카테고리별 상세 분석'],
-            [''],
-            ['카테고리', '영상수', '평균조회수', '평균성장률', '평균참여도', 'TOP 영상']
-        ];
-        
-        categories.forEach(category => {
-            const categoryVideos = this.currentData.filter(v => v.categoryName === category);
-            const avgViews = Math.floor(categoryVideos.reduce((sum, v) => 
-                sum + parseInt(v.views.replace(/,/g, '')), 0) / categoryVideos.length);
-            const avgGrowth = (categoryVideos.reduce((sum, v) => 
-                sum + parseFloat(v.growthRate), 0) / categoryVideos.length).toFixed(1);
-            const avgEngagement = (categoryVideos.reduce((sum, v) => 
-                sum + parseFloat(v.engagement), 0) / categoryVideos.length).toFixed(1);
-            const topVideo = categoryVideos.sort((a, b) => 
-                parseFloat(b.growthRate) - parseFloat(a.growthRate))[0];
-            
-            analysisData.push([
-                category,
-                categoryVideos.length,
-                avgViews.toLocaleString(),
-                avgGrowth + '%',
-                avgEngagement + '%',
-                topVideo ? topVideo.title : '-'
-            ]);
-        });
-        
-        return analysisData;
-    }
-    
-    // 카테고리 분포 데이터
-    getCategoryDistribution() {
-        const distribution = this.currentData.reduce((acc, video) => {
-            acc[video.categoryName] = (acc[video.categoryName] || 0) + 1;
-            return acc;
-        }, {});
-        
-        const total = this.currentData.length;
-        
-        return Object.entries(distribution).map(([category, count]) => [
-            category,
-            count,
-            ((count / total) * 100).toFixed(1) + '%'
-        ]);
-    }
-    
-    // Excel 스타일링 적용
-    applyExcelStyling(sheet) {
-        // 열 너비 설정
-        const colWidths = [
-            { wch: 6 },   // 순위
-            { wch: 60 },  // 제목
-            { wch: 20 },  // 채널
-            { wch: 15 },  // 카테고리
-            { wch: 12 },  // 조회수
-            { wch: 10 },  // 좋아요
-            { wch: 8 },   // 댓글수
-            { wch: 10 },  // 성장률
-            { wch: 10 },  // 참여도
-            { wch: 12 },  // 게시시간
-            { wch: 10 },  // 영상길이
-            { wch: 30 },  // 태그
-            { wch: 12 },  // 게시일
-            { wch: 15 },  // 비디오ID
-            { wch: 40 }   // 썸네일URL
-        ];
-        
-        sheet['!cols'] = colWidths;
-    }
-    
-    // CSV 다운로드
-    downloadCSV() {
-        console.log('📄 CSV 파일 생성 시작...');
+    // API 키 파일에서 로드
+    async loadApiKeyFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
         
         try {
-            const headers = [
-                '순위', '제목', '채널', '카테고리', '조회수', '좋아요', '댓글수',
-                '성장률(%)', '참여도(%)', '게시시간', '영상길이', '게시일'
+            const text = await file.text();
+            const apiKey = text.trim();
+            
+            if (apiKey.startsWith('AIza') && apiKey.length > 30) {
+                this.setApiKey(apiKey);
+                alert('✅ API 키가 성공적으로 로드되었습니다!');
+            } else {
+                alert('❌ 올바른 YouTube API 키가 아닙니다.');
+            }
+        } catch (error) {
+            alert('❌ 파일을 읽는 중 오류가 발생했습니다.');
+        }
+        
+        // 파일 입력 초기화
+        event.target.value = '';
+    }
+    
+    // API 키 초기화
+    clearApiKey() {
+        localStorage.removeItem('youtube_api_key');
+        this.apiKey = null;
+        alert('✅ API 키가 초기화되었습니다.');
+    }
+    
+    // 다운로드 기능들
+    downloadExcel() {
+        if (!this.scanResults || this.scanResults.length === 0) {
+            alert('다운로드할 데이터가 없습니다.');
+            return;
+        }
+        
+        try {
+            const workbook = XLSX.utils.book_new();
+            
+            // 메인 데이터 시트
+            const mainData = this.scanResults.map(video => ({
+                '순위': video.rank,
+                '제목': video.title,
+                '채널': video.channel,
+                '바이럴점수': video.viralScore,
+                '조회수': video.viewCount,
+                '좋아요': video.likeCount,
+                '댓글수': video.commentCount,
+                '참여율': `${video.engagementRate.toFixed(2)}%`,
+                '성장률': `${video.growthRate.toFixed(1)}%`,
+                '형식': video.isShorts ? '쇼츠' : '롱폼',
+                '길이': `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}`,
+                '업로드일': video.publishDate,
+                '검색키워드': video.searchKeyword
+            }));
+            
+            const mainSheet = XLSX.utils.json_to_sheet(mainData);
+            XLSX.utils.book_append_sheet(workbook, mainSheet, '최상위 핫한 영상');
+            
+            // 요약 시트
+            const summaryData = [
+                ['항목', '값'],
+                ['총 검출 영상 수', this.scanResults.length],
+                ['평균 바이럴 점수', Math.round(this.scanResults.reduce((sum, v) => sum + v.viralScore, 0) / this.scanResults.length)],
+                ['쇼츠 비율', `${Math.round((this.scanResults.filter(v => v.isShorts).length / this.scanResults.length) * 100)}%`],
+                ['평균 성장률', `${(this.scanResults.reduce((sum, v) => sum + v.growthRate, 0) / this.scanResults.length).toFixed(1)}%`],
+                ['분석 일시', new Date().toLocaleString('ko-KR')]
             ];
             
-            let csvContent = headers.join(',') + '\n';
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(workbook, summarySheet, '분석 요약');
             
-            this.currentData.forEach(video => {
-                const row = [
-                    video.rank,
-                    `"${video.title.replace(/"/g, '""')}"`,  // 제목 따옴표 처리
-                    `"${video.channel}"`,
-                    `"${video.categoryName}"`,
-                    video.views,
-                    video.likes,
-                    video.comments,
-                    video.growthRate,
-                    video.engagement,
-                    `"${video.publishTime}"`,
-                    video.duration,
-                    video.publishedAt
-                ];
-                csvContent += row.join(',') + '\n';
-            });
-            
-            // BOM 추가 (Excel에서 한글 깨짐 방지)
-            const blob = new Blob(['\uFEFF' + csvContent], { 
-                type: 'text/csv;charset=utf-8;' 
-            });
-            
-            const filename = this.generateFilename('시니어_YouTube_트렌드', 'csv');
-            this.downloadBlob(blob, filename);
-            
-            console.log('✅ CSV 파일 다운로드 완료:', filename);
-            this.showDownloadSuccess('CSV');
+            // 파일 다운로드
+            const fileName = `시니어_YouTube_트렌드_전체스캔_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
             
         } catch (error) {
-            console.error('❌ CSV 다운로드 오류:', error);
-            this.showDownloadError('CSV');
+            console.error('Excel 다운로드 오류:', error);
+            alert('Excel 다운로드 중 오류가 발생했습니다.');
         }
     }
     
-    // JSON 다운로드
-    // JSON 다운로드
-    downloadJSON() {
-      console.log('📋 JSON 파일 생성 시작.');
-      try {
-        const categories = Array.from(new Set((this.currentData || []).map(v => v.categoryName || '-')));
-    
-        const exportData = {
-          metadata: {
-            title: '시니어 YouTube 트렌드 분석 데이터',
-            generatedAt: new Date().toISOString(),
-            totalVideos: (this.currentData || []).length,
-            categories,
-            summary: {
-              totalViews: (this.currentData || []).reduce((sum, v) =>
-                sum + (parseInt(String(v.views).replace(/,/g, '')) || 0), 0),
-              avgGrowthRate: ((this.currentData || []).reduce((sum, v) =>
-                sum + (parseFloat(v.growthRate) || 0), 0) / ((this.currentData || []).length || 1)).toFixed(1)
-            }
-          },
-          data: (this.currentData || []).map(v => ({
-            rank: v.rank,
-            title: v.title,
-            channel: v.channel,
-            categoryName: v.categoryName,
-            views: v.views,
-            likes: v.likes,
-            comments: v.comments,
-            growthRate: v.growthRate,
-            engagement: v.engagement,
-            publishTime: v.publishTime,
-            duration: v.duration,
-            // 숫자형 파생값
-            viewsNumeric: parseInt(String(v.views).replace(/,/g, '')) || 0,
-            likesNumeric: parseInt(String(v.likes).replace(/,/g, '')) || 0,
-            commentsNumeric: parseInt(String(v.comments).replace(/,/g, '')) || 0,
-            growthRateNumeric: parseFloat(v.growthRate) || 0,
-            engagementNumeric: parseFloat(v.engagement) || 0
-          }))
-        };
-    
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const filename = this.generateFilename('시니어_YouTube_트렌드', 'json');
-        this.downloadBlob(blob, filename);
-    
-        console.log('✅ JSON 파일 다운로드 완료:', filename);
-        this.showDownloadSuccess('JSON');
-      } catch (error) {
-        console.error('❌ JSON 다운로드 오류:', error);
-        this.showDownloadError('JSON');
-      }
-    }
-
-    
-    // PDF 리포트 다운로드 (간단한 HTML → PDF)
-    // PDF 리포트 다운로드 (간단한 HTML → PDF)
-    downloadPDF() {
-      console.log('📄 PDF 리포트 생성 시작.');
-      try {
-        const htmlContent = this.generatePDFContent();
-        const printWindow = window.open('', '_blank');
-    
-        if (!printWindow) {
-          alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.');
-          return;
+    downloadCSV() {
+        if (!this.scanResults || this.scanResults.length === 0) {
+            alert('다운로드할 데이터가 없습니다.');
+            return;
         }
-    
-        printWindow.document.open();
-        printWindow.document.write(`
-          <html>
-            <head>
-              <meta charset="utf-8" />
-              <title>시니어 YouTube 트렌드 리포트</title>
-              <style>
-                body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; }
-                h1 { margin-bottom: 12px; }
-                table { width: 100%; border-collapse: collapse; font-size: 12px; }
-                th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
-                thead { background:#f8fafc; }
-              </style>
-            </head>
-            <body>${htmlContent}</body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-      } catch (error) {
-        console.error('❌ PDF 다운로드 오류:', error);
-        this.showDownloadError('PDF');
-      }
-    }
-
-    
-    // PDF용 HTML 콘텐츠 생성
-    generatePDFContent() {
-        const totalViews = this.currentData.reduce((sum, video) => 
-            sum + parseInt(video.views.replace(/,/g, '')), 0);
-        const avgGrowthRate = (this.currentData.reduce((sum, video) => 
-            sum + parseFloat(video.growthRate), 0) / this.currentData.length).toFixed(1);
         
-        return `
-            <!DOCTYPE html>
-            <html lang="ko">
-            <head>
-                <meta charset="UTF-8">
-                <title>시니어 YouTube 트렌드 분석 보고서</title>
-                <style>
-                    @page { margin: 2cm; }
-                    body { font-family: 'Malgun Gothic', sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
-                    .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3b82f6; padding-bottom: 20px; }
-                    .header h1 { color: #3b82f6; font-size: 24px; margin-bottom: 10px; }
-                    .header .date { color: #666; font-size: 14px; }
-                    .summary { background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-                    .summary h2 { color: #1e293b; margin-bottom: 15px; }
-                    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-                    .stat-item { text-align: center; }
-                    .stat-value { font-size: 18px; font-weight: bold; color: #3b82f6; display: block; }
-                    .stat-label { font-size: 12px; color: #666; }
-                    .video-list { margin-top: 30px; }
-                    .video-list h2 { color: #1e293b; margin-bottom: 20px; }
-                    .video-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                    .video-table th { background: #3b82f6; color: white; padding: 8px; text-align: left; }
-                    .video-table td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
-                    .video-table tr:nth-child(even) { background: #f8fafc; }
-                    .rank { font-weight: bold; color: #f59e0b; text-align: center; }
-                    .title { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                    .growth { font-weight: bold; color: #10b981; text-align: right; }
-                    .footer { margin-top: 40px; text-align: center; color: #666; font-size: 10px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>📊 시니어 YouTube 트렌드 분석 보고서</h1>
-                    <div class="date">생성일시: ${new Date().toLocaleString('ko-KR')}</div>
-                </div>
-                
-                <div class="summary">
-                    <h2>📈 분석 요약</h2>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-value">${this.currentData.length}</span>
-                            <span class="stat-label">분석된 영상</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value">${totalViews.toLocaleString()}</span>
-                            <span class="stat-label">총 조회수</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value">${avgGrowthRate}%</span>
-                            <span class="stat-label">평균 성장률</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="video-list">
-                    <h2>🔥 트렌드 영상 TOP ${Math.min(20, this.currentData.length)}</h2>
-                    <table class="video-table">
-                        <thead>
-                            <tr>
-                                <th>순위</th>
-                                <th>제목</th>
-                                <th>채널</th>
-                                <th>카테고리</th>
-                                <th>조회수</th>
-                                <th>좋아요</th>
-                                <th>성장률</th>
-                                <th>게시시간</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${this.currentData.slice(0, 20).map(video => `
-                                <tr>
-                                    <td class="rank">${video.rank}</td>
-                                    <td class="title" title="${video.title}">${video.title}</td>
-                                    <td>${video.channel}</td>
-                                    <td>${video.categoryName}</td>
-                                    <td>${video.views}</td>
-                                    <td>${video.likes}</td>
-                                    <td class="growth">${video.growthRate}%</td>
-                                    <td>${video.publishTime}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="footer">
-                    <p>본 보고서는 시니어 YouTube 트렌드 분석기에 의해 자동 생성되었습니다.</p>
-                    <p>문의: GitHub - Senior YouTube Trends Analyzer</p>
-                </div>
-            </body>
-            </html>
-        `;
+        const headers = ['순위', '제목', '채널', '바이럴점수', '조회수', '좋아요', '댓글수', '참여율', '성장률', '형식', '업로드일'];
+        const csvData = [
+            headers,
+            ...this.scanResults.map(video => [
+                video.rank,
+                `"${video.title.replace(/"/g, '""')}"`,
+                `"${video.channel.replace(/"/g, '""')}"`,
+                video.viralScore,
+                video.viewCount,
+                video.likeCount,
+                video.commentCount,
+                `${video.engagementRate.toFixed(2)}%`,
+                `${video.growthRate.toFixed(1)}%`,
+                video.isShorts ? '쇼츠' : '롱폼',
+                video.publishDate
+            ])
+        ];
+        
+        const csvContent = csvData.map(row => row.join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        const fileName = `시니어_YouTube_트렌드_전체스캔_${new Date().toISOString().slice(0, 10)}.csv`;
+        this.downloadBlob(blob, fileName);
     }
     
-    // 파일명 생성
-    generateFilename(prefix, extension) {
-        const now = new Date();
-        const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
-        const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-        return `${prefix}_${dateStr}_${timeStr}.${extension}`;
+    downloadJSON() {
+        if (!this.scanResults || this.scanResults.length === 0) {
+            alert('다운로드할 데이터가 없습니다.');
+            return;
+        }
+        
+        const jsonData = {
+            metadata: {
+                title: '시니어 YouTube 트렌드 분석 - 전체 스캔 결과',
+                generatedAt: new Date().toISOString(),
+                totalResults: this.scanResults.length,
+                scanType: 'full_channel_scan'
+            },
+            summary: {
+                totalVideos: this.scanResults.length,
+                avgViralScore: Math.round(this.scanResults.reduce((sum, v) => sum + v.viralScore, 0) / this.scanResults.length),
+                shortsRatio: Math.round((this.scanResults.filter(v => v.isShorts).length / this.scanResults.length) * 100),
+                avgGrowthRate: (this.scanResults.reduce((sum, v) => sum + v.growthRate, 0) / this.scanResults.length).toFixed(1)
+            },
+            results: this.scanResults
+        };
+        
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+        const fileName = `시니어_YouTube_트렌드_전체스캔_${new Date().toISOString().slice(0, 10)}.json`;
+        this.downloadBlob(blob, fileName);
     }
     
-    // Blob 다운로드
-    downloadBlob(blob, filename) {
-        const link = document.createElement('a');
+    downloadPDF() {
+        alert('PDF 다운로드 기능은 현재 개발 중입니다. Excel 형식을 이용해주세요.');
+    }
+    
+    // 유틸리티 함수들
+    downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
     
-    // 다운로드 성공 메시지
-    showDownloadSuccess(type) {
-        this.showToast(`✅ ${type} 파일이 성공적으로 다운로드되었습니다!`, 'success');
-    }
-    
-    // 다운로드 실패 메시지
-    showDownloadError(type) {
-        this.showToast(`❌ ${type} 파일 다운로드 중 오류가 발생했습니다.`, 'error');
-    }
-    
-    // 토스트 메시지 표시
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        
-        // 토스트 스타일
-        Object.assign(toast.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6',
-            color: 'white',
-            padding: '16px 24px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            zIndex: '9999',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            opacity: '0',
-            transform: 'translateX(100%)',
-            transition: 'all 0.3s ease'
-        });
-        
-        document.body.appendChild(toast);
-        
-        // 애니메이션
-        setTimeout(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateX(0)';
-        }, 100);
-        
-        // 자동 제거
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                document.body.removeChild(toast);
-            }, 300);
-        }, 3000);
-    }
-    
-    // 기타 유틸리티 함수들
-    simulateLoading(duration) {
-        return new Promise(resolve => setTimeout(resolve, duration));
-    }
-    
-    showLoading() {
-        document.getElementById('loadingSpinner').style.display = 'flex';
-        document.getElementById('errorMessage').style.display = 'none';
-    }
-    
-    hideLoading() {
-        document.getElementById('loadingSpinner').style.display = 'none';
-    }
-    
-    showError() {
-        document.getElementById('loadingSpinner').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'flex';
-    }
-    
-    changeViewMode(mode) {
-        this.renderVideos(mode);
-    }
-    
-    refreshData() {
-        location.reload();
-    }
-
-    // 🔧 유틸리티 메서드들 추가
     formatNumber(num) {
-        const n = parseInt(num) || 0;
-        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-        return n.toLocaleString();
-    }
-
-
-
-    // 📱 쇼츠/롱폼 비율 차트
-    createFormatChart() {
-      const canvas = document.getElementById('formatChart');
-      if (!canvas) { console.warn('formatChart 캔버스를 찾을 수 없습니다.'); return; }
-      const ctx = canvas.getContext('2d');
-    
-      const shorts = this.currentData.filter(v => (this.parseDuration(v.duration || 'PT0S') <= 60)).length;
-      const longForm = this.currentData.length - shorts;
-    
-      if (this.charts.formatChart) this.charts.formatChart.destroy();
-      this.charts.formatChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels: ['📱 쇼츠', '🎬 롱폼'], datasets: [{ data: [shorts, longForm] }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-    
-    // 🚀 바이럴 점수 분포 차트(간단 버킷)
-    createViralChart() {
-      const canvas = document.getElementById('viralChart');
-      if (!canvas) { console.warn('viralChart 캔버스를 찾을 수 없습니다.'); return; }
-      const ctx = canvas.getContext('2d');
-    
-      const buckets = { '0-100': 0, '100-200': 0, '200-500': 0, '500+': 0 };
-      (this.currentData || []).forEach(v => {
-        const s = v.viralScore || this.calculateViralScore?.(v) || 0;
-        if (s >= 500) buckets['500+']++;
-        else if (s >= 200) buckets['200-500']++;
-        else if (s >= 100) buckets['100-200']++;
-        else buckets['0-100']++;
-      });
-    
-      if (this.charts.viralChart) this.charts.viralChart.destroy();
-      this.charts.viralChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: Object.keys(buckets), datasets: [{ label: '영상 수', data: Object.values(buckets) }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
-      });
-    }
-    
-    // 📊 카테고리별 개수 차트
-    createCategoryChart() {
-      const canvas = document.getElementById('categoryChart');
-      if (!canvas) { console.warn('categoryChart 캔버스를 찾을 수 없습니다.'); return; }
-      const ctx = canvas.getContext('2d');
-    
-      const agg = (this.currentData || []).reduce((acc, v) => {
-        const k = v.categoryName || v.category || '기타';
-        acc[k] = (acc[k] || 0) + 1;
-        return acc;
-      }, {});
-    
-      if (this.charts.categoryChart) this.charts.categoryChart.destroy();
-      this.charts.categoryChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels: Object.keys(agg), datasets: [{ data: Object.values(agg) }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-    
-    // ⏰ 업로드 시간대 분포 차트
-    createTimeChart() {
-      const canvas = document.getElementById('timeChart');
-      if (!canvas) { console.warn('timeChart 캔버스를 찾을 수 없습니다.'); return; }
-      const ctx = canvas.getContext('2d');
-    
-      const hours = Array.from({ length: 24 }, (_, h) => h);
-      const dist = hours.map(() => 0);
-      (this.currentData || []).forEach(v => {
-        const ts = v.publishedAt || v.publishTime;
-        const d = ts ? new Date(ts) : null;
-        const h = d ? d.getHours() : NaN;
-        if (!Number.isNaN(h)) dist[h]++;
-      });
-    
-      if (this.charts.timeChart) this.charts.timeChart.destroy();
-      this.charts.timeChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: hours.map(h => `${h}시`), datasets: [{ label: '업로드 수', data: dist }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
-      });
-    }
-
-
-    // ====== 채널 우선 파이프라인 ======
-    async rankSeniorChannels({ category, count, timeRange, minViews, sortBy }) {
-      // 1) 채널 후보 수집
-      const maxChannels = 80; // API 쿼터 고려 (필요시 조절)
-      const channels = await this.discoverSeniorChannels({ category, maxChannels });
-    
-      // 2) 채널별 최근 업로드 스캔
-      const horizonDays = (timeRange==='3months') ? 90 : (timeRange==='month' ? 30 : 7);
-      const publishedAfter = new Date(Date.now() - horizonDays*24*60*60*1000).toISOString();
-    
-      // 간단한 동시성 제어(쓰로틀)
-      const chunk = async (arr, size) => {
-        const out = [];
-        for (let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
-        return out;
-      };
-      const channelChunks = await chunk(channels, 10);
-      const enriched = [];
-      for (const group of channelChunks) {
-        const parts = await Promise.all(group.map(ch =>
-          this.fetchChannelRecentVideos({ channel: ch, publishedAfter, perChannelLimit: 8, minViews })
-            .then(videos => ({...ch, _videos: videos}))
-            .catch(()=> ({...ch, _videos: []}))
-        ));
-        enriched.push(...parts);
-      }
-    
-      // 3) 채널 스코어 계산
-      const scored = enriched.map(ch => {
-        const vids = ch._videos||[];
-        const totalViews = vids.reduce((s,v)=> s + (v.viewsNumeric||0), 0);
-        const avgEng     = vids.length ? (vids.reduce((s,v)=> s + parseFloat(v.engagement||0), 0) / vids.length) : 0;
-        const avgVps     = vids.length ? (vids.reduce((s,v)=> s + (v.viewsPerSubNumeric||0), 0) / vids.length) : 0;
-        const recentBoost = vids.some(v => v.isShorts) ? 1.05 : 1; // 쇼츠 가점(가벼움)
-        const freqBoost   = Math.min(1.2, 0.9 + (vids.length/8)*0.3); // 업로드 빈도 가점
-        const viralAvg    = vids.length ? (vids.reduce((s,v)=> s + (v.viralScore||0), 0)/vids.length) : 0;
-    
-        const score = 
-          (totalViews/1000) * 0.45 +
-          (avgVps)          * 0.30 +
-          (avgEng)          * 0.15 +
-          (viralAvg)        * 0.10;
-    
-        return {...ch, _score: score*recentBoost*freqBoost, _totalViews: totalViews, _avgEng: avgEng, _avgVps: avgVps};
-      });
-    
-      scored.sort((a,b)=> (b._score||0) - (a._score||0));
-      scored.forEach((c,i)=> c.rank = i+1);
-    
-      // 4) 상위 채널부터 영상 리스트 채워넣기
-      const outVideos = [];
-      for (const ch of scored) {
-        const sorted = (ch._videos||[]).sort((a,b)=> (b.viralScore||0)-(a.viralScore||0));
-        for (const v of sorted) {
-          if (outVideos.length >= count) break;
-          outVideos.push(v);
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
         }
-        if (outVideos.length >= count) break;
-      }
-    
-      return { channels: scored, videos: outVideos };
+        return num.toLocaleString();
     }
     
-    // 다중 키워드 채널 검색 → 채널 통계 보강
-    async discoverSeniorChannels({ category, maxChannels=80 }) {
-      const keywords = (this.seniorKeywords?.[category] || this.seniorKeywords?.all || ['시니어']);
-      const uniq = new Map();
-    
-      // search?type=channel 페이징 수집
-      for (const kw of keywords) {
-        let nextPageToken = undefined;
-        while (uniq.size < maxChannels) {
-          const params = new URLSearchParams({
-            key: this.apiKey,
-            part: 'snippet',
-            q: kw,
-            type: 'channel',
-            maxResults: '50',
-            regionCode: 'KR',
-            relevanceLanguage: 'ko',
-            order: 'viewCount'
-          });
-          if (nextPageToken) params.set('pageToken', nextPageToken);
-    
-          const res = await fetch(`${this.baseUrl}/search?${params.toString()}`);
-          if (!res.ok) break;
-          const json = await res.json();
-          const items = json.items || [];
-          for (const it of items) {
-            const id = it?.snippet?.channelId || it?.id?.channelId;
-            if (!id) continue;
-            if (!uniq.has(id)) {
-              uniq.set(id, { channelId: id, title: (it.snippet?.channelTitle||'-') });
-            }
-          }
-          nextPageToken = json.nextPageToken;
-          if (!nextPageToken) break;
-        }
-        if (uniq.size >= maxChannels) break;
-      }
-    
-      // 채널 통계 조회
-      const ids = Array.from(uniq.keys());
-      const out = [];
-      for (let i=0;i<ids.length;i+=50) {
-        const chunk = ids.slice(i,i+50);
-        const params = new URLSearchParams({
-          key: this.apiKey,
-          part: 'snippet,statistics',
-          id: chunk.join(',')
-        });
-        const r = await fetch(`${this.baseUrl}/channels?${params.toString()}`);
-        if (!r.ok) continue;
-        const j = await r.json();
-        for (const ch of (j.items||[])) {
-          out.push({
-            channelId: ch.id,
-            title: ch?.snippet?.title || '-',
-            thumbnails: ch?.snippet?.thumbnails,
-            subscriberCount: Number(ch?.statistics?.subscriberCount || 0),
-            videoCount: Number(ch?.statistics?.videoCount || 0)
-          });
-        }
-      }
-      return out;
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
     
-    // 채널별 최근 영상 조회 → 기존 비디오 카드용 포맷으로 매핑
-    async fetchChannelRecentVideos({ channel, publishedAfter, perChannelLimit=8, minViews=0 }) {
-      let nextPageToken;
-      const videoIds = [];
-      while (videoIds.length < perChannelLimit) {
-        const perPage = Math.min(50, perChannelLimit - videoIds.length);
-        const sp = new URLSearchParams({
-          key: this.apiKey,
-          part: 'snippet',
-          type: 'video',
-          channelId: channel.channelId,
-          publishedAfter,
-          maxResults: String(perPage),
-          order: 'viewCount',
-          regionCode: 'KR',
-          relevanceLanguage: 'ko'
-        });
-        if (nextPageToken) sp.set('pageToken', nextPageToken);
-    
-        const r = await fetch(`${this.baseUrl}/search?${sp.toString()}`);
-        if (!r.ok) break;
-        const j = await r.json();
-        const batch = (j.items||[]).map(it=> it?.id?.videoId).filter(Boolean);
-        videoIds.push(...batch);
-        nextPageToken = j.nextPageToken;
-        if (!nextPageToken || batch.length===0) break;
-      }
-      const ids = videoIds.slice(0, perChannelLimit);
-      if (ids.length===0) return [];
-    
-      // 비디오 상세
-      const videos = [];
-      for (let i=0;i<ids.length;i+=50) {
-        const chunk = ids.slice(i,i+50);
-        const vp = new URLSearchParams({
-          key: this.apiKey,
-          part: 'statistics,contentDetails,snippet',
-          id: chunk.join(',')
-        });
-        const r = await fetch(`${this.baseUrl}/videos?${vp.toString()}`);
-        if (!r.ok) continue;
-        const j = await r.json();
-    
-        for (const v of (j.items||[])) {
-          const s=v.statistics||{}, sn=v.snippet||{}, cd=v.contentDetails||{};
-          const views = Number(s.viewCount||0);
-          if (views < minViews) continue;
-    
-          const subs  = Number(channel.subscriberCount||0);
-          const vps   = subs>0 ? (views/subs) : 0;
-          const engagement = (s.likeCount && views) ? ((Number(s.likeCount)/views)*100).toFixed(1) : (Math.random()*5+2).toFixed(1);
-    
-          const out = {
-            id: v.id,
-            videoId: v.id,
-            title: sn.title||'(제목 없음)',
-            channel: channel.title||'-',
-            channelId: channel.channelId,
-            category: category || 'all',
-            categoryName: this.getCategoryName ? this.getCategoryName(category||'all') : (category||'all'),
-            views: views.toLocaleString(),
-            viewsNumeric: views,
-            likes: Number(s.likeCount||0).toLocaleString(),
-            comments: Number(s.commentCount||0).toLocaleString(),
-            subscriberCount: subs,
-            subscriberCountFormatted: subs.toLocaleString(),
-            duration: (cd.duration||'PT0M').replace(/^PT/,'').toLowerCase(),
-            publishTime: new Date(sn.publishedAt||Date.now()).toLocaleDateString('ko-KR'),
-            growthRate: (Math.random()*20+5).toFixed(1),
-            thumbnail: (sn.thumbnails?.high?.url) || (sn.thumbnails?.default?.url) || '',
-            engagement,
-            tags: sn.tags||[],
-            description: sn.description||'',
-            publishedAt: (sn.publishedAt||'').slice(0,10),
-            isShorts: this.parseDuration(cd.duration||'PT0S') <= 60,
-            viewsPerSubNumeric: vps
-          };
-          out.viralScore = this.calculateViralScore(out);
-          videos.push(out);
-        }
-      }
-      return videos;
+    updateElement(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
     }
     
-    // 채널 랭킹 표 렌더
-    renderRankingTable(channels=[]) {
-      const tbody = document.querySelector('#rankingTable tbody');
-      if (!tbody) return;
-      const rows = channels.slice(0,50).map(ch => {
-        return `<tr>
-          <td>${ch.rank}</td>
-          <td><span class="badge-soft">${this.escapeHtml(ch.title||'-')}</span></td>
-          <td class="cell-number">${(ch.subscriberCount||0).toLocaleString()}</td>
-          <td class="cell-number">${(ch._videos?.length||0)}</td>
-          <td class="cell-number">${(ch._totalViews||0).toLocaleString()}</td>
-          <td class="cell-number">${(ch._avgVps||0).toFixed(3)}</td>
-          <td class="cell-number">${(ch._avgEng||0).toFixed(1)}%</td>
-          <td class="cell-number">${(ch._score||0).toFixed(2)}</td>
-        </tr>`;
-      }).join('');
-      tbody.innerHTML = rows || `<tr><td colspan="8" style="text-align:center;color:#64748b">데이터가 없습니다</td></tr>`;
-    }
-    
-    // 안전한 텍스트
-    escapeHtml(str='') {
-      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-    }
-
-    /* =======================
-       Pro 전수 탐색 전용 유틸
-    ======================= */
-    
-    // (a) 한국어 시니어 관련 키워드(확장 가능)
-    seniorKeywords = [
-      '시니어', '노년', '실버', '노후', '중장년',
-      '시니어 운동', '시니어 건강', '시니어 요리', '시니어 취미', '시니어 라이프',
-      '어르신', '실버세대', '실버 생활', '시니어 브이로그'
-    ];
-    
-    async collectSeniorVideosKR({ publishedAfter, format = 'shorts', minViews = 0, maxNeeded = 200 }) {
-      const base = this.baseUrl || 'https://www.googleapis.com/youtube/v3';
-      const foundIds = new Set();
-      const videoIds = [];
-      const results  = [];
-    
-      // 키워드 세트
-      const keywords = Array.isArray(this.seniorKeywords) && this.seniorKeywords.length
-        ? this.seniorKeywords
-        : ['시니어', '노년', '실버', '시니어 건강', '시니어 운동', '시니어 라이프'];
-    
-      // 요청량에 따라 키워드당 최대 페이지 동적 확대 (기본 5 → 최대 50)
-      const maxPagesPerKw = (maxNeeded >= 10000) ? 50
-                          : (maxNeeded >= 1000)  ? 20
-                          : (maxNeeded >= 500)   ? 10
-                          : 5;
-    
-      // 1) Search API로 videoId 전수 수집 (필요량 도달 시 조기 종료)
-      outer:
-      for (const kw of keywords) {
-        let nextPageToken = undefined;
-        let pageCount = 0;
-    
-        while (pageCount < maxPagesPerKw) {
-          const sp = new URLSearchParams({
-            key: this.apiKey,
-            part: 'snippet',
-            type: 'video',
-            q: kw,
-            publishedAfter,
-            maxResults: '50',
-            regionCode: 'KR',
-            relevanceLanguage: 'ko',
-            order: 'date'
-          });
-          if (nextPageToken) sp.set('pageToken', nextPageToken);
-    
-          const r = await fetch(`${base}/search?${sp.toString()}`);
-          if (!r.ok) break;
-          const j = await r.json();
-    
-          const items = j.items || [];
-          for (const it of items) {
-            const id = it?.id?.videoId;
-            if (!id || foundIds.has(id)) continue;
-            foundIds.add(id);
-            videoIds.push(id);
-            // video 상세 필터까지 고려하면 실제 결과는 줄어듭니다. 넉넉히 모으되,
-            // 너무 과도하면 /videos 단계에서 끊습니다.
-          }
-    
-          nextPageToken = j.nextPageToken;
-          pageCount += 1;
-    
-          // Search 단계에서 너무 많이 모였으면 /videos에서 자를 수 있도록 break
-          if (!nextPageToken) break;
-          // (여기서는 조기 종료를 하지 않고 /videos 단계에서 실제 필터 후 조기 종료)
-        }
-      }
-    
-      if (videoIds.length === 0) return [];
-    
-      // 2) Videos API: 상세 조회 + 필터 + 조기 종료
-      for (let i = 0; i < videoIds.length; i += 50) {
-        const chunk = videoIds.slice(i, i + 50);
-        const vp = new URLSearchParams({
-          key: this.apiKey,
-          part: 'statistics,contentDetails,snippet',
-          id: chunk.join(',')
-        });
-        const r = await fetch(`${base}/videos?${vp.toString()}`);
-        if (!r.ok) continue;
-        const j = await r.json();
-    
-        for (const v of (j.items || [])) {
-          const s  = v.statistics || {};
-          const sn = v.snippet || {};
-          const cd = v.contentDetails || {};
-    
-          const views = Number(s.viewCount || 0);
-          if (views < minViews) continue;
-    
-          // 길이(쇼츠 필터)
-          const durSec = (this.parseDuration
-            ? this.parseDuration(cd.duration || 'PT0S')
-            : this._parseISODuration(cd.duration || 'PT0S'));
-          const isShorts = durSec <= 60;
-          if (format === 'shorts' && !isShorts) continue;
-    
-          // 지표 계산
-          const engagement = (s.likeCount && views)
-            ? ((Number(s.likeCount) / views) * 100).toFixed(1)
-            : (Math.random() * 5 + 2).toFixed(1);
-    
-          const out = {
-            id: v.id,
-            videoId: v.id,
-            title: sn.title || '(제목 없음)',
-            channel: sn.channelTitle || '-',
-            channelId: sn.channelId || '',
-            views: views.toLocaleString(),
-            viewsNumeric: views,
-            likes: Number(s.likeCount || 0).toLocaleString(),
-            comments: Number(s.commentCount || 0).toLocaleString(),
-            duration: cd.duration || 'PT0S',
-            publishedAt: sn.publishedAt || '',
-            publishTime: new Date(sn.publishedAt || Date.now()).toLocaleDateString('ko-KR'),
-            engagement,
-            isShorts,
-            viewsPerSubNumeric: 0
-          };
-          out.viralScore = this.calculateViralScore ? this.calculateViralScore(out) : 0;
-    
-          results.push(out);
-    
-          // ✅ 필요 개수 도달 시 즉시 종료
-          if (results.length >= maxNeeded) {
-            return results;
-          }
-        }
-      }
-    
-      return results;
-    }
-
-
-    
-    // (c) ISO 8601 PT 포맷 → 초 (보조)
-    _parseISODuration(iso='PT0S') {
-      const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i) || [];
-      const h = parseInt(m[1]||'0',10), mm = parseInt(m[2]||'0',10), s = parseInt(m[3]||'0',10);
-      return h*3600 + mm*60 + s;
-    }
-    
-    // (d) 표 렌더링
-    // (개선) 표 렌더링 — 제목에 링크 적용
-    renderResultsTable(videos = []) {
-      const tbody = document.querySelector('#resultTable tbody');
-      if (!tbody) return;
-    
-      const rows = (videos || []).map(v => {
-        const titleText = this.escapeHtml ? this.escapeHtml(v.title) : String(v.title || '');
-        const url = v && v.videoId ? this.makeVideoUrl(v.videoId) : '';
-        const titleCell = url
-          ? `<a class="title-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="YouTube에서 영상 열기: ${titleText}">${titleText}</a>`
-          : titleText;
-    
-        const channelText = this.escapeHtml ? this.escapeHtml(v.channel) : String(v.channel || '');
-    
-        return `<tr>
-          <td>${v.rank ?? ''}</td>
-          <td>${titleCell}</td>
-          <td>${channelText}</td>
-          <td>${v.publishTime || ''}</td>
-          <td class="cell-number">${v.views || '0'}</td>
-          <td class="cell-number">${v.likes || '0'}</td>
-          <td class="cell-number">${(v.engagement || '0')}%</td>
-          <td class="cell-number">${(Number(v.viralScore) || 0).toFixed(2)}</td>
-          <td class="cell-number">${this._formatDur(v.duration || 'PT0S')}</td>
-        </tr>`;
-      }).join('');
-    
-      tbody.innerHTML = rows || `<tr><td colspan="9" style="text-align:center;color:#64748b">검색 결과가 없습니다</td></tr>`;
-    
-      // 엑셀 버튼 핸들러 1회 바인딩
-      const btn = document.getElementById('btnExportExcel');
-      if (btn && !btn._bound) {
-        btn.addEventListener('click', () => this.exportExcelFromVideos(videos));
-        btn._bound = true;
-      }
-    }
-
-    
-    // (e) 결과 정보 텍스트
-    updateResultInfo(total, printed, timeRange, format) {
-      const el = document.getElementById('resultInfo');
-      if (!el) return;
-      const tLabel = { '24h':'최근 24시간', '3d':'최근 3일', '7d':'최근 1주일', '14d':'최근 2주일' }[timeRange] || timeRange;
-      const fLabel = (format==='shorts') ? '쇼츠' : '전체';
-      el.textContent = `분석기간: ${tLabel}, 형식: ${fLabel}, 총 검출: ${total.toLocaleString()}건 중 상위 ${printed.toLocaleString()}건 표시`;
-    }
-    
-    // (f) 엑셀 다운로드 (CSP-safe: window.XLSX 사용)
-    exportExcelFromVideos(videos=[]) {
-      if (!window.XLSX) {
-        alert('엑셀 모듈 로드가 아직 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.');
-        return;
-      }
-      const rows = videos.map(v => ({
-        Rank: v.rank,
-        Title: v.title,
-        Channel: v.channel,
-        PublishedAt: v.publishedAt,
-        Views: v.viewsNumeric || 0,
-        Likes: (typeof v.likes==='string' ? Number(v.likes.replace(/,/g,'')) : (v.likes||0)),
-        EngagementPercent: Number(v.engagement||0),
-        ViralScore: Number(v.viralScore||0),
-        Duration: v.duration
-      }));
-      const wb = window.XLSX.utils.book_new();
-      const ws = window.XLSX.utils.json_to_sheet(rows);
-      window.XLSX.utils.book_append_sheet(wb, ws, 'Senior-Trends');
-      const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-      window.XLSX.writeFile(wb, `SeniorTrends_${stamp}.xlsx`);
-    }
-    
-    // (g) 사람이 읽기 쉬운 길이 출력
-    _formatDur(iso='PT0S') {
-      const sec = this._parseISODuration(iso);
-      if (sec < 60) return `${sec}s`;
-      const m = Math.floor(sec/60), s = sec%60;
-      if (m < 60) return `${m}m ${s}s`;
-      const h = Math.floor(m/60), mm = m%60;
-      return `${h}h ${mm}m`;
-    }
-    
-    // (h) 안전한 텍스트(없다면 보조)
-    escapeHtml(str='') {
-      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-    }
+    showError(message) {
+        const errorContainer = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
         
-    // 유튜브 영상 URL 생성
-    makeVideoUrl(videoId = '') {
-      const id = String(videoId || '').trim();
-      if (!id) return '';
-      return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+        if (errorContainer && errorText) {
+            errorText.textContent = message;
+            errorContainer.style.display = 'block';
+            
+            // 3초 후 자동 숨김
+            setTimeout(() => {
+                errorContainer.style.display = 'none';
+            }, 5000);
+        } else {
+            alert(message);
+        }
     }
-
     
-}  
-// ★★★★★ class SeniorYoutubeTrendsExcel  끝부분!!!!! ★★★★★
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
 
-
-
-// 앱 초기화
+// 페이지 로드 후 초기화
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 시니어 YouTube 트렌드 분석기 (엑셀 다운로드) 시작!');
-    window.seniorTrendsExcel = new SeniorYoutubeTrendsExcel();
-});
-
-
-
-window.copyToClipboard = function(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        console.log('클립보드에 복사됨:', text);
-    });
-};
-
-
-// ======================
-// 전역 유틸 함수 (클래스 밖)
-// ======================
-
-// 파일에서 API 키 읽어 localStorage 저장
-async function handleApiKeyFile(event) {
-  try {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-
-    const text = await file.text();
-    const key = (text || "").trim();
-
-    if (!isValidYouTubeApiKey(key)) {
-      alert("유효한 YouTube API 키 형식이 아닙니다. 파일 내용을 확인하세요.");
-      return;
+    console.log('🔥 시니어 YouTube 트렌드 분석기 Pro 초기화 중...');
+    
+    // 라이브러리 로딩 확인
+    if (typeof XLSX === 'undefined') {
+        console.error('❌ XLSX 라이브러리가 로드되지 않았습니다.');
+        return;
     }
-
-    localStorage.setItem("youtube_api_key", key);
-
-    // 클래스 인스턴스를 전역에서 쓰는 경우 갱신 (존재할 때만)
-    if (window.seniorTrendsExcel && typeof window.seniorTrendsExcel === "object") {
-      window.seniorTrendsExcel.apiKey = key;
+    
+    if (typeof Chart === 'undefined') {
+        console.error('❌ Chart.js 라이브러리가 로드되지 않았습니다.');
+        return;
     }
-
-    alert("✅ API 키가 저장되었습니다. 이제 실제 데이터로 검색할 수 있어요.");
-  } catch (err) {
-    console.error("API 키 파일 처리 오류:", err);
-    alert("API 키 파일을 읽는 중 오류가 발생했습니다.");
-  } finally {
-    const fileInput = document.getElementById("apiKeyFile");
-    if (fileInput) fileInput.value = "";
-  }
-}
-
-// API 키 초기화
-function clearSavedApiKey() {
-  localStorage.removeItem("youtube_api_key");
-  if (window.seniorTrendsExcel && typeof window.seniorTrendsExcel === "object") {
-    window.seniorTrendsExcel.apiKey = "DEMO_MODE";
-  }
-  alert("🧹 저장된 API 키를 초기화했습니다. (현재는 데모 모드)");
-}
-
-// 간단한 유효성 검사
-function isValidYouTubeApiKey(key) {
-  // 공개 키는 보통 "AIza"로 시작. 길이는 고정 아님이라 대략 체크
-  return /^AIza[0-9A-Za-z_\-]{10,}$/.test(key);
-}
-
-// ======================
-// 전역 이벤트 연결
-// ======================
-
-document.addEventListener("DOMContentLoaded", () => {
-  const loadBtn = document.getElementById("loadApiKeyBtn");
-  const clearBtn = document.getElementById("clearApiKeyBtn");
-  const fileInput = document.getElementById("apiKeyFile");
-
-  if (loadBtn && fileInput) {
-    loadBtn.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", handleApiKeyFile);
-  }
-  if (clearBtn) {
-    clearBtn.addEventListener("click", clearSavedApiKey);
-  }
-
-  // 참고: 클래스 인스턴스를 전역에 노출해 두면(예: window.seniorTrendsExcel)
-  // 위 전역 함수들이 인스턴스 상태(apiKey)를 갱신할 수 있습니다.
+    
+    console.log('✅ 모든 라이브러리 로딩 완료');
+    
+    // 메인 앱 초기화
+    window.ytAnalyzer = new FullScanYoutubeTrendsAnalyzer();
+    
+    console.log('🚀 전체 스캔 시스템 준비 완료!');
 });
