@@ -253,11 +253,18 @@ class OptimizedYoutubeTrendsAnalyzer {
                 return;
             }
             
+            const timeRangeText = {
+                '1day': '최근 1일',
+                '3days': '최근 3일', 
+                '1week': '최근 1주일',
+                '2weeks': '최근 2주일'
+            }[timeRange] || timeRange;
+            
             console.log('🔍 최적화된 스캔 설정:', { 
                 category, 
                 format, 
                 count, 
-                timeRange, 
+                timeRange: `${timeRange} (${timeRangeText})`, 
                 selectedKeywords: keywords.length,
                 keywords: keywords 
             });
