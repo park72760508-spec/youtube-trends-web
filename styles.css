@@ -1345,3 +1345,64 @@ input:focus {
 .video-card {
     will-change: transform;
 }
+
+
+/* == Pro 표 스타일 == */
+.table-responsive {
+  width: 100%;
+  overflow: auto;
+}
+
+.table-pro {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border: 1px solid rgba(226,232,240,.8);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+
+.table-pro thead th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(145deg,#f8fafc,#eef2f7);
+  color: #1f2937;
+  font-size: 14px;
+  text-align: left;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(226,232,240,.8);
+  white-space: nowrap;
+}
+
+.table-pro tbody td {
+  padding: 14px 16px;
+  font-size: 15px;
+  color: #374151;
+  border-bottom: 1px solid rgba(226,232,240,.6);
+}
+
+.table-pro tbody tr:hover {
+  background: #f9fbff;
+}
+
+.table-pro tbody tr td:nth-child(1) {
+  font-weight: 700;
+  color: #111827;
+}
+
+.badge-soft {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: rgba(59,130,246,.1);
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.cell-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
