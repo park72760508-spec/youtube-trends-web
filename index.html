@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- CSP-safe SheetJS (XLSX) ESM -->
+    <script type="module">
+      import * as XLSX from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
+      window.XLSX = XLSX; // 기존 코드에서 window.XLSX 사용 가능
+    </script>
+
+
     
     <!-- CSP 정책 완전 제거 (eval 오류 완전 해결) -->
     
@@ -110,28 +118,33 @@
                         
                         <!-- 두 번째 행: 고급 설정 -->
                         <!-- 두 번째 행: 고급 설정 -->
+                        <!-- 두 번째 행: 고급 설정 (Pro 전수 탐색) -->
                         <div class="form-row">
                           <div class="form-group">
-                            <label for="rankingMode">🏆 선정 방식</label>
-                            <select id="rankingMode" class="form-control">
-                              <option value="channel" selected>채널 우선 (권장)</option>
-                              <option value="video">영상 우선 (현재 방식)</option>
+                            <label>🏆 선정 방식</label>
+                            <div class="form-static">시니어 전체 영상 전수(기간 필터)</div>
+                          </div>
+                        
+                          <div class="form-group">
+                            <label for="videoFormat">🎬 영상 형식</label>
+                            <select id="videoFormat" class="form-control">
+                              <option value="shorts" selected>쇼츠(60초 이내)</option>
+                              <option value="all">전체</option>
                             </select>
                           </div>
                         
                           <div class="form-group">
-                            <label for="sortBy">🎯 분석 기준</label>
-                            <select id="sortBy" class="form-control">
-                              <option value="viral_score" selected>🚀 바이럴 점수 (종합)</option>
-                              <option value="growth_rate">📈 성장률 높은 순</option>
-                              <option value="engagement_rate">💬 참여율 높은 순</option>
-                              <option value="views_per_sub">👑 구독자 대비 조회수</option>
-                              <option value="recent_popular">🕐 최신 인기 영상</option>
+                            <label for="timeRange">🗓️ 분석 기간</label>
+                            <select id="timeRange" class="form-control">
+                              <option value="24h">최근 24시간</option>
+                              <option value="3d">최근 3일</option>
+                              <option value="7d" selected>최근 1주일</option>
+                              <option value="14d">최근 2주일</option>
                             </select>
                           </div>
                         
                           <div class="form-group">
-                            <label for="minViews">🎬 최소 조회수</label>
+                            <label for="minViews">👁️ 최소 조회수</label>
                             <select id="minViews" class="form-control">
                               <option value="0">제한 없음</option>
                               <option value="1000">1천 이상</option>
@@ -142,15 +155,28 @@
                           </div>
                         
                           <div class="form-group">
-                            <label for="videoCount">영상 개수</label>
+                            <label for="videoCount">출력 개수</label>
                             <select id="videoCount" class="form-control">
+                              <option value="10">10개</option>
                               <option value="20">20개</option>
                               <option value="50" selected>50개</option>
                               <option value="100">100개</option>
                               <option value="200">200개</option>
                             </select>
                           </div>
+                        
+                          <div class="form-group">
+                            <label for="sortBy">🎯 분석 기준(정렬)</label>
+                            <select id="sortBy" class="form-control">
+                              <option value="viral_score" selected>🚀 바이럴 점수 (종합)</option>
+                              <option value="views">조회수 높은 순</option>
+                              <option value="engagement_rate">참여율 높은 순</option>
+                              <option value="views_per_sub">구독대비 조회수</option>
+                              <option value="recent_popular">최신 인기</option>
+                            </select>
+                          </div>
                         </div>
+
                         
                         <!-- ▼ 채널 랭킹 & 트렌드 표 섹션 (신규) -->
                         <section class="charts-section" id="rankingSection" style="display:none; margin-top:24px;">
@@ -330,7 +356,7 @@
             </section>
 
             <!-- 차트 섹션 -->
-            <section class="charts-section" id="chartsSection" style="display: none;">
+            <!--<section class="charts-section" id="chartsSection" style="display: none;">
                 <div class="chart-row">
                     <div class="chart-container">
                         <h3>📊 쇼츠 vs 롱폼 비율</h3>
@@ -351,7 +377,7 @@
                         <canvas id="timeChart"></canvas>
                     </div>
                 </div>
-            </section>
+            </section>-->
 
             <!-- 트렌드 영상 목록 -->
             <section class="video-results" id="videoResults" style="display: none;">
@@ -364,6 +390,36 @@
                         </select>
                     </div>
                 </div>
+
+
+                  <!-- ▼ 결과 표 + 엑셀 버튼 섹션 (추가) -->
+                  <section id="resultTableSection" style="margin-top:16px;">
+                    <div class="table-toolbar" style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
+                      <button id="btnExportExcel" class="btn btn-primary">⬇️ 엑셀로 다운로드</button>
+                      <span class="muted" id="resultInfo"></span>
+                    </div>
+                
+                    <div class="table-responsive">
+                      <table id="resultTable" class="table-pro">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>제목</th>
+                            <th>채널</th>
+                            <th>게시일</th>
+                            <th>조회수</th>
+                            <th>좋아요</th>
+                            <th>참여율</th>
+                            <th>바이럴 점수</th>
+                            <th>길이</th>
+                          </tr>
+                        </thead>
+                        <tbody><!-- JS 렌더링 --></tbody>
+                      </table>
+                    </div>
+                  </section>
+                  <!-- ▲ 결과 표 섹션 끝 -->
+
                 
                 <div id="videosList" class="videos-container">
                     <!-- 동적으로 생성될 영상 목록 -->
