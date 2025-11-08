@@ -704,12 +704,12 @@ body {
 
 /* 테이블 컬럼 스타일 */
 .rank-col { width: 80px; text-align: center; }
-.video-col { min-width: 300px; }
+.video-col { min-width: 280px; }
 .viral-col { width: 120px; text-align: center; }
 .stats-col { width: 120px; text-align: right; }
 .engagement-col { width: 100px; text-align: center; }
 .growth-col { width: 100px; text-align: center; }
-.format-col { width: 80px; text-align: center; }
+.format-col { width: 100px; text-align: center; }
 .date-col { width: 120px; text-align: center; }
 
 .table-rank {
