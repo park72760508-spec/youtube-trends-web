@@ -1486,3 +1486,106 @@ body {
         padding: 10px;
     }
 }
+
+
+/* 성공 메시지 스타일 */
+.success-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 16px 24px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+    z-index: 9999;
+    max-width: 500px;
+    min-width: 300px;
+    text-align: center;
+    animation: slideInSuccess 0.3s ease-out;
+}
+
+.success-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.success-content i {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: #dcfce7;
+}
+
+.success-content h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: white;
+}
+
+.success-content p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #dcfce7;
+    line-height: 1.4;
+}
+
+@keyframes slideInSuccess {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* API 상태 표시 (헤더 아래 추가용) */
+.api-status-banner {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 12px 20px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: none;
+    position: relative;
+    z-index: 100;
+}
+
+.api-status-banner.show {
+    display: block;
+    animation: fadeInDown 0.3s ease-out;
+}
+
+.api-status-banner i {
+    margin-right: 8px;
+    color: #dcfce7;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .success-container {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        transform: none;
+        max-width: none;
+        min-width: auto;
+    }
+}
