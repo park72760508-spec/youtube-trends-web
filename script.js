@@ -563,6 +563,53 @@ class OptimizedYoutubeTrendsAnalyzer {
             this.showError(error.message);
         }
     }
+
+
+    // ★★★ 여기에 validateApiKeys 함수 삽입 ★★★
+    // API 키 검증 함수
+    async validateApiKeys() {
+        const stats = this.apiKeyManager.getOverallStats();
+        if (stats.totalKeys === 0) {
+            this.showError('검증할 API 키가 없습니다.');
+            return;
+        }
+        
+        this.showSuccess('API 키 검증을 시작합니다...', 'API 키 검증');
+        
+        for (let i = 0; i < this.apiKeyManager.apiKeys.length; i++) {
+            const apiKey = this.apiKeyManager.apiKeys[i];
+            const keyDisplay = `${apiKey.substr(0, 10)}...${apiKey.substr(-4)}`;
+            
+            try {
+                const testUrl = `${this.baseUrl}/channels?part=snippet&forUsername=test&key=${apiKey}`;
+                const response = await fetch(testUrl);
+                
+                if (response.ok || response.status === 404) {
+                    // 404는 정상 (존재하지 않는 사용자명이므로)
+                    console.log(`✅ API 키 ${keyDisplay}: 정상`);
+                    this.apiKeyManager.resetKeyStatus(apiKey);
+                    this.updateQuotaUsage(apiKey, 1);
+                } else if (response.status === 403) {
+                    console.error(`❌ API 키 ${keyDisplay}: 권한 오류 또는 할당량 초과`);
+                    this.apiKeyManager.handleApiKeyError(apiKey, new Error('권한 오류'));
+                } else {
+                    console.warn(`⚠️ API 키 ${keyDisplay}: 알 수 없는 오류 (${response.status})`);
+                }
+                
+                await this.delay(1000); // 키 검증 간 1초 대기
+                
+            } catch (error) {
+                console.error(`❌ API 키 ${keyDisplay}: 연결 실패`, error);
+            }
+        }
+        
+        this.apiKeyManager.updateApiKeyStatusDisplay();
+        this.showSuccess('API 키 검증이 완료되었습니다.');
+    }
+    // ★★★ validateApiKeys 함수 끝 ★★★
+
+
+
     
     // 다운로드 버튼 설정 (기존과 동일)
     setupDownloadButtons() {
