@@ -2204,69 +2204,81 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // (K) 전체 파이프라인 (동시성 제한 + 품질 로그)
     async runChannelUploadPipeline(keywords, { format, timeRange, perChannelMax, topN, softTarget = 2000, dailyCapUnits = 8000 } = {}) {
-      console.log(`🚀 파이프라인 시작: kw=${keywords.length}, perChannelMax=${perChannelMax}, topN=${topN}`);
+      const upd = (percent, totalKw, doneKw, found, action) => {
+        // 프로젝트의 진행 업데이트 함수에 맞춰 호출
+        if (typeof this.updateProgress === 'function') {
+          this.updateProgress(percent, totalKw, doneKw, found, action);
+        }
+      };
     
-      // 1) 키워드 → 채널 인덱싱
+      // ===== 1) 키워드 → 채널 인덱싱 =====
+      upd(undefined, keywords.length, 0, 0, '키워드 인덱싱 중…');
       const channels = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax * 2));
-      console.log(`📚 채널 인덱싱 결과: ${channels.length}개`);
+      upd(25, keywords.length, keywords.length, 0, `채널 발견: ${channels.length}개`);
       if (!channels.length) return [];
     
-      // 2) 채널 → 업로드 재생목록 ID
+      // ===== 2) 채널 → 업로드 재생목록 ID =====
       const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
-      const uploadsIds = await this.runWithPool(channels, concurrency, async (ch, idx) => {
+      let chDone = 0;
+      const uploadsIds = await this.runWithPool(channels, concurrency, async (ch) => {
+        if (!this.isScanning || this.abortController?.signal?.aborted) return null;
         const up = await this.getUploadsPlaylistId(ch);
+        chDone++;
+        // 키워드 진행은 종료했으니 분모는 키워드 수, 분자는 그대로 유지하되 액션/퍼센트만 단계에 맞게 업데이트
+        upd(25 + Math.round((chDone / channels.length) * 15), keywords.length, keywords.length, 0, `업로드 재생목록 수집 ${chDone}/${channels.length}`);
         return up ? { ch, up } : null;
       });
       const valid = uploadsIds.filter(Boolean);
-      console.log(`📡 업로드 재생목록 유효 채널: ${valid.length}개`);
     
-      // 3) 업로드 재생목록 → 영상ID
+      // ===== 3) 업로드 재생목록 → 영상ID =====
       const allIdsSet = new Set();
+      let plDone = 0;
       await this.runWithPool(valid, concurrency, async (row) => {
+        if (!this.isScanning || this.abortController?.signal?.aborted) return null;
         const ids = await this.fetchRecentUploads(row.up, perChannelMax);
         ids.forEach(id => allIdsSet.add(id));
+        plDone++;
+        // 발견된 영상(중복 제거 전) 실시간 반영
+        upd(40 + Math.round((plDone / Math.max(1, valid.length)) * 30), keywords.length, keywords.length, allIdsSet.size, `영상ID 수집 ${plDone}/${valid.length}`);
       });
+    
       const allIds = Array.from(allIdsSet);
-      console.log(`🎞 수집된 videoId 개수: ${allIds.length}`);
+      // 업로드 결과가 0이면 즉시 종료(불필요한 videos.list 호출 방지)
+      if (allIds.length === 0) {
+        upd(100, keywords.length, keywords.length, 0, '영상ID 없음 — 종료');
+        console.warn('영상ID가 수집되지 않았습니다. 기간/형식/키워드 조건을 완화해 보세요.');
+        return [];
+      }
     
-      // 4) 상세 통계
+      // ===== 4) 상세 통계 조회 =====
+      upd(70, keywords.length, keywords.length, allIds.length, `상세 조회 준비 (${allIds.length}개)`);
       const stats = await this.fetchVideoStatsBulk(allIds);
-      console.log(`📦 videos.list 상세 응답 개수: ${stats.length}`);
+      upd(85, keywords.length, keywords.length, stats.length, `상세 조회 완료 (${stats.length}개)`);
     
-      // 5) 점수 계산
+      // ===== 5) 점수 계산/정렬 =====
       const tryScore = (fmt, tr) => {
         const s = this.computeViralScore(stats, { format: fmt, timeRange: tr });
         s.sort((a,b) => b.score - a.score);
         return s;
       };
-    
       let scored = tryScore(format, timeRange);
-      console.log(`🧮 1차 스코어 결과: ${scored.length}개 (format=${format}, time=${timeRange})`);
-    
-      // 빈 결과면 완화: 형식=전체, 기간=2weeks → 그래도 0이면 기간=custom:30
       if (!scored.length) {
         const fmt2 = (format === 'shorts' || format === 'long') ? undefined : format;
         scored = tryScore(fmt2, '2weeks');
-        console.warn(`⚠️ 스코어 0 → 완화 재계산(전체형식/2weeks): ${scored.length}개`);
-        if (!scored.length) {
-          scored = tryScore(fmt2, 'custom:30');
-          console.warn(`⚠️ 스코어 0 → 완화 재계산(전체형식/30days): ${scored.length}개`);
-        }
+        if (!scored.length) scored = tryScore(fmt2, 'custom:30');
       }
     
-      // 6) 상위 topN (ID 정상화)
       const top = scored.slice(0, Math.min(topN || 200, 10000)).map((s, i) => {
         const v = s.video;
-        // videos.list 응답에서 id는 문자열, playlistItems에서 온 응답은 v.contentDetails?.videoId일 수 있음
         const vid = v.id || v.videoId || v?.contentDetails?.videoId;
-        if (!v.id && vid) v.id = vid;  // 표시·중복제거 일관성
+        if (!v.id && vid) v.id = vid;
         return { rank: i+1, score: s.score, ...v };
       });
     
-      console.log(`✅ 상위 결과: ${top.length}개`);
-    
+      upd(100, keywords.length, keywords.length, top.length, `정렬/상위 도출 완료 (${top.length}개)`);
       return top;
     }
+
 
     /* === [/NEW] ============================================================= */
 
