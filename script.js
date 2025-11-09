@@ -1832,6 +1832,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                     // API 호출
                     if (this.canUseQuota(100)) {
                         videos = await this.searchVideosForKeyword(keyword, format, timeRange, viewCountFilter);
+                        // 할당량 업데이트는 searchVideosForKeyword에서 자동 처리됨
                         this.saveToCache(cacheKey, videos);
                     } else {
                         console.warn(`⚠️ 할당량 부족으로 ${keyword}를 모의 데이터로 대체합니다.`);
@@ -1855,6 +1856,31 @@ class OptimizedYoutubeTrendsAnalyzer {
             } catch (error) {
                 console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
             }
+        }
+        
+        // ★★★ 여기가 삽입 위치 ★★★
+        // 모든 API 키 실패 시 데모 모드 자동 전환
+        if (this.allVideos.length === 0 && processedKeywords > 0) {
+            console.warn('🔴 모든 키워드 검색이 실패했습니다. 데모 모드로 전환합니다.');
+            
+            this.showSuccess(`
+                API 키 문제로 인해 데모 모드로 전환되었습니다.
+                
+                실제 데이터를 보시려면:
+                1. API 키 상태를 확인하세요
+                2. 새로운 API 키를 추가하세요  
+                3. 내일 다시 시도해보세요
+            `, 'API 문제 감지');
+            
+            // 데모 데이터 생성
+            const category = document.getElementById('scanCategory')?.value || 'all';
+            this.allVideos = this.mockDataGenerator.generateRealisticData(category, count || 50);
+            this.allVideos.forEach(video => {
+                video.isSimulated = true;
+                video.title = "🎯 [데모] " + video.title;
+            });
+            
+            console.log(`📊 데모 데이터 ${this.allVideos.length}개 생성 완료`);
         }
         
         // 바이럴 점수 계산 및 결과 정리
