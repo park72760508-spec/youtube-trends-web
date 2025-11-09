@@ -3275,21 +3275,21 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 중복 제거 메서드
     // 중복 제거 메서드 (videoId 우선, id/ contentDetails.videoId 보조)
+    // 중복 제거 메서드 (videoId 우선, id / contentDetails.videoId 보조)
     removeDuplicates(videos) {
       const unique = [];
       const seen = new Set();
-    
       for (const video of (videos || [])) {
-        const key = (video.videoId || video.id || video?.contentDetails?.videoId || '').toString().trim();
+        const key = (video.videoId || video.id || (video.contentDetails && video.contentDetails.videoId) || '').toString().trim();
         if (!key) continue;
         if (seen.has(key)) continue;
         seen.add(key);
         unique.push(video);
       }
-    
       console.log(`🔄 중복 제거: ${Array.isArray(videos) ? videos.length : 0} → ${unique.length}`);
       return unique;
     }
+
 
     
     // 바이럴 점수 계산
