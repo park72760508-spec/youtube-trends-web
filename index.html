@@ -165,6 +165,46 @@
                                             </div>
                                         </div>
                                     </div>
+
+
+                                    <!-- API 키 풀 관리 섹션 -->
+                                    <section class="api-key-management-section">
+                                        <div class="api-key-container">
+                                            <h2>🔑 API 키 풀 관리</h2>
+                                            <p class="section-description">여러 개의 YouTube API 키를 등록하여 검색 할당량을 대폭 확장하세요.</p>
+                                            
+                                            <!-- API 키 추가 -->
+                                            <div class="api-key-input-section">
+                                                <div class="input-group">
+                                                    <input type="text" 
+                                                           id="apiKeyInput" 
+                                                           placeholder="YouTube Data API v3 키를 입력하세요 (예: AIzaSy...)" 
+                                                           class="api-key-input">
+                                                    <button id="addApiKeyBtn" class="btn-primary">
+                                                        <i class="fas fa-plus"></i> 키 추가
+                                                    </button>
+                                                    <button id="refreshApiKeyStatusBtn" class="btn-secondary">
+                                                        <i class="fas fa-sync-alt"></i> 상태 새로고침
+                                                    </button>
+                                                </div>
+                                                <div class="api-key-help">
+                                                    <small>
+                                                        💡 <strong>팁:</strong> 
+                                                        <a href="https://console.developers.google.com/" target="_blank">Google Cloud Console</a>에서 
+                                                        YouTube Data API v3를 활성화하고 API 키를 생성하세요. 키 개수에 제한은 없습니다!
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- API 키 상태 표시 -->
+                                            <div id="apiKeyStatusContainer" class="api-key-status-container">
+                                                <div class="no-keys-message">
+                                                    <i class="fas fa-key"></i>
+                                                    <p>등록된 API 키가 없습니다. 위에서 API 키를 추가해보세요.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
                                     
                                     <!-- 예상 API 비용 표시 -->
                                     <div class="api-cost-estimate">
