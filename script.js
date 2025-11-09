@@ -440,10 +440,10 @@ class OptimizedYoutubeTrendsAnalyzer {
 
         // === 운영 기본값(최초 1회) ===
         if (!localStorage.getItem('hot_perChannelMax')) {
-          localStorage.setItem('hot_perChannelMax','500'); // 채널당 최대 수집(기본 1000)
+          localStorage.setItem('hot_perChannelMax','50'); // 채널당 최대 수집(기본 1000)
         }
         if (!localStorage.getItem('hot_concurrency')) {
-          localStorage.setItem('hot_concurrency','5');      // 동시성(권장 4~8)
+          localStorage.setItem('hot_concurrency','4');      // 동시성(권장 4~8)
         }
         if (!localStorage.getItem('hot_w_viewsPerDay')) {
           localStorage.setItem('hot_w_viewsPerDay','1.0');  // 가중치: 조회속도
