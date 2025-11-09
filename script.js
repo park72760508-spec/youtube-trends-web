@@ -588,7 +588,57 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
         
         if (stats.activeKeys === 0) {
-            this.showError('사용 가능한 API 키가 없습니다. 키 상태를 확인하거나 새 키를 추가해주세요.');
+            this.showError(`
+                사용 가능한 API 키가 없습니다. 
+                
+                가능한 원인:
+                1. 모든 키의 일일 할당량 소진 (10,000 units/day)
+                2. API 키에서 YouTube Data API v3가 활성화되지 않음
+                3. API 키 권한 설정 문제
+                
+                해결 방법:
+                • Google Cloud Console에서 API 키 상태 확인
+                • YouTube Data API v3 활성화 확인
+                • 새로운 API 키 추가
+                • 내일 자정(UTC) 이후 재시도
+            `);
+            return;
+        }
+        
+        // 추가 검증: 실제 API 키 테스트
+        console.log('🔍 API 키 상태 검증 중...');
+        const testApiKey = this.getApiKey();
+        if (!testApiKey) {
+            this.showError('사용 가능한 API 키를 찾을 수 없습니다.');
+            return;
+        }
+        
+        // 간단한 API 테스트 (1 unit 소모)
+        try {
+            const testUrl = `${this.baseUrl}/channels?part=snippet&forUsername=test&key=${testApiKey}`;
+            const testResponse = await fetch(testUrl);
+            
+            if (testResponse.status === 403) {
+                this.apiKeyManager.handleApiKeyError(testApiKey, new Error('API 키 권한 오류'));
+                this.showError(`
+                    API 키 권한 오류가 발생했습니다.
+                    
+                    확인 사항:
+                    1. Google Cloud Console에서 YouTube Data API v3가 활성화되어 있는지 확인
+                    2. API 키가 올바르게 생성되었는지 확인
+                    3. API 키의 일일 할당량이 남아있는지 확인
+                    
+                    Google Cloud Console: https://console.developers.google.com/
+                `);
+                return;
+            }
+            
+            this.updateQuotaUsage(testApiKey, 1);
+            console.log('✅ API 키 검증 완료');
+            
+        } catch (error) {
+            console.error('❌ API 키 테스트 실패:', error);
+            this.showError('API 키 연결 테스트에 실패했습니다. 네트워크 연결을 확인해주세요.');
             return;
         }
         
@@ -2036,6 +2086,115 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         return null;
     }
+
+
+    // getVideoDetails 함수 추가 (1985줄 이후)
+    async getVideoDetails(videoIds, searchKeyword, apiKey = null) {
+        if (!videoIds || videoIds.length === 0) {
+            return [];
+        }
+        
+        // API 키가 제공되지 않았으면 새로 가져오기
+        if (!apiKey) {
+            apiKey = this.getApiKey();
+            if (!apiKey) {
+                throw new Error('사용 가능한 YouTube API 키가 없습니다.');
+            }
+        }
+        
+        try {
+            // 배치 크기로 나누어 처리 (한 번에 최대 50개)
+            const batchSize = 50;
+            const batches = [];
+            
+            for (let i = 0; i < videoIds.length; i += batchSize) {
+                batches.push(videoIds.slice(i, i + batchSize));
+            }
+            
+            const allVideos = [];
+            
+            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                const batch = batches[batchIndex];
+                
+                // 각 배치마다 API 키 상태 확인
+                const currentApiKey = batchIndex === 0 ? apiKey : this.getApiKey();
+                if (!currentApiKey) {
+                    console.warn('⚠️ 사용 가능한 API 키가 없어 일부 비디오 정보를 가져올 수 없습니다.');
+                    break;
+                }
+                
+                try {
+                    const url = new URL(`${this.baseUrl}/videos`);
+                    url.searchParams.append('part', 'snippet,statistics,contentDetails');
+                    url.searchParams.append('id', batch.join(','));
+                    url.searchParams.append('key', currentApiKey);
+                    
+                    console.log(`📊 비디오 상세정보 요청: ${batch.length}개 (API 키: ${currentApiKey.substr(0, 10)}...)`);
+                    
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        const errorMessage = `비디오 상세정보 요청 실패: ${response.status} ${response.statusText}`;
+                        
+                        // API 키 에러 처리
+                        if (response.status === 403) {
+                            console.error(`🚫 API 키 할당량 초과: ${currentApiKey.substr(0, 10)}...`);
+                            this.apiKeyManager.handleApiKeyError(currentApiKey, new Error(errorMessage));
+                            
+                            // 다른 키로 재시도
+                            const nextApiKey = this.getApiKey();
+                            if (nextApiKey && nextApiKey !== currentApiKey) {
+                                console.log(`🔄 다른 API 키로 재시도: ${nextApiKey.substr(0, 10)}...`);
+                                continue;
+                            }
+                        } else {
+                            this.apiKeyManager.handleApiKeyError(currentApiKey, new Error(errorMessage));
+                        }
+                        
+                        throw new Error(errorMessage);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // 성공적인 API 호출 시 할당량 업데이트
+                    this.updateQuotaUsage(currentApiKey, 1);
+                    
+                    if (data.items) {
+                        const processedVideos = data.items.map(video => 
+                            this.transformVideoDataOptimized(video, searchKeyword)
+                        );
+                        allVideos.push(...processedVideos);
+                        
+                        console.log(`✅ 배치 ${batchIndex + 1}/${batches.length}: ${processedVideos.length}개 비디오 처리 완료`);
+                    }
+                    
+                } catch (batchError) {
+                    console.error(`❌ 배치 ${batchIndex + 1} 처리 실패:`, batchError);
+                    
+                    // 배치 실패 시에도 다음 배치 계속 처리
+                    continue;
+                }
+                
+                // API 호출 간격 (다음 배치가 있을 때만)
+                if (batchIndex < batches.length - 1) {
+                    await this.delay(500);
+                }
+            }
+            
+            console.log(`📋 총 ${allVideos.length}개 비디오 상세정보 가져오기 완료`);
+            return allVideos;
+            
+        } catch (error) {
+            console.error('❌ 비디오 상세정보 가져오기 전체 실패:', error);
+            
+            // 전체 실패 시에도 API 키 에러 처리
+            this.apiKeyManager.handleApiKeyError(apiKey, error);
+            
+            return [];
+        }
+    }
+
+
     
     // 헬퍼 메서드들 추가
     getPublishedAfterDate(timeRange) {
