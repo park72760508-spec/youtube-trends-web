@@ -3102,34 +3102,53 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
-// ===== 누락된 핵심 메서드들 추가 =====
+    // ===== 누락된 핵심 메서드들 추가 =====
+        
+    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
+      const progressBar = document.getElementById('progressBar');
+      const scannedKeywordsEl = document.getElementById('scannedKeywords');
+      const foundVideosEl = document.getElementById('foundVideos');
+      const calculatedScoresEl = document.getElementById('calculatedScores');
+      const currentActionEl = document.getElementById('currentAction');
     
-    // 스캔 진행 상황 업데이트
-    updateScanProgress(processedKeywords, totalKeywords, foundVideos) {
-        const scannedKeywordsElement = document.getElementById('scannedKeywords');
-        const foundVideosElement = document.getElementById('foundVideos');
-        const calculatedScoresElement = document.getElementById('calculatedScores');
-        const progressBar = document.querySelector('.progress-bar');
-        
-        if (scannedKeywordsElement) {
-            scannedKeywordsElement.textContent = `${processedKeywords} / ${totalKeywords}`;
-        }
-        
-        if (foundVideosElement) {
-            foundVideosElement.textContent = foundVideos;
-        }
-        
-        if (calculatedScoresElement) {
-            calculatedScoresElement.textContent = processedKeywords;
-        }
-        
-        if (progressBar) {
-            const progress = (processedKeywords / totalKeywords) * 100;
-            progressBar.style.width = `${progress}%`;
-        }
-        
-        console.log(`📊 진행률: ${processedKeywords}/${totalKeywords} (${((processedKeywords/totalKeywords)*100).toFixed(1)}%)`);
+      // ===== 진행 수치 보정(클램프) =====
+      const safeTotal = Math.max(1, Number(totalKeywords || 0));
+      const safeScanned = Math.max(0, Math.min(Number(scannedKeywords || 0), safeTotal));
+    
+      // percent가 넘어와도, 기본은 "진짜 진행률"을 우선 사용
+      let computedPercent = Math.round((safeScanned / safeTotal) * 100);
+      if (!Number.isFinite(computedPercent)) computedPercent = 0;
+    
+      // 외부에서 강제 percent를 주면 둘 중 더 작은 값 사용 (100% 초과 방지)
+      if (Number.isFinite(percent)) {
+        computedPercent = Math.min(computedPercent, Math.round(Math.max(0, Math.min(percent, 100))));
+      }
+      computedPercent = Math.max(0, Math.min(computedPercent, 100));
+    
+      // ===== UI 반영 =====
+      if (progressBar) {
+        progressBar.style.width = `${computedPercent}%`;
+        progressBar.textContent = `${computedPercent}%`;
+      }
+      if (scannedKeywordsEl) {
+        scannedKeywordsEl.textContent = `${safeScanned} / ${safeTotal}`;
+      }
+      if (foundVideosEl) {
+        const fv = Number(foundVideos || 0);
+        foundVideosEl.textContent = Number.isFinite(fv) ? fv.toLocaleString() : '0';
+      }
+      if (calculatedScoresEl) {
+        // 기존 코드가 foundVideos를 그대로 넣던 문제 수정: '점수 계산된 건수'가 없다면 최소 스캔 진행 수로 표시
+        calculatedScoresEl.textContent = `${safeScanned}`;
+      }
+      if (currentActionEl) {
+        currentActionEl.textContent = action || '';
+      }
+    
+      // 콘솔 로그(보정값 기준)
+      console.log(`📊 진행률: ${safeScanned}/${safeTotal} (${computedPercent}%)  ${action || ''}`);
     }
+
     
     // 중복 제거 메서드
     removeDuplicates(videos) {
