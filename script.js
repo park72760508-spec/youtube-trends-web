@@ -461,16 +461,19 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 할당량 상태 표시
+    // 할당량 상태 표시 (API 키 풀링 시스템)
     displayQuotaStatus() {
-        this.checkQuotaReset();
-        const remaining = this.quotaLimit - this.quotaUsed;
-        const resetDate = new Date(this.quotaResetTime).toLocaleString('ko-KR');
+        this.apiKeyManager.checkQuotaReset();
+        const stats = this.apiKeyManager.getOverallStats();
         
-        console.log(`📊 현재 API 할당량 상태:`);
-        console.log(`   사용량: ${this.quotaUsed}/${this.quotaLimit}`);
-        console.log(`   남은량: ${remaining}`);
-        console.log(`   리셋: ${resetDate}`);
-    }
+        console.log(`📊 API 키 풀 할당량 상태:`);
+        console.log(`   등록된 키: ${stats.totalKeys}개`);
+        console.log(`   활성 키: ${stats.activeKeys}개`);
+        console.log(`   총 할당량: ${stats.totalQuotaAvailable.toLocaleString()}`);
+        console.log(`   사용량: ${stats.totalQuotaUsed.toLocaleString()}`);
+        console.log(`   남은량: ${stats.remainingQuota.toLocaleString()}`);
+        console.log(`   사용률: ${stats.utilizationRate}%`);
+}
     
     // 이벤트 리스너 설정
     setupEventListeners() {
@@ -629,15 +632,21 @@ class OptimizedYoutubeTrendsAnalyzer {
             
             // 할당량 확인
             // 할당량 확인
-            this.checkQuotaReset();
-            const remaining = this.quotaLimit - this.quotaUsed;
+            // API 키 풀 할당량 확인
+            this.apiKeyManager.checkQuotaReset();
+            const stats = this.apiKeyManager.getOverallStats();
             const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
             
-            console.log(`💰 예상 할당량 비용: ${estimatedCost} (현재 잔여: ${remaining})`);
+            console.log(`💰 예상 할당량 비용: ${estimatedCost} (전체 잔여: ${stats.remainingQuota})`);
+            console.log(`🔑 API 키 풀 상태: ${stats.activeKeys}/${stats.totalKeys}개 활성`);
             
-            // 할당량이 완전히 0인 경우에만 데모 모드
-            if (remaining <= 0) {
-                console.warn('🔴 API 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
+            if (stats.totalKeys === 0) {
+                this.showError('등록된 API 키가 없습니다. API 키를 먼저 추가해주세요.');
+                return;
+            }
+            
+            if (stats.remainingQuota <= 0) {
+                console.warn('🔴 모든 API 키의 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
                 this.showDemoModeNotice();
                 this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
                 // 데모 데이터임을 명확히 표시
@@ -647,12 +656,13 @@ class OptimizedYoutubeTrendsAnalyzer {
                 });
             } else {
                 // 할당량이 있으면 실제 데이터만 사용
-                console.log('🟢 실제 데이터로 검색을 진행합니다.');
+                console.log(`🟢 실제 데이터로 검색을 진행합니다. (활용 가능 할당량: ${stats.remainingQuota.toLocaleString()})`);
                 
                 // 할당량이 부족해도 가능한 만큼만 실제 데이터 수집
-                const affordableKeywords = keywords.slice(0, Math.floor(remaining / 100));
+                const affordableKeywords = keywords.slice(0, Math.floor(stats.remainingQuota / 100));
                 if (affordableKeywords.length < keywords.length) {
                     console.warn(`⚠️ 할당량 부족으로 ${affordableKeywords.length}개 키워드만 검색합니다.`);
+                    this.showSuccess(`${affordableKeywords.length}개 키워드로 검색을 진행합니다. (전체 ${keywords.length}개 중)`);
                 }
                 
                 await this.runFullScan(affordableKeywords, format, timeRange, count, viewCountFilter);
@@ -756,8 +766,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                 if (!keywordVideos) {
                     keywordVideos = await this.searchVideosForKeyword(keyword, format, timeRange);
                     this.saveToCache(cacheKey, keywordVideos);
-                    this.updateQuotaUsage(100); // 검색 요청 비용
-                    
+                                       
                     // API 호출 간격
                     await this.delay(800);
                 }
@@ -849,7 +858,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         try {
             const result = await this.searchVideosForKeyword(keyword, format, timeRange);
             this.saveToCache(cacheKey, result);
-            this.updateQuotaUsage(100);
             return result;
         } catch (error) {
             console.error(`키워드 "${keyword}" 검색 실패:`, error);
@@ -1693,64 +1701,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
     
-    // startOptimizedScan 메서드 수정 (키워드 티어 반영)
-    async startOptimizedScan() {
-        if (!this.apiKey) {
-            this.showError('YouTube API 키가 필요합니다. API 키를 먼저 설정해주세요.');
-            return;
-        }
-        
-        if (this.isScanning) {
-            this.showError('이미 스캔이 진행 중입니다.');
-            return;
-        }
-        
-        this.isScanning = true;
-        this.allVideos = [];
-        this.scanResults = [];
-        
-        // UI 상태 변경
-        this.showScanProgress();
-        this.updateScanButton(true);
-        
-        try {
-            // 설정 값들 가져오기 (키워드 티어 추가)
-            const category = document.getElementById('scanCategory')?.value || 'all';
-            const format = document.getElementById('videoFormat')?.value || 'all';
-            const count = parseInt(document.getElementById('resultCount')?.value || '50');
-            const timeRange = document.getElementById('timeRange')?.value || 'week';
-            const keywordTier = document.getElementById('keywordTier')?.value || 'tier1';
-            
-            console.log('🔍 최적화된 스캔 설정:', { category, format, count, timeRange, keywordTier });
-            
-            // 선택된 티어에 따른 키워드 가져오기
-            const keywords = this.getSelectedKeywords(category, keywordTier);
-            
-            // 할당량 확인
-            this.checkQuotaReset();
-            const remaining = this.quotaLimit - this.quotaUsed;
-            const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
-            
-            console.log(`💰 예상 할당량 비용: ${estimatedCost} (현재 잔여: ${remaining})`);
-            
-            if (remaining < estimatedCost) {
-                // 할당량 부족 시 스마트 모드로 전환
-                console.warn('⚠️ 할당량 부족으로 스마트 모드로 전환합니다.');
-                await this.runSmartMode(category, format, count, keywords.slice(0, Math.floor(remaining / 100)));
-            } else {
-                // 정상 스캔 실행
-                await this.runFullScan(keywords, format, timeRange, count);
-            }
-            
-        } catch (error) {
-            console.error('❌ 스캔 중 오류:', error);
-            this.showError(`스캔 중 오류가 발생했습니다: ${error.message}`);
-        } finally {
-            this.isScanning = false;
-            this.updateScanButton(false);
-            this.hideScanProgress();
-        }
-    }
+
 
 
     // 성공 메시지 표시
@@ -1830,7 +1781,6 @@ class OptimizedYoutubeTrendsAnalyzer {
                     // API 호출
                     if (this.canUseQuota(100)) {
                         videos = await this.searchVideosForKeyword(keyword, format, timeRange, viewCountFilter);
-                        this.updateQuotaUsage(100);
                         this.saveToCache(cacheKey, videos);
                     } else {
                         console.warn(`⚠️ 할당량 부족으로 ${keyword}를 모의 데이터로 대체합니다.`);
@@ -1885,7 +1835,6 @@ class OptimizedYoutubeTrendsAnalyzer {
                 if (!videos) {
                     if (this.canUseQuota(100)) {
                         videos = await this.searchVideosForKeyword(keyword, format, 'week');
-                        this.updateQuotaUsage(100);
                         this.saveToCache(cacheKey, videos);
                     } else {
                         break; // 할당량 부족시 중단
