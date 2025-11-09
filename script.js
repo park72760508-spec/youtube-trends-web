@@ -2028,23 +2028,19 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // (C) 재시도 & 지수 백오프 래퍼
     async fetchWithRetry(url, { apiKey, units, method='GET', body=null, maxRetry=5, baseDelay=500 } = {}) {
+      const signal = this.abortController?.signal;
       for (let attempt = 0; attempt <= maxRetry; attempt++) {
         try {
-          const res = await fetch(url, { method, body });
-          if (res.ok) {
-            // 단위 차감
-            this.updateQuotaUsage(apiKey, units);
-            return res;
-          }
-          // 403/429/5xx → 재시도 후보
+          const res = await fetch(url, { method, body, signal });
+          if (res.ok) { this.updateQuotaUsage(apiKey, units); return res; }
           if ([429, 500, 502, 503, 504].includes(res.status)) {
             const delay = baseDelay * Math.pow(2, attempt);
             await this.delay(delay);
             continue;
           }
-          // 그 외 에러는 즉시 처리
-          return res;
+          return res; // 4xx 등은 재시도하지 않음
         } catch (e) {
+          if (e?.name === 'AbortError') throw e; // 취소 시 즉시 종료
           const delay = baseDelay * Math.pow(2, attempt);
           await this.delay(delay);
           continue;
@@ -2052,26 +2048,46 @@ class OptimizedYoutubeTrendsAnalyzer {
       }
       throw new Error('fetchWithRetry: max retry exceeded');
     }
+
     
     // (D) 동시성 제한 헬퍼 (간단 풀)
     async runWithPool(items, limit, worker) {
       const results = [];
       let idx = 0, active = 0;
+      const signal = this.abortController?.signal;
+    
       return new Promise((resolve) => {
         const next = () => {
           while (active < limit && idx < items.length) {
+            if (!this.isScanning || (signal && signal.aborted)) break;
+    
             const i = idx++;
             active++;
-            Promise.resolve(worker(items[i], i))
+    
+            Promise.resolve().then(() => worker(items[i], i))
               .then(r => { results[i] = r; })
-              .catch(_ => { results[i] = null; })
-              .finally(() => { active--; (idx < items.length) ? next() : (active===0 && resolve(results)); });
+              .catch(err => {
+                if (err?.name === 'AbortError') {
+                  results[i] = null; // 취소
+                } else {
+                  results[i] = null; // 실패
+                }
+              })
+              .finally(() => {
+                active--;
+                if (idx < items.length && this.isScanning && !(signal && signal.aborted)) {
+                  next();
+                } else if (active === 0) {
+                  resolve(results);
+                }
+              });
           }
-          if (idx >= items.length && active === 0) resolve(results);
+          if ((idx >= items.length || !this.isScanning || (signal && signal.aborted)) && active === 0) resolve(results);
         };
         next();
       });
     }
+
     
     // (E) 키워드 → 채널 인덱싱 (search.list: type=channel, 100units/호출)
     async discoverSeedChannels(keywords, maxPerKeyword = 200) {
