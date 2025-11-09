@@ -440,10 +440,10 @@ class OptimizedYoutubeTrendsAnalyzer {
 
         // === 운영 기본값(최초 1회) ===
         if (!localStorage.getItem('hot_perChannelMax')) {
-          localStorage.setItem('hot_perChannelMax','50'); // 채널당 최대 수집(기본 1000)
+          localStorage.setItem('hot_perChannelMax','300'); // 기본 300 (UI에서 100~1000 조정)
         }
         if (!localStorage.getItem('hot_concurrency')) {
-          localStorage.setItem('hot_concurrency','4');      // 동시성(권장 4~8)
+          localStorage.setItem('hot_concurrency','4');     // 기본 4 (UI에서 4~8 조정)
         }
         if (!localStorage.getItem('hot_w_viewsPerDay')) {
           localStorage.setItem('hot_w_viewsPerDay','1.0');  // 가중치: 조회속도
@@ -460,6 +460,9 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         // API 키 상태 표시 초기화
         this.apiKeyManager.updateApiKeyStatusDisplay();
+
+        // 슬라이더 UI ↔ localStorage 초기화
+        this.initTuningControls();
         
         // 키워드 선택 UI 초기화 추가
         setTimeout(() => {
@@ -540,6 +543,46 @@ class OptimizedYoutubeTrendsAnalyzer {
         // 다운로드 버튼들
         this.setupDownloadButtons();
     }
+
+        //슬라이더 초기화 함수 추가
+        initTuningControls() {
+          const pcmEl  = document.getElementById('perChannelMax');
+          const pcmVal = document.getElementById('perChannelMaxValue');
+          const ccEl   = document.getElementById('concurrency');
+          const ccVal  = document.getElementById('concurrencyValue');
+        
+          // perChannelMax
+          if (pcmEl && pcmVal) {
+            const stored = Number(localStorage.getItem('hot_perChannelMax') || 300);
+            const clamped = Math.min(1000, Math.max(100, stored));
+            pcmEl.value = clamped;
+            pcmVal.textContent = clamped.toString();
+        
+            pcmEl.addEventListener('input', (e) => {
+              const v = Number(e.target.value);
+              const safe = Math.min(1000, Math.max(100, v));
+              pcmVal.textContent = safe.toString();
+              localStorage.setItem('hot_perChannelMax', String(safe));
+            });
+          }
+        
+          // concurrency
+          if (ccEl && ccVal) {
+            const storedC = Number(localStorage.getItem('hot_concurrency') || 4);
+            const clampedC = Math.min(8, Math.max(4, storedC));
+            ccEl.value = clampedC;
+            ccVal.textContent = clampedC.toString();
+        
+            ccEl.addEventListener('input', (e) => {
+              const v = Number(e.target.value);
+              const safe = Math.min(8, Math.max(4, v));
+              ccVal.textContent = safe.toString();
+              localStorage.setItem('hot_concurrency', String(safe));
+            });
+          }
+        }
+
+
     
     // API 키 풀 관련 이벤트 설정
     setupApiKeyPoolEvents() {
