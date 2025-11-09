@@ -1888,24 +1888,28 @@ class OptimizedYoutubeTrendsAnalyzer {
               : `<a href="${this.generateYouTubeLink(keyId)}" target="_blank" rel="noopener noreferrer" class="action-btn external" title="YouTube에서 보기"><i class="fas fa-external-link-alt"></i></a>`;
     
             // 셀 템플릿
-            row.innerHTML = `
-                <td class="title-cell">
-                    <div class="video-title">${titleLink}</div>
-                    <div class="video-channel">${video.channelTitle || video.channel || ''}</div>
-                    ${video.searchKeyword ? `<div class="video-keyword">키워드: ${video.searchKeyword}</div>` : ''}
-                </td>
-                <td class="viral-score-cell">
-                    <span class="table-viral-score ${video.isSimulated ? 'simulated' : ''}">${Number(video.viralScore || 0)}</span>
-                </td>
-                <td class="stats-cell">${this.formatNumber ? this.formatNumber(Number(video.viewCount || 0)) : (video.viewCount || 0)}</td>
-                <td class="engagement-cell">${Number(video.engagementRate || 0).toFixed(1)}%</td>
-                <td class="growth-cell">${Number(video.growthRate || 0).toFixed(1)}%</td>
-                <td class="format-cell">
-                    <span class="format-badge ${video.format || (video.isShorts ? 'shorts' : 'long')}">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
-                </td>
-                <td class="date-cell">${video.publishDate || video.publishedAt || ''}</td>
-                <td class="action-cell">${actionButton}</td>
-            `;
+            // 셀 템플릿 (순위 컬럼 추가 및 데이터 수정)
+                        row.innerHTML = `
+                            <td class="rank-cell">
+                                <span class="rank-number">#${index + 1}</span>
+                            </td>
+                            <td class="title-cell">
+                                <div class="video-title">${titleLink}</div>
+                                <div class="video-channel">${video.channelTitle || video.channel || ''}</div>
+                                ${video.searchKeyword ? `<div class="video-keyword">키워드: ${video.searchKeyword}</div>` : ''}
+                            </td>
+                            <td class="viral-score-cell">
+                                <span class="table-viral-score ${video.isSimulated ? 'simulated' : ''}">${Number(video.viralScore || 0)}</span>
+                            </td>
+                            <td class="stats-cell">${this.formatNumber ? this.formatNumber(Number(video.viewCount || 0)) : (video.viewCount || 0)}</td>
+                            <td class="engagement-cell">${Number(video.engagementRate || 0).toFixed(1)}%</td>
+                            <td class="growth-cell">${Number(video.growthRate || 0).toFixed(1)}%</td>
+                            <td class="format-cell">
+                                <span class="format-badge ${video.format || (video.isShorts ? 'shorts' : 'long')}">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
+                            </td>
+                            <td class="date-cell">${this.formatPublishDate(video)}</td>
+                            <td class="action-cell">${actionButton}</td>
+                        `;
     
             tableBody.appendChild(row);
         });
@@ -3002,9 +3006,21 @@ class OptimizedYoutubeTrendsAnalyzer {
         uniqueVideos = this.applyViewCountFilter(uniqueVideos, viewCountFilter);
         
         // 바이럴 점수 계산
+        // 바이럴 점수 계산 (강화)
         uniqueVideos.forEach(video => {
+            // 기본값 설정
+            if (!video.viewCount) video.viewCount = 0;
+            if (!video.likeCount) video.likeCount = 0;
+            if (!video.commentCount) video.commentCount = 0;
+            if (!video.subscriberCount) video.subscriberCount = 1000; // 기본 구독자 수
+            if (!video.daysSincePublish) {
+                video.daysSincePublish = video.publishedAt ? 
+                    Math.floor((Date.now() - new Date(video.publishedAt)) / (1000 * 60 * 60 * 24)) : 1;
+            }
+            
             this.calculateViralScore(video);
         });
+        
         
         // 정렬 및 제한
         this.scanResults = uniqueVideos
@@ -3333,9 +3349,11 @@ class OptimizedYoutubeTrendsAnalyzer {
         const engagementScore = Math.min(engagementRate * 5, 25);
         
         // 성장률 점수 (0-25점)
-        const growthRate = (video.viewCount / Math.max(video.subscriberCount, 1000)) * 100;
-        video.growthRate = growthRate;
-        const growthScore = Math.min(growthRate * 0.5, 25);
+        // 성장률 점수 (0-25점) - 계산 로직 개선
+        const subscriberBase = Math.max(video.subscriberCount || 1000, 1000);
+        const growthRate = Math.min((video.viewCount / subscriberBase) * 100, 1000); // 최대 1000% 제한
+        video.growthRate = Math.round(growthRate * 100) / 100; // 소수점 2자리까지
+        const growthScore = Math.min(growthRate * 0.1, 25); // 계수 조정
         
         // 최신성 점수 (0-20점) - 기간별 가중치 적용
         const daysSincePublish = video.daysSincePublish || 1;
@@ -3368,6 +3386,46 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         return video.viralScore;
     }
+
+
+    // 업로드일 포맷팅 함수 추가
+        formatPublishDate(video) {
+            if (!video.publishedAt && !video.publishDate) {
+                return '-';
+            }
+            
+            // publishedAt이 있으면 그것을 우선 사용
+            if (video.publishedAt) {
+                try {
+                    // ISO 문자열에서 중복 제거
+                    let dateString = video.publishedAt;
+                    if (typeof dateString === 'string' && dateString.includes('Z') && dateString.indexOf('Z') !== dateString.lastIndexOf('Z')) {
+                        // Z가 중복되어 있다면 첫 번째 Z까지만 사용
+                        dateString = dateString.substring(0, dateString.indexOf('Z') + 1);
+                    }
+                    
+                    const date = new Date(dateString);
+                    if (!isNaN(date.getTime())) {
+                        return date.toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                    }
+                } catch (error) {
+                    console.warn('날짜 파싱 오류:', error);
+                }
+            }
+            
+            // publishDate가 있으면 그것을 사용
+            if (video.publishDate) {
+                return video.publishDate;
+            }
+            
+            return '-';
+        }
+
+
     
     // 숫자 포맷팅
     formatNumber(num) {
