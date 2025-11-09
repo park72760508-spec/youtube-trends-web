@@ -541,6 +541,12 @@ class OptimizedYoutubeTrendsAnalyzer {
                 this.apiKeyManager.updateApiKeyStatusDisplay();
             });
         }
+        
+        // API 키 검증 버튼 이벤트 추가
+        const validateApiKeysBtn = document.getElementById('validateApiKeysBtn');
+        if (validateApiKeysBtn) {
+            validateApiKeysBtn.addEventListener('click', () => this.validateApiKeys());
+        }
     }
     
     // API 키 추가
