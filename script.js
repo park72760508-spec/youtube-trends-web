@@ -1952,12 +1952,26 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // enrichVideoData 메서드 추가
+    // enrichVideoData 메서드 추가
     async enrichVideoData(item, searchKeyword) {
         try {
+            // API 키 풀링 시스템에서 키 가져오기
+            const apiKey = this.getApiKey();
+            if (!apiKey) {
+                throw new Error('사용 가능한 API 키가 없습니다.');
+            }
+            
             // 비디오 상세 정보 가져오기
-            const detailUrl = `${this.baseUrl}/videos?part=statistics,contentDetails&id=${item.id.videoId}&key=${this.apiKey}`;
+            const detailUrl = `${this.baseUrl}/videos?part=statistics,contentDetails&id=${item.id.videoId}&key=${apiKey}`;
             const detailResponse = await fetch(detailUrl);
+            
+            if (!detailResponse.ok) {
+                this.apiKeyManager.handleApiKeyError(apiKey, new Error(`API 요청 실패: ${detailResponse.status}`));
+                throw new Error(`API 요청 실패: ${detailResponse.status}`);
+            }
+            
             const detailData = await detailResponse.json();
+            this.updateQuotaUsage(apiKey, 1);
             
             if (detailData.items && detailData.items.length > 0) {
                 const videoDetail = detailData.items[0];
@@ -1965,9 +1979,16 @@ class OptimizedYoutubeTrendsAnalyzer {
                 const contentDetails = videoDetail.contentDetails;
                 
                 // 채널 정보 가져오기
-                const channelUrl = `${this.baseUrl}/channels?part=statistics&id=${item.snippet.channelId}&key=${this.apiKey}`;
+                const channelUrl = `${this.baseUrl}/channels?part=statistics&id=${item.snippet.channelId}&key=${apiKey}`;
                 const channelResponse = await fetch(channelUrl);
+                
+                if (!channelResponse.ok) {
+                    this.apiKeyManager.handleApiKeyError(apiKey, new Error(`채널 API 요청 실패: ${channelResponse.status}`));
+                    throw new Error(`채널 API 요청 실패: ${channelResponse.status}`);
+                }
+                
                 const channelData = await channelResponse.json();
+                this.updateQuotaUsage(apiKey, 1);
                 
                 let subscriberCount = 0;
                 if (channelData.items && channelData.items.length > 0) {
