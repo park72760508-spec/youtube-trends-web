@@ -439,9 +439,10 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.displayQuotaStatus();
 
         // === 운영 기본값(최초 1회) ===
-        if (!localStorage.getItem('hot_perChannelMax')) {
-          localStorage.setItem('hot_perChannelMax','300'); // 기본 300 (UI에서 100~1000 조정)
+        if (!localStorage.getItem('hot_maxChannels')) {
+          localStorage.setItem('hot_maxChannels','100'); // 기본 100, UI에서 10~1000 조정
         }
+        
         if (!localStorage.getItem('hot_concurrency')) {
           localStorage.setItem('hot_concurrency','4');     // 기본 4 (UI에서 4~8 조정)
         }
@@ -565,7 +566,7 @@ class OptimizedYoutubeTrendsAnalyzer {
               localStorage.setItem('hot_perChannelMax', String(safe));
             });
           }
-        
+            
           // concurrency
           if (ccEl && ccVal) {
             const storedC = Number(localStorage.getItem('hot_concurrency') || 4);
@@ -580,6 +581,27 @@ class OptimizedYoutubeTrendsAnalyzer {
               localStorage.setItem('hot_concurrency', String(safe));
             });
           }
+
+            // maxChannels (검출 채널 상한)
+            {
+              const mcEl  = document.getElementById('maxChannels');
+              const mcVal = document.getElementById('maxChannelsValue');
+              if (mcEl && mcVal) {
+                const stored = Number(localStorage.getItem('hot_maxChannels') || 100);
+                const clamped = Math.min(1000, Math.max(10, stored));
+                mcEl.value = clamped;
+                mcVal.textContent = clamped.toString();
+            
+                mcEl.addEventListener('input', (e) => {
+                  const v = Number(e.target.value);
+                  const safe = Math.min(1000, Math.max(10, v));
+                  mcVal.textContent = safe.toString();
+                  localStorage.setItem('hot_maxChannels', String(safe));
+                });
+              }
+            }
+
+          
         }
 
 
@@ -2308,7 +2330,14 @@ class OptimizedYoutubeTrendsAnalyzer {
     /* === [/NEW] ============================================================= */
 
 
-    
+    // 전역 최대 채널 수 (샘플 실행/운영 상한)
+    getMaxChannels() {
+      const v = Number(localStorage.getItem('hot_maxChannels'));
+      if (Number.isFinite(v) && v > 0) return Math.min(5000, Math.floor(v));
+      return 100; // 기본 100 (UI 슬라이더로 10~1000 조절)
+    }
+
+
 
     /* === [NEW] 채널-우회(업로드 재생목록) 파이프라인 ====================== */
     
