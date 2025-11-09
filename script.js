@@ -427,11 +427,15 @@ class OptimizedYoutubeTrendsAnalyzer {
 
     
     // 초기화
+    // 초기화
     init() {
-        console.log('🎯 API 할당량 최적화 시스템 시작');
+        console.log('🎯 API 키 풀링 시스템 시작');
         this.setupEventListeners();
         this.showOptimizedWelcomeMessage();
         this.displayQuotaStatus();
+        
+        // API 키 상태 표시 초기화
+        this.apiKeyManager.updateApiKeyStatusDisplay();
         
         // 키워드 선택 UI 초기화 추가
         setTimeout(() => {
