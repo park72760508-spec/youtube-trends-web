@@ -2,93 +2,6 @@
  * 시니어 YouTube 트렌드 분석기 Pro - API 할당량 최적화 버전
  * 할당량 초과 문제 해결을 위한 스마트 검색 시스템
  */
-// ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 시작 부분 ★★★★★
-class OptimizedYoutubeTrendsAnalyzer {
-    constructor() {
-        // API 키 풀링 시스템 초기화
-        this.apiKeyManager = new MultiApiKeyManager();
-        this.baseUrl = 'https://www.googleapis.com/youtube/v3';
-        this.allVideos = [];
-        this.scanResults = [];
-        this.isScanning = false;
-        this.charts = {};
-        
-        // 캐시 시스템
-        this.cache = new Map();
-        this.cacheExpiry = 2 * 60 * 60 * 1000; // 2시간
-        
-        // 최적화된 키워드 (우선순위별)
-        this.optimizedKeywords = {
-            tier1: [
-                '시니어', '노인', '중년', '50대', '60대', '70대', '실버'
-            ],
-            tier2: [
-                '라이프', '노후 생활', '건강', '명언',
-                '음식', '혜택', '복지', '주택', '재테크'
-            ],
-            tier3: [
-                '시니어 운동', '노년 취미', '실버 요리', '중년 건강',
-                '시니어 테크', '노인 여행', '실버 댄스', '중년 요리'
-            ]
-        };
-        
-        // 모의 데이터 생성기 (할당량 절약용)
-        this.mockDataGenerator = new MockDataGenerator();
-        
-        this.init();
-    }
-    
-    // 할당량 사용량 업데이트 (API 키별)
-    updateQuotaUsage(apiKey, units) {
-        if (apiKey) {
-            this.apiKeyManager.updateQuotaUsage(apiKey, units);
-        }
-    }
-    
-    // 할당량 확인 (전체 풀 기준)
-    canUseQuota(requiredUnits = 100) {
-        this.apiKeyManager.checkQuotaReset();
-        const stats = this.apiKeyManager.getOverallStats();
-        return stats.remainingQuota >= requiredUnits;
-    }
-    
-    // 할당량 상태 표시
-    displayQuotaStatus() {
-        this.apiKeyManager.checkQuotaReset();
-        const stats = this.apiKeyManager.getOverallStats();
-        
-        console.log(`📊 API 키 풀 할당량 상태:`);
-        console.log(`   등록된 키: ${stats.totalKeys}개`);
-        console.log(`   활성 키: ${stats.activeKeys}개`);
-        console.log(`   총 할당량: ${stats.totalQuotaAvailable.toLocaleString()}`);
-        console.log(`   사용량: ${stats.totalQuotaUsed.toLocaleString()}`);
-        console.log(`   남은량: ${stats.remainingQuota.toLocaleString()}`);
-        console.log(`   사용률: ${stats.utilizationRate}%`);
-    }
-    
-    // 캐시 키 생성
-    getCacheKey(keyword, format, timeRange) {
-        return `${keyword}_${format}_${timeRange}`;
-    }
-    
-    // 캐시에서 데이터 가져오기
-    getFromCache(cacheKey) {
-        const cached = this.cache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp) < this.cacheExpiry) {
-            console.log(`💾 캐시에서 데이터 로드: ${cacheKey}`);
-            return cached.data;
-        }
-        return null;
-    }
-    
-    // 캐시에 데이터 저장
-    saveToCache(cacheKey, data) {
-        this.cache.set(cacheKey, {
-            data: data,
-            timestamp: Date.now()
-        });
-    }
-
 
     // ★★★★★ MultiApiKeyManager 클래스 시작 ★★★★★
     class MultiApiKeyManager {
@@ -423,6 +336,97 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
     // ★★★★★ MultiApiKeyManager 클래스 끝 ★★★★★
+
+
+
+
+
+// ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 시작 부분 ★★★★★
+class OptimizedYoutubeTrendsAnalyzer {
+    constructor() {
+        // API 키 풀링 시스템 초기화
+        this.apiKeyManager = new MultiApiKeyManager();
+        this.baseUrl = 'https://www.googleapis.com/youtube/v3';
+        this.allVideos = [];
+        this.scanResults = [];
+        this.isScanning = false;
+        this.charts = {};
+        
+        // 캐시 시스템
+        this.cache = new Map();
+        this.cacheExpiry = 2 * 60 * 60 * 1000; // 2시간
+        
+        // 최적화된 키워드 (우선순위별)
+        this.optimizedKeywords = {
+            tier1: [
+                '시니어', '노인', '중년', '50대', '60대', '70대', '실버'
+            ],
+            tier2: [
+                '라이프', '노후 생활', '건강', '명언',
+                '음식', '혜택', '복지', '주택', '재테크'
+            ],
+            tier3: [
+                '시니어 운동', '노년 취미', '실버 요리', '중년 건강',
+                '시니어 테크', '노인 여행', '실버 댄스', '중년 요리'
+            ]
+        };
+        
+        // 모의 데이터 생성기 (할당량 절약용)
+        this.mockDataGenerator = new MockDataGenerator();
+        
+        this.init();
+    }
+    
+    // 할당량 사용량 업데이트 (API 키별)
+    updateQuotaUsage(apiKey, units) {
+        if (apiKey) {
+            this.apiKeyManager.updateQuotaUsage(apiKey, units);
+        }
+    }
+    
+    // 할당량 확인 (전체 풀 기준)
+    canUseQuota(requiredUnits = 100) {
+        this.apiKeyManager.checkQuotaReset();
+        const stats = this.apiKeyManager.getOverallStats();
+        return stats.remainingQuota >= requiredUnits;
+    }
+    
+    // 할당량 상태 표시
+    displayQuotaStatus() {
+        this.apiKeyManager.checkQuotaReset();
+        const stats = this.apiKeyManager.getOverallStats();
+        
+        console.log(`📊 API 키 풀 할당량 상태:`);
+        console.log(`   등록된 키: ${stats.totalKeys}개`);
+        console.log(`   활성 키: ${stats.activeKeys}개`);
+        console.log(`   총 할당량: ${stats.totalQuotaAvailable.toLocaleString()}`);
+        console.log(`   사용량: ${stats.totalQuotaUsed.toLocaleString()}`);
+        console.log(`   남은량: ${stats.remainingQuota.toLocaleString()}`);
+        console.log(`   사용률: ${stats.utilizationRate}%`);
+    }
+    
+    // 캐시 키 생성
+    getCacheKey(keyword, format, timeRange) {
+        return `${keyword}_${format}_${timeRange}`;
+    }
+    
+    // 캐시에서 데이터 가져오기
+    getFromCache(cacheKey) {
+        const cached = this.cache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp) < this.cacheExpiry) {
+            console.log(`💾 캐시에서 데이터 로드: ${cacheKey}`);
+            return cached.data;
+        }
+        return null;
+    }
+    
+    // 캐시에 데이터 저장
+    saveToCache(cacheKey, data) {
+        this.cache.set(cacheKey, {
+            data: data,
+            timestamp: Date.now()
+        });
+    }
 
 
     
