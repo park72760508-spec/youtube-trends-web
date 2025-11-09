@@ -271,26 +271,34 @@ class OptimizedYoutubeTrendsAnalyzer {
             });
             
             // 할당량 확인
+            // 할당량 확인
             this.checkQuotaReset();
             const remaining = this.quotaLimit - this.quotaUsed;
             const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
             
             console.log(`💰 예상 할당량 비용: ${estimatedCost} (현재 잔여: ${remaining})`);
             
-            if (remaining < estimatedCost) {
-                // 할당량 부족 시 스마트 모드로 전환
-                console.warn('⚠️ 할당량 부족으로 스마트 모드로 전환합니다.');
-                const affordableKeywords = keywords.slice(0, Math.floor(remaining / 100));
-                if (affordableKeywords.length > 0) {
-                    await this.runSmartMode(category, format, count, affordableKeywords);
-                } else {
-                    // 할당량이 전혀 없으면 모의 데이터로만 실행
-                    console.warn('⚠️ 할당량 부족으로 모의 데이터로만 실행합니다.');
-                    this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
-                }
+            // 할당량이 완전히 0인 경우에만 데모 모드
+            if (remaining <= 0) {
+                console.warn('🔴 API 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
+                this.showDemoModeNotice();
+                this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
+                // 데모 데이터임을 명확히 표시
+                this.allVideos.forEach(video => {
+                    video.isSimulated = true;
+                    video.title = "🎯 [데모] " + video.title;
+                });
             } else {
-                // 정상 스캔 실행
-                await this.runFullScan(keywords, format, timeRange, count, viewCountFilter);
+                // 할당량이 있으면 실제 데이터만 사용
+                console.log('🟢 실제 데이터로 검색을 진행합니다.');
+                
+                // 할당량이 부족해도 가능한 만큼만 실제 데이터 수집
+                const affordableKeywords = keywords.slice(0, Math.floor(remaining / 100));
+                if (affordableKeywords.length < keywords.length) {
+                    console.warn(`⚠️ 할당량 부족으로 ${affordableKeywords.length}개 키워드만 검색합니다.`);
+                }
+                
+                await this.runFullScan(affordableKeywords, format, timeRange, count, viewCountFilter);
             }
             
             // 결과 후처리 및 표시
@@ -308,27 +316,31 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
     
-    // 스마트 모드 실행 (할당량 최소 사용)
-    async executeSmartMode(category, format, timeRange, count) {
-        console.log('🧠 스마트 모드 실행: 핵심 키워드 + 모의 데이터');
+    // 데모 모드 안내 표시
+    showDemoModeNotice() {
+        const notice = document.createElement('div');
+        notice.id = 'demoModeNotice';
+        notice.className = 'demo-mode-notice';
+        notice.innerHTML = `
+            <div class="demo-notice-content">
+                <i class="fas fa-info-circle"></i>
+                <h3>🎯 데모 모드</h3>
+                <p>API 할당량이 소진되어 데모 데이터로 실행됩니다.</p>
+                <p>실제 데이터 검색을 원하시면 API 키를 새로 설정하거나 내일 다시 시도해 주세요.</p>
+                <button onclick="this.parentElement.parentElement.remove()" class="demo-close-btn">
+                    <i class="fas fa-times"></i> 확인
+                </button>
+            </div>
+        `;
         
-        // 1단계: 핵심 키워드만 사용
-        const coreKeywords = this.optimizedKeywords.tier1;
-        const maxKeywords = Math.min(coreKeywords.length, Math.floor((this.quotaLimit - this.quotaUsed) / 100));
-        const selectedKeywords = coreKeywords.slice(0, maxKeywords);
+        document.body.appendChild(notice);
         
-        this.updateProgress(0, selectedKeywords.length + 50, 0, 0, '스마트 모드 시작...');
-        
-        // 실제 API 호출 (제한적)
-        const realVideos = await this.performLimitedRealScan(selectedKeywords, format, timeRange);
-        
-        // 모의 데이터로 보완
-        const mockVideos = await this.generateSmartMockData(category, count - realVideos.length, realVideos);
-        
-        // 결과 병합
-        this.allVideos = [...realVideos, ...mockVideos];
-        
-        this.updateProgress(100, selectedKeywords.length + 50, selectedKeywords.length + 50, this.allVideos.length, '스마트 모드 완료!');
+        // 3초 후 자동 제거
+        setTimeout(() => {
+            if (document.getElementById('demoModeNotice')) {
+                notice.remove();
+            }
+        }, 5000);
     }
     
     // 하이브리드 모드 실행 (실제 + 모의 데이터)
@@ -429,7 +441,7 @@ class OptimizedYoutubeTrendsAnalyzer {
             
             const batch = keywords.slice(i, i + batchSize);
             const batchPromises = batch.map(keyword => 
-                this.searchWithFallback(keyword, format, timeRange)
+                this.searchWithRealDataOnly(keyword, format, timeRange)
             );
             
             try {
@@ -461,7 +473,8 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 폴백이 있는 검색
-    async searchWithFallback(keyword, format, timeRange) {
+    // 실제 데이터 전용 검색 (폴백 제거)
+    async searchWithRealDataOnly(keyword, format, timeRange) {
         // 캐시 확인
         const cacheKey = this.getCacheKey(keyword, format, timeRange);
         let cachedResult = this.getFromCache(cacheKey);
@@ -482,10 +495,10 @@ class OptimizedYoutubeTrendsAnalyzer {
             this.updateQuotaUsage(100);
             return result;
         } catch (error) {
-            console.warn(`키워드 "${keyword}" 검색 실패, 모의 데이터로 대체:`, error);
+            console.error(`키워드 "${keyword}" 검색 실패:`, error);
             
-            // API 오류 시 해당 키워드에 대한 모의 데이터 생성
-            return this.mockDataGenerator.generateForKeyword(keyword, 5);
+            // 모의 데이터 대신 빈 배열 반환 (실제 데이터만 사용 정책)
+            return [];
         }
     }
     
