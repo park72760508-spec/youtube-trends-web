@@ -5,17 +5,13 @@
 // ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 시작 부분 ★★★★★
 class OptimizedYoutubeTrendsAnalyzer {
     constructor() {
-        this.apiKey = this.getApiKey();
+        // API 키 풀링 시스템 초기화
+        this.apiKeyManager = new MultiApiKeyManager();
         this.baseUrl = 'https://www.googleapis.com/youtube/v3';
         this.allVideos = [];
         this.scanResults = [];
         this.isScanning = false;
         this.charts = {};
-        
-        // API 할당량 관리
-        this.quotaUsed = parseInt(localStorage.getItem('youtube_quota_used') || '0');
-        this.quotaLimit = 10000; // 일일 할당량
-        this.quotaResetTime = this.getQuotaResetTime();
         
         // 캐시 시스템
         this.cache = new Map();
@@ -23,17 +19,13 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         // 최적화된 키워드 (우선순위별)
         this.optimizedKeywords = {
-            // 1단계: 핵심 키워드 (가장 중요)
             tier1: [
                 '시니어', '노인', '중년', '50대', '60대', '70대', '실버'
-                
             ],
-            // 2단계: 확장 키워드 (중요)
             tier2: [
                 '라이프', '노후 생활', '건강', '명언',
                 '음식', '혜택', '복지', '주택', '재테크'
             ],
-            // 3단계: 세부 키워드 (선택적)
             tier3: [
                 '시니어 운동', '노년 취미', '실버 요리', '중년 건강',
                 '시니어 테크', '노인 여행', '실버 댄스', '중년 요리'
@@ -46,44 +38,32 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.init();
     }
     
-    // 할당량 리셋 시간 계산 (매일 자정 UTC)
-    getQuotaResetTime() {
-        const now = new Date();
-        const tomorrow = new Date(now);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-        tomorrow.setUTCHours(0, 0, 0, 0);
-        return tomorrow.getTime();
-    }
-    
-    // 할당량 확인 및 리셋
-    checkQuotaReset() {
-        const now = Date.now();
-        if (now >= this.quotaResetTime) {
-            this.quotaUsed = 0;
-            localStorage.setItem('youtube_quota_used', '0');
-            this.quotaResetTime = this.getQuotaResetTime();
-            console.log('🔄 일일 할당량이 리셋되었습니다.');
+    // 할당량 사용량 업데이트 (API 키별)
+    updateQuotaUsage(apiKey, units) {
+        if (apiKey) {
+            this.apiKeyManager.updateQuotaUsage(apiKey, units);
         }
     }
     
-    // 할당량 사용량 업데이트
-    updateQuotaUsage(units) {
-        this.quotaUsed += units;
-        localStorage.setItem('youtube_quota_used', this.quotaUsed.toString());
-        
-        const remaining = this.quotaLimit - this.quotaUsed;
-        console.log(`📊 API 할당량 사용: ${this.quotaUsed}/${this.quotaLimit} (남은 할당량: ${remaining})`);
-        
-        // 할당량 경고
-        if (remaining < 1000) {
-            console.warn('⚠️ API 할당량이 부족합니다. 스마트 모드로 전환합니다.');
-        }
-    }
-    
-    // 할당량 확인
+    // 할당량 확인 (전체 풀 기준)
     canUseQuota(requiredUnits = 100) {
-        this.checkQuotaReset();
-        return (this.quotaUsed + requiredUnits) <= this.quotaLimit;
+        this.apiKeyManager.checkQuotaReset();
+        const stats = this.apiKeyManager.getOverallStats();
+        return stats.remainingQuota >= requiredUnits;
+    }
+    
+    // 할당량 상태 표시
+    displayQuotaStatus() {
+        this.apiKeyManager.checkQuotaReset();
+        const stats = this.apiKeyManager.getOverallStats();
+        
+        console.log(`📊 API 키 풀 할당량 상태:`);
+        console.log(`   등록된 키: ${stats.totalKeys}개`);
+        console.log(`   활성 키: ${stats.activeKeys}개`);
+        console.log(`   총 할당량: ${stats.totalQuotaAvailable.toLocaleString()}`);
+        console.log(`   사용량: ${stats.totalQuotaUsed.toLocaleString()}`);
+        console.log(`   남은량: ${stats.remainingQuota.toLocaleString()}`);
+        console.log(`   사용률: ${stats.utilizationRate}%`);
     }
     
     // 캐시 키 생성
@@ -108,6 +88,343 @@ class OptimizedYoutubeTrendsAnalyzer {
             timestamp: Date.now()
         });
     }
+
+
+    // ★★★★★ MultiApiKeyManager 클래스 시작 ★★★★★
+    class MultiApiKeyManager {
+        constructor() {
+            this.apiKeys = this.loadApiKeys();
+            this.currentKeyIndex = 0;
+            this.keyQuotaUsage = this.loadKeyQuotaUsage();
+            this.quotaLimit = 10000; // 키당 일일 할당량
+            this.quotaResetTime = this.getQuotaResetTime();
+            
+            // 키별 상태 추적
+            this.keyStatus = new Map(); // 키별 상태 (active, limited, error)
+            this.keyErrors = new Map(); // 키별 에러 횟수
+            
+            this.initializeKeyStatus();
+        }
+        
+        // API 키 목록 로드
+        loadApiKeys() {
+            const stored = localStorage.getItem('youtube_api_keys');
+            if (stored) {
+                try {
+                    return JSON.parse(stored);
+                } catch (e) {
+                    console.error('API 키 로드 오류:', e);
+                }
+            }
+            return [];
+        }
+        
+        // 키별 할당량 사용량 로드
+        loadKeyQuotaUsage() {
+            const stored = localStorage.getItem('youtube_key_quota_usage');
+            if (stored) {
+                try {
+                    return new Map(JSON.parse(stored));
+                } catch (e) {
+                    console.error('할당량 데이터 로드 오류:', e);
+                }
+            }
+            return new Map();
+        }
+        
+        // 키별 상태 초기화
+        initializeKeyStatus() {
+            this.apiKeys.forEach(key => {
+                if (!this.keyStatus.has(key)) {
+                    this.keyStatus.set(key, 'active');
+                }
+                if (!this.keyErrors.has(key)) {
+                    this.keyErrors.set(key, 0);
+                }
+            });
+        }
+        
+        // 할당량 리셋 시간 계산
+        getQuotaResetTime() {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+            tomorrow.setUTCHours(0, 0, 0, 0);
+            return tomorrow.getTime();
+        }
+        
+        // 할당량 리셋 확인
+        checkQuotaReset() {
+            const now = Date.now();
+            if (now >= this.quotaResetTime) {
+                // 모든 키의 할당량 리셋
+                this.keyQuotaUsage.clear();
+                this.keyStatus.forEach((value, key) => {
+                    if (value === 'limited') {
+                        this.keyStatus.set(key, 'active');
+                    }
+                });
+                this.keyErrors.clear();
+                
+                this.quotaResetTime = this.getQuotaResetTime();
+                this.saveKeyQuotaUsage();
+                
+                console.log('🔄 모든 API 키의 일일 할당량이 리셋되었습니다.');
+                this.updateApiKeyStatusDisplay();
+            }
+        }
+        
+        // API 키 추가
+        addApiKey(apiKey) {
+            if (!apiKey || apiKey.trim() === '') {
+                throw new Error('유효한 API 키를 입력해주세요.');
+            }
+            
+            const trimmedKey = apiKey.trim();
+            
+            if (this.apiKeys.includes(trimmedKey)) {
+                throw new Error('이미 등록된 API 키입니다.');
+            }
+            
+            this.apiKeys.push(trimmedKey);
+            this.keyStatus.set(trimmedKey, 'active');
+            this.keyErrors.set(trimmedKey, 0);
+            this.keyQuotaUsage.set(trimmedKey, 0);
+            
+            this.saveApiKeys();
+            this.saveKeyQuotaUsage();
+            
+            console.log(`✅ API 키 추가됨: ${trimmedKey.substr(0, 10)}...`);
+            return true;
+        }
+        
+        // API 키 제거
+        removeApiKey(index) {
+            if (index < 0 || index >= this.apiKeys.length) {
+                throw new Error('유효하지 않은 키 인덱스입니다.');
+            }
+            
+            const removedKey = this.apiKeys[index];
+            this.apiKeys.splice(index, 1);
+            this.keyStatus.delete(removedKey);
+            this.keyErrors.delete(removedKey);
+            this.keyQuotaUsage.delete(removedKey);
+            
+            // 현재 인덱스 조정
+            if (this.currentKeyIndex >= this.apiKeys.length) {
+                this.currentKeyIndex = 0;
+            }
+            
+            this.saveApiKeys();
+            this.saveKeyQuotaUsage();
+            
+            console.log(`🗑️ API 키 제거됨: ${removedKey.substr(0, 10)}...`);
+            return true;
+        }
+        
+        // 사용 가능한 API 키 반환
+        getAvailableApiKey() {
+            this.checkQuotaReset();
+            
+            if (this.apiKeys.length === 0) {
+                console.error('❌ 등록된 API 키가 없습니다.');
+                return null;
+            }
+            
+            // 사용 가능한 키 찾기 (라운드 로빈 방식)
+            let attempts = 0;
+            const maxAttempts = this.apiKeys.length;
+            
+            while (attempts < maxAttempts) {
+                const currentKey = this.apiKeys[this.currentKeyIndex];
+                const keyUsage = this.keyQuotaUsage.get(currentKey) || 0;
+                const keyStatus = this.keyStatus.get(currentKey);
+                
+                // 키가 사용 가능한지 확인
+                if (keyStatus === 'active' && keyUsage < (this.quotaLimit - 500)) {
+                    console.log(`🔑 사용 중인 API 키: ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit})`);
+                    return currentKey;
+                }
+                
+                // 다음 키로 이동
+                this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+                attempts++;
+            }
+            
+            // 모든 키가 한계치에 도달한 경우, 가장 적게 사용된 키 반환
+            let bestKey = null;
+            let lowestUsage = this.quotaLimit;
+            
+            for (const [key, usage] of this.keyQuotaUsage) {
+                const status = this.keyStatus.get(key);
+                if (status !== 'error' && usage < lowestUsage) {
+                    bestKey = key;
+                    lowestUsage = usage;
+                }
+            }
+            
+            if (bestKey) {
+                console.log(`⚠️ 최선의 키 선택: ${bestKey.substr(0, 10)}... (${lowestUsage}/${this.quotaLimit})`);
+                return bestKey;
+            }
+            
+            console.error('❌ 사용 가능한 API 키가 없습니다. 모든 키의 할당량이 소진되었습니다.');
+            return null;
+        }
+        
+        // 할당량 사용량 업데이트
+        updateQuotaUsage(apiKey, units) {
+            if (!apiKey) return;
+            
+            const currentUsage = this.keyQuotaUsage.get(apiKey) || 0;
+            const newUsage = currentUsage + units;
+            
+            this.keyQuotaUsage.set(apiKey, newUsage);
+            this.saveKeyQuotaUsage();
+            
+            // 할당량 한계 확인
+            if (newUsage >= (this.quotaLimit - 1000)) {
+                this.keyStatus.set(apiKey, 'limited');
+                console.warn(`⚠️ API 키 할당량 거의 소진: ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit})`);
+            }
+            
+            console.log(`📊 할당량 업데이트: ${apiKey.substr(0, 10)}... +${units} (총: ${newUsage}/${this.quotaLimit})`);
+            this.updateApiKeyStatusDisplay();
+        }
+        
+        // API 키 에러 처리
+        handleApiKeyError(apiKey, error) {
+            if (!apiKey) return;
+            
+            const errorCount = (this.keyErrors.get(apiKey) || 0) + 1;
+            this.keyErrors.set(apiKey, errorCount);
+            
+            // 403 오류 (할당량 초과) 처리
+            if (error && error.message && error.message.includes('403')) {
+                this.keyStatus.set(apiKey, 'limited');
+                console.error(`🚫 API 키 할당량 초과: ${apiKey.substr(0, 10)}...`);
+            } 
+            // 연속 에러 시 일시 비활성화
+            else if (errorCount >= 3) {
+                this.keyStatus.set(apiKey, 'error');
+                console.error(`❌ API 키 연속 에러로 비활성화: ${apiKey.substr(0, 10)}...`);
+            }
+            
+            this.updateApiKeyStatusDisplay();
+        }
+        
+        // 키 상태 복구
+        resetKeyStatus(apiKey) {
+            this.keyStatus.set(apiKey, 'active');
+            this.keyErrors.set(apiKey, 0);
+            console.log(`🔄 API 키 상태 복구: ${apiKey.substr(0, 10)}...`);
+            this.updateApiKeyStatusDisplay();
+        }
+        
+        // 전체 통계 정보
+        getOverallStats() {
+            const totalKeys = this.apiKeys.length;
+            const activeKeys = Array.from(this.keyStatus.values()).filter(status => status === 'active').length;
+            const totalQuotaUsed = Array.from(this.keyQuotaUsage.values()).reduce((sum, usage) => sum + usage, 0);
+            const totalQuotaAvailable = this.apiKeys.length * this.quotaLimit;
+            const remainingQuota = totalQuotaAvailable - totalQuotaUsed;
+            
+            return {
+                totalKeys,
+                activeKeys,
+                totalQuotaUsed,
+                totalQuotaAvailable,
+                remainingQuota,
+                utilizationRate: ((totalQuotaUsed / totalQuotaAvailable) * 100).toFixed(1)
+            };
+        }
+        
+        // 데이터 저장
+        saveApiKeys() {
+            localStorage.setItem('youtube_api_keys', JSON.stringify(this.apiKeys));
+        }
+        
+        saveKeyQuotaUsage() {
+            const usageArray = Array.from(this.keyQuotaUsage.entries());
+            localStorage.setItem('youtube_key_quota_usage', JSON.stringify(usageArray));
+        }
+        
+        // UI 업데이트
+        updateApiKeyStatusDisplay() {
+            const container = document.getElementById('apiKeyStatusContainer');
+            if (!container) return;
+            
+            const stats = this.getOverallStats();
+            
+            container.innerHTML = `
+                <div class="api-key-overview">
+                    <h4>🔑 API 키 풀 상태</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">등록된 키:</span>
+                            <span class="stat-value">${stats.totalKeys}개</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">활성 키:</span>
+                            <span class="stat-value">${stats.activeKeys}개</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">총 할당량:</span>
+                            <span class="stat-value">${stats.totalQuotaAvailable.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">남은 할당량:</span>
+                            <span class="stat-value">${stats.remainingQuota.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">사용률:</span>
+                            <span class="stat-value">${stats.utilizationRate}%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="api-key-list">
+                    ${this.apiKeys.map((key, index) => {
+                        const usage = this.keyQuotaUsage.get(key) || 0;
+                        const status = this.keyStatus.get(key) || 'active';
+                        const errors = this.keyErrors.get(key) || 0;
+                        const usagePercent = ((usage / this.quotaLimit) * 100).toFixed(1);
+                        
+                        return `
+                            <div class="api-key-item ${status}">
+                                <div class="key-info">
+                                    <span class="key-display">${key.substr(0, 10)}...${key.substr(-4)}</span>
+                                    <span class="key-status ${status}">${this.getStatusText(status)}</span>
+                                </div>
+                                <div class="key-usage">
+                                    <div class="usage-bar">
+                                        <div class="usage-fill" style="width: ${usagePercent}%"></div>
+                                    </div>
+                                    <span class="usage-text">${usage.toLocaleString()}/${this.quotaLimit.toLocaleString()}</span>
+                                </div>
+                                <div class="key-actions">
+                                    ${status === 'error' ? `<button onclick="ytAnalyzer.apiKeyManager.resetKeyStatus('${key}')" class="btn-reset">복구</button>` : ''}
+                                    <button onclick="ytAnalyzer.apiKeyManager.removeApiKey(${index})" class="btn-remove">제거</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+        
+        getStatusText(status) {
+            switch (status) {
+                case 'active': return '🟢 활성';
+                case 'limited': return '🟡 제한';
+                case 'error': return '🔴 에러';
+                default: return '❓ 알 수 없음';
+            }
+        }
+    }
+    // ★★★★★ MultiApiKeyManager 클래스 끝 ★★★★★
+
+
     
     // 초기화
     init() {
@@ -123,8 +440,9 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // API 키 확인
+    // API 키 확인 (풀링 시스템 사용)
     getApiKey() {
-        return localStorage.getItem('youtube_api_key') || null;
+        return this.apiKeyManager.getAvailableApiKey();
     }
     
     // 최적화된 웰컴 메시지
@@ -173,21 +491,9 @@ class OptimizedYoutubeTrendsAnalyzer {
             stopScanBtn.addEventListener('click', () => this.stopScan());
         }
         
-        // API 키 관련
-        const loadApiKeyBtn = document.getElementById('loadApiKeyBtn');
-        const apiKeyFile = document.getElementById('apiKeyFile');
-        const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
-        
-        if (loadApiKeyBtn && apiKeyFile) {
-            loadApiKeyBtn.addEventListener('click', () => apiKeyFile.click());
-            apiKeyFile.addEventListener('change', (e) => this.loadApiKeyFromFile(e));
-        }
-        
-        if (clearApiKeyBtn) {
-            clearApiKeyBtn.addEventListener('click', () => this.clearApiKey());
-        }
-
-
+        // API 키 풀링 관련 이벤트
+        this.setupApiKeyPoolEvents();
+    
         // 키워드 선택 관련 이벤트 리스너 추가
         this.setupKeywordSelectionEvents();
         
@@ -202,6 +508,49 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         // 다운로드 버튼들
         this.setupDownloadButtons();
+    }
+    
+    // API 키 풀 관련 이벤트 설정
+    setupApiKeyPoolEvents() {
+        const addApiKeyBtn = document.getElementById('addApiKeyBtn');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const refreshStatusBtn = document.getElementById('refreshApiKeyStatusBtn');
+        
+        if (addApiKeyBtn && apiKeyInput) {
+            addApiKeyBtn.addEventListener('click', () => this.addApiKey());
+            apiKeyInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addApiKey();
+                }
+            });
+        }
+        
+        if (refreshStatusBtn) {
+            refreshStatusBtn.addEventListener('click', () => {
+                this.apiKeyManager.updateApiKeyStatusDisplay();
+            });
+        }
+    }
+    
+    // API 키 추가
+    addApiKey() {
+        const input = document.getElementById('apiKeyInput');
+        if (!input) return;
+        
+        const apiKey = input.value.trim();
+        if (!apiKey) {
+            this.showError('API 키를 입력해주세요.');
+            return;
+        }
+        
+        try {
+            this.apiKeyManager.addApiKey(apiKey);
+            input.value = '';
+            this.apiKeyManager.updateApiKeyStatusDisplay();
+            this.showSuccess('API 키가 성공적으로 추가되었습니다.');
+        } catch (error) {
+            this.showError(error.message);
+        }
     }
     
     // 다운로드 버튼 설정 (기존과 동일)
@@ -1562,39 +1911,86 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // searchVideosForKeyword 메서드 추가 (실제 API 호출)
-    async searchVideosForKeyword(keyword, format, timeRange, viewCountFilter = 'all') {
-        const videos = [];
-        
-        try {
-            const publishedAfter = this.getPublishedAfterDate(timeRange);
-            const url = `${this.baseUrl}/search?part=snippet&q=${encodeURIComponent(keyword)}&type=video&order=relevance&publishedAfter=${publishedAfter}&maxResults=50&key=${this.apiKey}`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            if (data.error) {
-                // 할당량 초과 시 특별 처리
-                if (data.error.message.includes('quota') || data.error.message.includes('exceeded')) {
-                    console.warn(`⚠️ API 할당량 초과 (${keyword}). 모의 데이터로 대체합니다.`);
-                    return this.mockDataGenerator.generateForKeyword(keyword, 10);
-                }
-                throw new Error(data.error.message);
-            }
-            
-            if (data.items) {
-                for (const item of data.items) {
-                    const video = await this.enrichVideoData(item, keyword);
-                    if (video && this.matchesFormat(video, format)) {
-                        videos.push(video);
-                    }
-                }
-            }
-            
-        } catch (error) {
-            console.error(`❌ API 검색 실패 (${keyword}):`, error);
+    async searchVideosForKeyword(keyword, format, timeRange) {
+        const apiKey = this.getApiKey();
+        if (!apiKey) {
+            throw new Error('사용 가능한 YouTube API 키가 없습니다. API 키 풀에 키를 추가해주세요.');
         }
         
-        return videos;
+        try {
+            // API URL 구성
+            const url = new URL(`${this.baseUrl}/search`);
+            url.searchParams.append('part', 'snippet');
+            url.searchParams.append('q', keyword);
+            url.searchParams.append('type', 'video');
+            url.searchParams.append('order', 'relevance');
+            url.searchParams.append('maxResults', '50');
+            url.searchParams.append('key', apiKey);
+            
+            // 시간 범위 필터
+            if (timeRange && timeRange !== 'all') {
+                const publishedAfter = this.getTimeFilter(timeRange);
+                url.searchParams.append('publishedAfter', publishedAfter);
+            }
+            
+            // 영상 길이 필터
+            if (format && format !== 'all') {
+                const videoDuration = this.getDurationFilter(format);
+                if (videoDuration !== 'any') {
+                    url.searchParams.append('videoDuration', videoDuration);
+                }
+            }
+            
+            console.log(`🔍 키워드 검색: "${keyword}" (${format}, ${timeRange}) - API 키: ${apiKey.substr(0, 10)}...`);
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorMessage = `API 요청 실패: ${response.status} ${response.statusText}`;
+                
+                // API 키 에러 처리
+                if (response.status === 403) {
+                    console.error(`🚫 API 키 할당량 초과: ${apiKey.substr(0, 10)}...`);
+                    this.apiKeyManager.handleApiKeyError(apiKey, new Error(errorMessage));
+                } else if (response.status === 400) {
+                    console.error(`❌ API 키 오류: ${apiKey.substr(0, 10)}...`);
+                    this.apiKeyManager.handleApiKeyError(apiKey, new Error(errorMessage));
+                }
+                
+                throw new Error(errorMessage);
+            }
+            
+            const data = await response.json();
+            
+            // 성공적인 API 호출 시 할당량 업데이트
+            this.updateQuotaUsage(apiKey, 100);
+            
+            if (!data.items || data.items.length === 0) {
+                console.warn(`⚠️ 키워드 "${keyword}"에 대한 결과가 없습니다.`);
+                return [];
+            }
+            
+            // 비디오 ID 추출
+            const videoIds = data.items.map(item => item.id.videoId).filter(Boolean);
+            
+            if (videoIds.length === 0) {
+                return [];
+            }
+            
+            // 상세 정보 가져오기 (동일한 API 키 사용)
+            const detailedVideos = await this.getVideoDetails(videoIds, keyword, apiKey);
+            
+            console.log(`✅ 키워드 "${keyword}": ${detailedVideos.length}개 영상 검색됨 (API 키: ${apiKey.substr(0, 10)}...)`);
+            return detailedVideos;
+            
+        } catch (error) {
+            console.error(`❌ 키워드 "${keyword}" 검색 실패:`, error);
+            
+            // API 키 에러 처리
+            this.apiKeyManager.handleApiKeyError(apiKey, error);
+            
+            throw error;
+        }
     }
     
     // enrichVideoData 메서드 추가
