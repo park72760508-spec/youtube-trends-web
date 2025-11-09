@@ -1840,48 +1840,57 @@ class OptimizedYoutubeTrendsAnalyzer {
     displayTableView() {
         const tableBody = document.getElementById('videoTableBody');
         if (!tableBody) return;
-        
+    
         tableBody.innerHTML = '';
-        
-        this.scanResults.forEach((video, index) => {
+    
+        // ✅ 렌더 직전 중복제거(딱 1회)
+        const rows = this.removeDuplicates(this.scanResults || []);
+    
+        rows.forEach((video, index) => {
             const row = document.createElement('tr');
-            if (video.isSimulated) {
-                row.classList.add('simulated-row');
+            if (video.isShorts || video.isSimulated) {
+                // 필요시 표시 스타일 유지
+                if (video.isSimulated) row.classList.add('simulated-row');
             }
-            
-            const titleLink = this.createVideoTitleLink(video);
-            const actionButton = video.isSimulated ? 
-                '<button class="action-btn" onclick="alert(\'모의 데이터입니다\')" title="모의 데이터"><i class="fas fa-info"></i></button>' :
-                `<a href="${this.generateYouTubeLink(video.id)}" target="_blank" class="action-btn external" title="YouTube에서 보기"><i class="fas fa-external-link-alt"></i></a>`;
-            
+    
+            // ✅ videoId 우선으로 안전한 ID 확보
+            const keyId = (video.videoId || video.id || (video.contentDetails && video.contentDetails.videoId) || '').toString();
+    
+            // 제목 링크/액션 버튼도 keyId 사용
+            const titleLink = this.createVideoTitleLink
+                ? this.createVideoTitleLink({ ...video, id: keyId })
+                : `<a href="${this.generateYouTubeLink(keyId)}" target="_blank" rel="noopener noreferrer">${video.title || '(제목 없음)'}</a>`;
+    
+            const actionButton = video.isSimulated
+              ? '<button class="action-btn" onclick="alert(\'모의 데이터입니다\')" title="모의 데이터"><i class="fas fa-info"></i></button>'
+              : `<a href="${this.generateYouTubeLink(keyId)}" target="_blank" rel="noopener noreferrer" class="action-btn external" title="YouTube에서 보기"><i class="fas fa-external-link-alt"></i></a>`;
+    
+            // 셀 템플릿
             row.innerHTML = `
-                <td class="rank-cell">
-                    <span class="rank-number">${index + 1}</span>
-                    ${video.isSimulated ? '<span class="simulated-tag">모의</span>' : ''}
-                </td>
-                <td class="video-info-cell">
+                <td class="title-cell">
                     <div class="video-title">${titleLink}</div>
-                    <div class="video-channel">${video.channel}</div>
-                    <div class="video-keyword">키워드: ${video.searchKeyword}</div>
+                    <div class="video-channel">${video.channelTitle || video.channel || ''}</div>
+                    ${video.searchKeyword ? `<div class="video-keyword">키워드: ${video.searchKeyword}</div>` : ''}
                 </td>
                 <td class="viral-score-cell">
-                    <span class="table-viral-score ${video.isSimulated ? 'simulated' : ''}">${video.viralScore}</span>
+                    <span class="table-viral-score ${video.isSimulated ? 'simulated' : ''}">${Number(video.viralScore || 0)}</span>
                 </td>
-                <td class="stats-cell">${this.formatNumber(video.viewCount)}</td>
-                <td class="engagement-cell">${video.engagementRate.toFixed(1)}%</td>
-                <td class="growth-cell">${video.growthRate.toFixed(1)}%</td>
+                <td class="stats-cell">${this.formatNumber ? this.formatNumber(Number(video.viewCount || 0)) : (video.viewCount || 0)}</td>
+                <td class="engagement-cell">${Number(video.engagementRate || 0).toFixed(1)}%</td>
+                <td class="growth-cell">${Number(video.growthRate || 0).toFixed(1)}%</td>
                 <td class="format-cell">
-                    <span class="format-badge ${video.format}">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
+                    <span class="format-badge ${video.format || (video.isShorts ? 'shorts' : 'long')}">${video.isShorts ? '📱 쇼츠' : '🎬 롱폼'}</span>
                 </td>
-                <td class="date-cell">${video.publishDate}</td>
+                <td class="date-cell">${video.publishDate || video.publishedAt || ''}</td>
                 <td class="action-cell">${actionButton}</td>
             `;
-            
+    
             tableBody.appendChild(row);
         });
-        
-        console.log(`📋 테이블 뷰 업데이트 완료: ${this.scanResults.length}개 영상`);
+    
+        console.log(`📋 테이블 뷰 업데이트 완료: ${rows.length}개 영상`);
     }
+
     
 
     // OptimizedYoutubeTrendsAnalyzer 클래스에 추가할 메서드들
@@ -2957,7 +2966,8 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     processAndDisplayResults(maxCount, viewCountFilter = 'all') {
         // 중복 제거
-        let uniqueVideos = this.removeDuplicates(this.allVideos);
+        const sourceRows = Array.isArray(this.scanResults) ? this.scanResults : (this.allVideos || []);
+        let uniqueVideos = this.removeDuplicates(sourceRows);
         
         // 조회수 필터 적용
         uniqueVideos = this.applyViewCountFilter(uniqueVideos, viewCountFilter);
@@ -3264,20 +3274,23 @@ class OptimizedYoutubeTrendsAnalyzer {
 
     
     // 중복 제거 메서드
+    // 중복 제거 메서드 (videoId 우선, id/ contentDetails.videoId 보조)
     removeDuplicates(videos) {
-        const uniqueVideos = [];
-        const seenIds = new Set();
-        
-        for (const video of videos) {
-            if (!seenIds.has(video.id)) {
-                seenIds.add(video.id);
-                uniqueVideos.push(video);
-            }
-        }
-        
-        console.log(`🔄 중복 제거: ${videos.length} → ${uniqueVideos.length}`);
-        return uniqueVideos;
+      const unique = [];
+      const seen = new Set();
+    
+      for (const video of (videos || [])) {
+        const key = (video.videoId || video.id || video?.contentDetails?.videoId || '').toString().trim();
+        if (!key) continue;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(video);
+      }
+    
+      console.log(`🔄 중복 제거: ${Array.isArray(videos) ? videos.length : 0} → ${unique.length}`);
+      return unique;
     }
+
     
     // 바이럴 점수 계산
     calculateViralScore(video) {
