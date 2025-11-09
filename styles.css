@@ -1589,3 +1589,89 @@ body {
         min-width: auto;
     }
 }
+
+
+
+/* 데모 모드 안내 스타일 */
+.demo-mode-notice {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.demo-notice-content {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    max-width: 500px;
+    margin: 20px;
+}
+
+.demo-notice-content i {
+    color: #f59e0b;
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.demo-notice-content h3 {
+    color: #1f2937;
+    margin-bottom: 16px;
+    font-size: 24px;
+}
+
+.demo-notice-content p {
+    color: #6b7280;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+.demo-close-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 20px;
+    transition: background-color 0.2s;
+}
+
+.demo-close-btn:hover {
+    background: #1e40af;
+}
+
+/* 데모 데이터 구분 스타일 강화 */
+.video-card.simulated-data {
+    border: 2px dashed #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.video-card.simulated-data::before {
+    content: "📊 데모 데이터";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #f59e0b;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.simulated-row {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-left: 4px solid #f59e0b;
+}
