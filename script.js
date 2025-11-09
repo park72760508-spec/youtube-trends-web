@@ -572,7 +572,7 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
     // ★★★ 여기에 validateApiKeys 함수 삽입 ★★★
-    // API 키 검증 함수
+    // API 키 검증 함수 (개선된 버전)
     async validateApiKeys() {
         const stats = this.apiKeyManager.getOverallStats();
         if (stats.totalKeys === 0) {
@@ -582,35 +582,115 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         this.showSuccess('API 키 검증을 시작합니다...', 'API 키 검증');
         
+        let validKeys = 0;
+        let invalidKeys = 0;
+        let quotaExceededKeys = 0;
+        
         for (let i = 0; i < this.apiKeyManager.apiKeys.length; i++) {
             const apiKey = this.apiKeyManager.apiKeys[i];
             const keyDisplay = `${apiKey.substr(0, 10)}...${apiKey.substr(-4)}`;
             
+            console.log(`🔍 API 키 검증 중: ${keyDisplay}`);
+            
             try {
-                const testUrl = `${this.baseUrl}/channels?part=snippet&forUsername=test&key=${apiKey}`;
+                // YouTube 검색 API로 간단한 테스트 (가장 일반적이고 안전한 방법)
+                const testUrl = `${this.baseUrl}/search?part=snippet&q=YouTube&type=video&maxResults=1&key=${apiKey}`;
                 const response = await fetch(testUrl);
                 
-                if (response.ok || response.status === 404) {
-                    // 404는 정상 (존재하지 않는 사용자명이므로)
-                    console.log(`✅ API 키 ${keyDisplay}: 정상`);
+                if (response.ok) {
+                    // 성공: API 키가 정상 작동
+                    console.log(`✅ API 키 ${keyDisplay}: 정상 작동`);
                     this.apiKeyManager.resetKeyStatus(apiKey);
-                    this.updateQuotaUsage(apiKey, 1);
+                    this.updateQuotaUsage(apiKey, 100); // search API는 100 units
+                    validKeys++;
+                    
                 } else if (response.status === 403) {
-                    console.error(`❌ API 키 ${keyDisplay}: 권한 오류 또는 할당량 초과`);
-                    this.apiKeyManager.handleApiKeyError(apiKey, new Error('권한 오류'));
+                    // 403 오류: 더 자세한 분석
+                    let errorData = null;
+                    try {
+                        errorData = await response.json();
+                    } catch (e) {
+                        console.warn('오류 데이터 파싱 실패');
+                    }
+                    
+                    const errorReason = errorData?.error?.errors?.[0]?.reason || 'unknown';
+                    const errorMessage = errorData?.error?.message || '알 수 없는 오류';
+                    
+                    console.error(`❌ API 키 ${keyDisplay} 검증 실패:`);
+                    console.error(`   - 상태: 403 Forbidden`);
+                    console.error(`   - 원인: ${errorReason}`);
+                    console.error(`   - 메시지: ${errorMessage}`);
+                    
+                    if (errorReason === 'quotaExceeded' || errorReason === 'rateLimitExceeded') {
+                        console.log(`📊 ${keyDisplay}: 할당량 초과`);
+                        this.apiKeyManager.keyStatus.set(apiKey, 'limited');
+                        quotaExceededKeys++;
+                    } else if (errorReason === 'accessNotConfigured') {
+                        console.log(`🔧 ${keyDisplay}: YouTube Data API v3가 활성화되지 않음`);
+                        this.apiKeyManager.keyStatus.set(apiKey, 'error');
+                        invalidKeys++;
+                    } else if (errorReason === 'keyInvalid' || errorReason === 'forbidden') {
+                        console.log(`🔑 ${keyDisplay}: API 키가 잘못되었거나 권한 없음`);
+                        this.apiKeyManager.keyStatus.set(apiKey, 'error');
+                        invalidKeys++;
+                    } else {
+                        console.log(`⚠️ ${keyDisplay}: 기타 권한 문제 (${errorReason})`);
+                        this.apiKeyManager.keyStatus.set(apiKey, 'error');
+                        invalidKeys++;
+                    }
+                    
+                } else if (response.status === 400) {
+                    console.warn(`⚠️ API 키 ${keyDisplay}: 잘못된 요청 (400) - API 키는 유효할 수 있음`);
+                    // 400 오류는 요청 자체의 문제일 수 있으므로 키 상태를 변경하지 않음
+                    
                 } else {
-                    console.warn(`⚠️ API 키 ${keyDisplay}: 알 수 없는 오류 (${response.status})`);
+                    console.warn(`⚠️ API 키 ${keyDisplay}: 예상치 못한 HTTP 오류 (${response.status})`);
+                    this.apiKeyManager.keyStatus.set(apiKey, 'error');
+                    invalidKeys++;
                 }
                 
-                await this.delay(1000); // 키 검증 간 1초 대기
-                
             } catch (error) {
-                console.error(`❌ API 키 ${keyDisplay}: 연결 실패`, error);
+                console.error(`❌ API 키 ${keyDisplay}: 네트워크 연결 실패`, error);
+                // 네트워크 오류는 키 자체의 문제가 아니므로 상태 변경하지 않음
+            }
+            
+            // 각 키 검증 간 2초 대기 (API 레이트 리미트 방지)
+            if (i < this.apiKeyManager.apiKeys.length - 1) {
+                await this.delay(2000);
             }
         }
         
+        // 검증 결과 저장 및 UI 업데이트
+        this.apiKeyManager.saveApiKeys();
+        this.apiKeyManager.saveKeyQuotaUsage();
         this.apiKeyManager.updateApiKeyStatusDisplay();
-        this.showSuccess('API 키 검증이 완료되었습니다.');
+        
+        // 결과 요약 표시
+        const resultMessage = `
+            API 키 검증 완료!
+            
+            📊 검증 결과:
+            ✅ 정상: ${validKeys}개
+            🚫 설정 문제: ${invalidKeys}개  
+            📈 할당량 초과: ${quotaExceededKeys}개
+            
+            ${invalidKeys > 0 ? `
+            ⚠️ 설정 문제가 있는 키는 Google Cloud Console에서 
+            YouTube Data API v3가 활성화되어 있는지 확인하세요.
+            
+            Google Cloud Console: https://console.developers.google.com/
+            ` : ''}
+            
+            ${quotaExceededKeys > 0 ? '📅 할당량 초과 키는 내일 자정(UTC)에 자동 복구됩니다.' : ''}
+        `;
+        
+        if (validKeys > 0) {
+            this.showSuccess(resultMessage, '✅ 검증 완료');
+        } else if (quotaExceededKeys > 0 && invalidKeys === 0) {
+            this.showSuccess(resultMessage, '📊 할당량 문제');
+        } else {
+            this.showError(resultMessage, '❌ 설정 문제 발견');
+        }
     }
     // ★★★ validateApiKeys 함수 끝 ★★★
 
