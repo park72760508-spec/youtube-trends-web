@@ -437,6 +437,26 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.setupEventListeners();
         this.showOptimizedWelcomeMessage();
         this.displayQuotaStatus();
+
+        // === 운영 기본값(최초 1회) ===
+        if (!localStorage.getItem('hot_perChannelMax')) {
+          localStorage.setItem('hot_perChannelMax','1000'); // 채널당 최대 수집(기본 1000)
+        }
+        if (!localStorage.getItem('hot_concurrency')) {
+          localStorage.setItem('hot_concurrency','6');      // 동시성(권장 4~8)
+        }
+        if (!localStorage.getItem('hot_w_viewsPerDay')) {
+          localStorage.setItem('hot_w_viewsPerDay','1.0');  // 가중치: 조회속도
+        }
+        if (!localStorage.getItem('hot_w_engagement')) {
+          localStorage.setItem('hot_w_engagement','3.0');   // 가중치: 참여율
+        }
+        if (!localStorage.getItem('hot_maxAgeDays')) {
+          localStorage.setItem('hot_maxAgeDays','14');      // 가중치: 기본 최대 기간(일)
+        }
+        // === /운영 기본값 ===
+
+
         
         // API 키 상태 표시 초기화
         this.apiKeyManager.updateApiKeyStatusDisplay();
@@ -861,11 +881,15 @@ class OptimizedYoutubeTrendsAnalyzer {
                 // [NEW] 채널-우회 파이프라인으로 실행
                 const ranked = await this.runChannelUploadPipeline(
                   affordableKeywords,
-                  { format, timeRange, perChannelMax: 150, topN: count }
+                  { 
+                    format, 
+                    timeRange, 
+                    perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000), // 최대 기본 1000
+                    topN: count // UI의 수치가 1~10000까지 그대로 반영
+                  }
                 );
                 
-                // 결과 표시 어댑터
-                // 기존 코드가 this.scanResults 기반으로 동작한다면 다음처럼 매핑:
+                // 결과를 기존 UI 포맷으로 매핑하여 재사용
                 this.scanResults = (ranked || []).map(v => ({
                   videoId: v.id,
                   title: v.snippet?.title,
@@ -878,16 +902,15 @@ class OptimizedYoutubeTrendsAnalyzer {
                     const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
                     return secs <= 60;
                   })(),
-                  viralScore: Math.round((v.score || 0) * 10) // 내부 점수 스케일 통일
+                  viralScore: Math.round((v.__score || v.score || 0) * 10)
                 }));
                 
-                // 공통 표시 루틴 호출
+                // 공통 표시 루틴
                 if (typeof this.processAndDisplayResults === 'function') {
                   await this.processAndDisplayResults(count);
                 } else {
-                  // 대체: 기본 표시/요약 카드 갱신
-                  this.displayResults();
-                  this.updateSummaryCards();
+                  this.displayResults?.();
+                  this.updateSummaryCards?.();
                 }
 
             }
@@ -1920,6 +1943,265 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
 
+    /* === [NEW] 채널-우회 파이프라인 with 동시성·백오프·TTL 캐시·가중치 튜너·필터 === */
+    
+    // (A) 내부 설정 (UI 없이 코드 레벨에서 조정 가능)
+    getHotScoreWeights() {
+      // 필요시 localStorage로 현업 튜닝 허용
+      // ex) localStorage.setItem('hot_w_viewsPerDay', '1.0'); 등
+      const getW = (k, def) => Number(localStorage.getItem(k) || def);
+      return {
+        wVelocity:   getW('hot_w_viewsPerDay', 1.0),   // 조회 속도 가중
+        wER:         getW('hot_w_engagement',  3.0),   // 참여율 가중
+        maxAgeDays:  getW('hot_maxAgeDays',    14),    // 기본 최대 기간
+      };
+    }
+    
+    // (B) 간단 TTL 캐시 (메모리 + localStorage 미러)
+    _getTTL() { return 6 * 60 * 60 * 1000; } // 6시간
+    _cacheGetLS(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (Date.now() - obj.t > (obj.ttl || this._getTTL())) return null;
+        return obj.v;
+      } catch(e){ return null; }
+    }
+    _cacheSetLS(key, value, ttl = this._getTTL()) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ t: Date.now(), ttl, v: value }));
+      } catch(e){}
+    }
+    _cacheKey(type, id, extra='') { return `yt_pro_cache:${type}:${id}:${extra}`; }
+    
+    // (C) 재시도 & 지수 백오프 래퍼
+    async fetchWithRetry(url, { apiKey, units, method='GET', body=null, maxRetry=5, baseDelay=500 } = {}) {
+      for (let attempt = 0; attempt <= maxRetry; attempt++) {
+        try {
+          const res = await fetch(url, { method, body });
+          if (res.ok) {
+            // 단위 차감
+            this.updateQuotaUsage(apiKey, units);
+            return res;
+          }
+          // 403/429/5xx → 재시도 후보
+          if ([429, 500, 502, 503, 504].includes(res.status)) {
+            const delay = baseDelay * Math.pow(2, attempt);
+            await this.delay(delay);
+            continue;
+          }
+          // 그 외 에러는 즉시 처리
+          return res;
+        } catch (e) {
+          const delay = baseDelay * Math.pow(2, attempt);
+          await this.delay(delay);
+          continue;
+        }
+      }
+      throw new Error('fetchWithRetry: max retry exceeded');
+    }
+    
+    // (D) 동시성 제한 헬퍼 (간단 풀)
+    async runWithPool(items, limit, worker) {
+      const results = [];
+      let idx = 0, active = 0;
+      return new Promise((resolve) => {
+        const next = () => {
+          while (active < limit && idx < items.length) {
+            const i = idx++;
+            active++;
+            Promise.resolve(worker(items[i], i))
+              .then(r => { results[i] = r; })
+              .catch(_ => { results[i] = null; })
+              .finally(() => { active--; (idx < items.length) ? next() : (active===0 && resolve(results)); });
+          }
+          if (idx >= items.length && active === 0) resolve(results);
+        };
+        next();
+      });
+    }
+    
+    // (E) 키워드 → 채널 인덱싱 (search.list: type=channel, 100units/호출)
+    async discoverSeedChannels(keywords, maxPerKeyword = 200) {
+      const set = new Set();
+      for (const kw of keywords) {
+        let pageToken = '';
+        for (let p=0; p<Math.ceil(maxPerKeyword/50); p++) {
+          const apiKey = this.getApiKey(); if (!apiKey) break;
+          const url = `${this.baseUrl}/search?part=snippet&type=channel&maxResults=50&q=${encodeURIComponent(kw)}&key=${apiKey}${pageToken?`&pageToken=${pageToken}`:''}`;
+          const res = await this.fetchWithRetry(url, { apiKey, units: 100 });
+          if (!res.ok) break;
+          const data = await res.json();
+          (data.items||[]).forEach(it => {
+            const cid = it.snippet?.channelId || it.id?.channelId;
+            if (cid) set.add(cid);
+          });
+          pageToken = data.nextPageToken || '';
+          if (!pageToken) break;
+        }
+      }
+      console.log(`📚 채널 인덱싱 완료: ${set.size}개`);
+      return Array.from(set);
+    }
+    
+    // (F) 채널 → 업로드 재생목록 ID (1unit)
+    async getUploadsPlaylistId(channelId) {
+      const ck = this._cacheKey('uploadsId', channelId);
+      const cached = this._cacheGetLS(ck);
+      if (cached) return cached;
+    
+      const apiKey = this.getApiKey(); if (!apiKey) return null;
+      const url = `${this.baseUrl}/channels?part=contentDetails&id=${channelId}&key=${apiKey}`;
+      const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+      if (!res.ok) return null;
+    
+      const data = await res.json();
+      const id = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
+      if (id) this._cacheSetLS(ck, id);
+      return id;
+    }
+    
+    // (G) 업로드 재생목록 → 최근 업로드 영상ID 페이지네이션 (1unit/페이지)
+    async fetchRecentUploads(uploadsPlaylistId, maxItems = 200) {
+      const ck = this._cacheKey('recentUploads', uploadsPlaylistId, `max=${maxItems}`);
+      const cached = this._cacheGetLS(ck);
+      if (cached) return cached;
+    
+      const ids = [];
+      let pageToken = '';
+      while (ids.length < maxItems) {
+        const apiKey = this.getApiKey(); if (!apiKey) break;
+        const url = `${this.baseUrl}/playlistItems?part=contentDetails&maxResults=50&playlistId=${uploadsPlaylistId}&key=${apiKey}${pageToken?`&pageToken=${pageToken}`:''}`;
+        const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+        if (!res.ok) break;
+        const data = await res.json();
+        (data.items||[]).forEach(it => { const v = it.contentDetails?.videoId; if (v) ids.push(v); });
+        pageToken = data.nextPageToken || '';
+        if (!pageToken) break;
+      }
+      this._cacheSetLS(ck, ids);
+      return ids;
+    }
+    
+    // (H) videos.list 일괄 상세조회 (1unit/호출, 50개씩)
+    async fetchVideoStatsBulk(videoIds) {
+      const results = [];
+      for (let i=0; i<videoIds.length; i+=50) {
+        const group = videoIds.slice(i, i+50);
+        const apiKey = this.getApiKey(); if (!apiKey) break;
+        const url = `${this.baseUrl}/videos?part=snippet,contentDetails,statistics&id=${group.join(',')}&key=${apiKey}`;
+        const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+        if (!res.ok) continue;
+        const data = await res.json();
+        (data.items||[]).forEach(v => results.push(v));
+      }
+      return results;
+    }
+    
+    // (I) ISO8601 → 초
+    parseISODurationToSec(iso) {
+      const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso) || [];
+      return (Number(m[1]||0)*3600) + (Number(m[2]||0)*60) + Number(m[3]||0);
+    }
+    
+    // (J) 기간/형식 필터 + 가중치 기반 바이럴 점수
+    computeViralScore(items, { timeRange, format, now = Date.now() }) {
+      const W = this.getHotScoreWeights();
+    
+      // 기간 해석(세분화): 1day/3days/1week/2weeks/custom:n
+      let rangeMs = 7*86400000; // default 1week
+      if (timeRange === '1day') rangeMs = 1*86400000;
+      else if (timeRange === '3days') rangeMs = 3*86400000;
+      else if (timeRange === '1week') rangeMs = 7*86400000;
+      else if (timeRange === '2weeks') rangeMs = 14*86400000;
+      else if (typeof timeRange === 'string' && timeRange.startsWith('custom:')) {
+        const n = Number(timeRange.split(':')[1]||W.maxAgeDays);
+        rangeMs = Math.max(1, n) * 86400000;
+      }
+    
+      const filtered = items.filter(v => {
+        const t = new Date(v.snippet?.publishedAt || 0).getTime();
+        if (!t || (now - t) > rangeMs) return false;
+        if (format === 'shorts' || format === 'long') {
+          const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
+          if (format === 'shorts' && secs > 60) return false;
+          if (format === 'long' && secs <= 60) return false;
+        }
+        return true;
+      });
+    
+      return filtered.map(v => {
+        const st = v.statistics || {};
+        const views = Number(st.viewCount || 0);
+        const likes = Number(st.likeCount || 0);
+        const comments = Number(st.commentCount || 0);
+    
+        const pub = new Date(v.snippet?.publishedAt || 0).getTime();
+        const ageDays = Math.max((now - pub) / 86400000, 0.01);
+    
+        const velocity = views / ageDays;                   // 조회 속도
+        const er = (likes + comments) / Math.max(views,1);  // 참여율
+    
+        const score = (W.wVelocity * velocity) * (1 + W.wER * er);
+        const out = { video: v, score };
+        // UI 호환을 위해 __score 필드도 남김
+        v.__score = score;
+        return out;
+      });
+    }
+    
+    // (K) 전체 파이프라인 (동시성 제한 + 품질 로그)
+    async runChannelUploadPipeline(keywords, { format, timeRange, perChannelMax=150, topN=200 }) {
+      console.log(`🚀 파이프라인 시작: kw=${keywords.length}, perChannelMax=${perChannelMax}, topN=${topN}`);
+    
+      // 1) 키워드 → 채널 인덱싱
+      const channels = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax*2));
+      if (!channels.length) return [];
+    
+      // 2) 채널 → 업로드 재생목록 ID (동시성 제한)
+      const concurrency = Number(localStorage.getItem('hot_concurrency') || 6); // 권장 6~8
+      const uploadsIds = await this.runWithPool(channels, concurrency, async (ch, idx) => {
+        const up = await this.getUploadsPlaylistId(ch);
+        if ((idx+1) % 50 === 0) console.log(`📡 업로드ID 수집 진행: ${idx+1}/${channels.length}`);
+        return up ? { ch, up } : null;
+      });
+      const valid = uploadsIds.filter(Boolean);
+    
+      // 3) 업로드 재생목록 → 최근 업로드 영상ID (동시성 제한)
+      const allIdsSet = new Set();
+      await this.runWithPool(valid, concurrency, async (row, idx) => {
+        const ids = await this.fetchRecentUploads(row.up, perChannelMax);
+        ids.forEach(id => allIdsSet.add(id));
+        if ((idx+1) % 50 === 0) console.log(`🎞 영상ID 수집 진행: ${idx+1}/${valid.length}, 누적=${allIdsSet.size}`);
+      });
+    
+      // 4) 상세 통계 일괄 조회
+      const allIds = Array.from(allIdsSet);
+      console.log(`📦 상세 조회 대상: ${allIds.length}개`);
+      const stats = await this.fetchVideoStatsBulk(allIds);
+    
+      // 5) 점수 계산 → 정렬 → 상위 N
+      const scored = this.computeViralScore(stats, { format, timeRange });
+      scored.sort((a,b) => b.score - a.score);
+    
+      // 6) 상위 topN (1~10000까지 대응)
+      const top = scored.slice(0, Math.min(topN || 200, 10000)).map((s, i) => ({
+        rank: i+1, score: s.score, ...s.video
+      }));
+    
+      // 품질 로그/요약
+      const shorts = top.filter(v => {
+        const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
+        return secs <= 60;
+      }).length;
+      console.log(`✅ 상위 ${top.length}개 도출 (Shorts=${shorts}, Long=${top.length-shorts})`);
+      return top;
+    }
+    /* === [/NEW] ============================================================= */
+
+
+    
 
     /* === [NEW] 채널-우회(업로드 재생목록) 파이프라인 ====================== */
     
