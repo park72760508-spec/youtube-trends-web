@@ -933,20 +933,28 @@ class OptimizedYoutubeTrendsAnalyzer {
                 );
                 
                 // 결과를 기존 UI 포맷으로 매핑하여 재사용
-                this.scanResults = (ranked || []).map(v => ({
-                  videoId: v.id,
-                  title: v.snippet?.title,
-                  channelTitle: v.snippet?.channelTitle,
-                  publishedAt: v.snippet?.publishedAt,
-                  viewCount: Number(v.statistics?.viewCount || 0),
-                  likeCount: Number(v.statistics?.likeCount || 0),
-                  commentCount: Number(v.statistics?.commentCount || 0),
-                  isShorts: (() => {
-                    const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-                    return secs <= 60;
-                  })(),
-                  viralScore: Math.round((v.__score || v.score || 0) * 10)
-                }));
+                this.scanResults = (ranked || []).map(v => {
+                  const id = v.id || v.videoId || v?.contentDetails?.videoId || '';
+                  return {
+                    videoId: id,
+                    title: v.snippet?.title || '',
+                    channelTitle: v.snippet?.channelTitle || '',
+                    publishedAt: v.snippet?.publishedAt || '',
+                    viewCount: Number(v.statistics?.viewCount || 0),
+                    likeCount: Number(v.statistics?.likeCount || 0),
+                    commentCount: Number(v.statistics?.commentCount || 0),
+                    isShorts: (() => {
+                      const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
+                      return secs <= 60;
+                    })(),
+                    viralScore: Math.round((v.__score || v.score || 0) * 10)
+                  };
+                });
+                
+                // 🔽 이 한 줄 추가 (렌더/정렬 전에 딱 1회만)
+                this.scanResults = this.dedupeRows(this.scanResults);
+
+                
                 
                 // 공통 표시 루틴
                 if (typeof this.processAndDisplayResults === 'function') {
@@ -2195,52 +2203,71 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // (K) 전체 파이프라인 (동시성 제한 + 품질 로그)
-    async runChannelUploadPipeline(keywords, { format, timeRange, perChannelMax=150, topN=200 }) {
+    async runChannelUploadPipeline(keywords, { format, timeRange, perChannelMax, topN, softTarget = 2000, dailyCapUnits = 8000 } = {}) {
       console.log(`🚀 파이프라인 시작: kw=${keywords.length}, perChannelMax=${perChannelMax}, topN=${topN}`);
     
       // 1) 키워드 → 채널 인덱싱
-      const channels = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax*2));
+      const channels = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax * 2));
+      console.log(`📚 채널 인덱싱 결과: ${channels.length}개`);
       if (!channels.length) return [];
     
-      // 2) 채널 → 업로드 재생목록 ID (동시성 제한)
-      const concurrency = Number(localStorage.getItem('hot_concurrency') || 6); // 권장 6~8
+      // 2) 채널 → 업로드 재생목록 ID
+      const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
       const uploadsIds = await this.runWithPool(channels, concurrency, async (ch, idx) => {
         const up = await this.getUploadsPlaylistId(ch);
-        if ((idx+1) % 50 === 0) console.log(`📡 업로드ID 수집 진행: ${idx+1}/${channels.length}`);
         return up ? { ch, up } : null;
       });
       const valid = uploadsIds.filter(Boolean);
+      console.log(`📡 업로드 재생목록 유효 채널: ${valid.length}개`);
     
-      // 3) 업로드 재생목록 → 최근 업로드 영상ID (동시성 제한)
+      // 3) 업로드 재생목록 → 영상ID
       const allIdsSet = new Set();
-      await this.runWithPool(valid, concurrency, async (row, idx) => {
+      await this.runWithPool(valid, concurrency, async (row) => {
         const ids = await this.fetchRecentUploads(row.up, perChannelMax);
         ids.forEach(id => allIdsSet.add(id));
-        if ((idx+1) % 50 === 0) console.log(`🎞 영상ID 수집 진행: ${idx+1}/${valid.length}, 누적=${allIdsSet.size}`);
+      });
+      const allIds = Array.from(allIdsSet);
+      console.log(`🎞 수집된 videoId 개수: ${allIds.length}`);
+    
+      // 4) 상세 통계
+      const stats = await this.fetchVideoStatsBulk(allIds);
+      console.log(`📦 videos.list 상세 응답 개수: ${stats.length}`);
+    
+      // 5) 점수 계산
+      const tryScore = (fmt, tr) => {
+        const s = this.computeViralScore(stats, { format: fmt, timeRange: tr });
+        s.sort((a,b) => b.score - a.score);
+        return s;
+      };
+    
+      let scored = tryScore(format, timeRange);
+      console.log(`🧮 1차 스코어 결과: ${scored.length}개 (format=${format}, time=${timeRange})`);
+    
+      // 빈 결과면 완화: 형식=전체, 기간=2weeks → 그래도 0이면 기간=custom:30
+      if (!scored.length) {
+        const fmt2 = (format === 'shorts' || format === 'long') ? undefined : format;
+        scored = tryScore(fmt2, '2weeks');
+        console.warn(`⚠️ 스코어 0 → 완화 재계산(전체형식/2weeks): ${scored.length}개`);
+        if (!scored.length) {
+          scored = tryScore(fmt2, 'custom:30');
+          console.warn(`⚠️ 스코어 0 → 완화 재계산(전체형식/30days): ${scored.length}개`);
+        }
+      }
+    
+      // 6) 상위 topN (ID 정상화)
+      const top = scored.slice(0, Math.min(topN || 200, 10000)).map((s, i) => {
+        const v = s.video;
+        // videos.list 응답에서 id는 문자열, playlistItems에서 온 응답은 v.contentDetails?.videoId일 수 있음
+        const vid = v.id || v.videoId || v?.contentDetails?.videoId;
+        if (!v.id && vid) v.id = vid;  // 표시·중복제거 일관성
+        return { rank: i+1, score: s.score, ...v };
       });
     
-      // 4) 상세 통계 일괄 조회
-      const allIds = Array.from(allIdsSet);
-      console.log(`📦 상세 조회 대상: ${allIds.length}개`);
-      const stats = await this.fetchVideoStatsBulk(allIds);
+      console.log(`✅ 상위 결과: ${top.length}개`);
     
-      // 5) 점수 계산 → 정렬 → 상위 N
-      const scored = this.computeViralScore(stats, { format, timeRange });
-      scored.sort((a,b) => b.score - a.score);
-    
-      // 6) 상위 topN (1~10000까지 대응)
-      const top = scored.slice(0, Math.min(topN || 200, 10000)).map((s, i) => ({
-        rank: i+1, score: s.score, ...s.video
-      }));
-    
-      // 품질 로그/요약
-      const shorts = top.filter(v => {
-        const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-        return secs <= 60;
-      }).length;
-      console.log(`✅ 상위 ${top.length}개 도출 (Shorts=${shorts}, Long=${top.length-shorts})`);
       return top;
     }
+
     /* === [/NEW] ============================================================= */
 
 
@@ -2383,6 +2410,21 @@ class OptimizedYoutubeTrendsAnalyzer {
     /* === [/NEW] ============================================================ */
 
 
+    // 결과 중복 제거: videoId를 우선 키로 사용
+    dedupeRows(rows) {
+      const seen = new Set();
+      const out = [];
+      for (const r of (rows || [])) {
+        // videoId 우선, 없으면 id → contentDetails.videoId 순서로 키 선택
+        const key = (r.videoId || r.id || r?.contentDetails?.videoId || '').toString().trim();
+        if (!key) continue;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(r);
+      }
+      console.log(`🔄 중복 제거: ${Array.isArray(rows) ? rows.length : 0} → ${out.length}`);
+      return out;
+    }
     
 
 
