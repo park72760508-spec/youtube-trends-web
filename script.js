@@ -580,8 +580,15 @@ class OptimizedYoutubeTrendsAnalyzer {
     // 최적화된 스캔 시작
     // 최적화된 스캔 시작
     async startOptimizedScan() {
-        if (!this.apiKey) {
-            this.showError('YouTube API 키가 필요합니다. API 키를 먼저 설정해주세요.');
+        // API 키 풀링 시스템 확인
+        const stats = this.apiKeyManager.getOverallStats();
+        if (stats.totalKeys === 0) {
+            this.showError('등록된 API 키가 없습니다. 위의 API 키 관리 섹션에서 키를 추가해주세요.');
+            return;
+        }
+        
+        if (stats.activeKeys === 0) {
+            this.showError('사용 가능한 API 키가 없습니다. 키 상태를 확인하거나 새 키를 추가해주세요.');
             return;
         }
         
@@ -1344,12 +1351,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         });
     }
     
-    // API 키 관련 메서드들 (기존과 동일)
-    
-    setApiKey(key) {
-        localStorage.setItem('youtube_api_key', key);
-        this.apiKey = key;
-    }
     
 
     
@@ -2579,46 +2580,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // API 키 파일에서 로드
-    async loadApiKeyFromFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        try {
-            const text = await file.text();
-            const apiKey = text.trim();
-            
-            if (apiKey) {
-                localStorage.setItem('youtube_api_key', apiKey);
-                this.apiKey = apiKey;
-                console.log('✅ API 키가 성공적으로 로드되었습니다.');
-                
-                // 성공 메시지 표시
-                this.showSuccess('API 키가 성공적으로 설정되었습니다.', 'API 키 설정 완료');
-                
-                // 상단 배너로도 표시
-                this.showApiStatusBanner('YouTube API 키가 정상적으로 연결되었습니다', true);
-            }
-        } catch (error) {
-            console.error('❌ API 키 로드 실패:', error);
-            this.showError('API 키 파일을 읽을 수 없습니다.');
-        }
-    }
     
-    // API 키 초기화 x
-    clearApiKey() {
-        localStorage.removeItem('youtube_api_key');
-        this.apiKey = null;
-        console.log('🔄 API 키가 초기화되었습니다.');
-        
-        // 성공 메시지 표시
-        this.showSuccess('API 키가 초기화되었습니다.', 'API 키 초기화 완료');
-        
-        // 상단 배너 숨김
-        const banner = document.getElementById('apiStatusBanner');
-        if (banner) {
-            banner.classList.remove('show');
-        }
-    }
     
     // 스캔 중지
     stopScan() {
