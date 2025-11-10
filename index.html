@@ -362,33 +362,30 @@
             </section>
 
             <!-- 데이터 다운로드 섹션 -->
-            <section class="download-section" id="downloadSection" style="display: none;">
-                <div class="download-container">
-                    <h2>📥 분석 결과 다운로드</h2>
-                    <p>전체 스캔으로 검출된 최상위 핫한 영상 데이터를 다운로드하세요</p>
-                    
-                    <div class="download-buttons">
-                        <button id="downloadExcel" class="download-btn excel">
-                            <i class="fas fa-file-excel"></i>
-                            <span>Excel 다운로드</span>
-                            <small>상세 분석 데이터</small>
-                        </button>
-                        <button id="downloadCSV" class="download-btn csv">
-                            <i class="fas fa-file-csv"></i>
-                            <span>CSV 다운로드</span>
-                            <small>간편 데이터</small>
-                        </button>
-                        <button id="downloadJSON" class="download-btn json">
-                            <i class="fas fa-file-code"></i>
-                            <span>JSON 다운로드</span>
-                            <small>개발자용</small>
-                        </button>
-                        <button id="downloadPDF" class="download-btn pdf">
-                            <i class="fas fa-file-pdf"></i>
-                            <span>PDF 보고서</span>
-                            <small>분석 리포트</small>
-                        </button>
-                    </div>
+            <!-- 다운로드 섹션 (374-398줄) -->
+            <section class="download-section">
+                <h2>📥 데이터 다운로드</h2>
+                <div class="download-buttons">
+                    <button id="downloadExcel" class="download-btn excel">
+                        <i class="fas fa-file-excel"></i>
+                        <span>Excel 다운로드</span>
+                        <small>화면 표시 데이터</small>
+                    </button>
+                    <button id="downloadJSON" class="download-btn json">
+                        <i class="fas fa-file-code"></i>
+                        <span>JSON 다운로드</span>
+                        <small>화면 표시 데이터</small>
+                    </button>
+                    <button id="downloadBackgroundData" class="download-btn background">
+                        <i class="fas fa-database"></i>
+                        <span>백데이터 받기</span>
+                        <small>전체 수집 데이터</small>
+                    </button>
+                    <button id="downloadPDF" class="download-btn pdf">
+                        <i class="fas fa-file-pdf"></i>
+                        <span>PDF 보고서</span>
+                        <small>분석 리포트</small>
+                    </button>
                 </div>
             </section>
 
