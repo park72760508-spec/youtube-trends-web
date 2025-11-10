@@ -1011,15 +1011,43 @@ class OptimizedYoutubeTrendsAnalyzer {
                 this.allVideos = dedupedResults;
                 
                 // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
-                this.scanResults = dedupedResults.slice(0, count).map((video, index) => ({
-                  ...video,
-                  rank: index + 1,
-                  channel: video.channelTitle || video.channel || 'N/A',
-                  publishDate: video.publishedAt || video.publishDate || 'N/A',
-                  engagementRate: this.calculateEngagementRate(video),
-                  growthRate: this.calculateGrowthRate(video),
-                  duration: this.parseDurationFromVideo(video)
-                }));
+                this.scanResults = dedupedResults.slice(0, count).map((video, index) => {
+                    // 🔥 안전한 계산 로직
+                    const viewCount = video.viewCount || 0;
+                    const likeCount = video.likeCount || 0;
+                    const commentCount = video.commentCount || 0;
+                    const subscriberCount = video.subscriberCount || 0;
+                    
+                    // 참여율 계산
+                    const engagementRate = viewCount > 0 
+                        ? ((likeCount + commentCount) / viewCount) * 100 
+                        : 0;
+                    
+                    // 성장률 계산    
+                    const growthRate = subscriberCount > 0 
+                        ? (viewCount / subscriberCount) * 100 
+                        : viewCount / 1000;
+                    
+                    // 길이 파싱
+                    let duration = 0;
+                    if (typeof video.duration === 'number') {
+                        duration = video.duration;
+                    } else if (video.contentDetails && video.contentDetails.duration) {
+                        duration = this.parseDuration(video.contentDetails.duration);
+                    } else if (typeof video.duration === 'string' && video.duration.startsWith('PT')) {
+                        duration = this.parseDuration(video.duration);
+                    }
+                    
+                    return {
+                        ...video,
+                        rank: index + 1,
+                        channel: video.channelTitle || video.channel || 'N/A',
+                        publishDate: video.publishedAt || video.publishDate || 'N/A',
+                        engagementRate: Math.round(engagementRate * 100) / 100, // 소수점 2자리
+                        growthRate: Math.round(growthRate * 100) / 100,         // 소수점 2자리  
+                        duration: duration
+                    };
+                });
                                 
                 
                 // 공통 표시 루틴
@@ -1376,6 +1404,59 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         return hours * 3600 + minutes * 60 + seconds;
     }
+
+
+    // 🔥 메소드 호출 전 존재 여부 확인하는 안전 래퍼
+    safeCalculateEngagementRate(video) {
+        try {
+            if (typeof this.calculateEngagementRate === 'function') {
+                return this.calculateEngagementRate(video);
+            } else {
+                // 직접 계산
+                const viewCount = video.viewCount || 0;
+                const likeCount = video.likeCount || 0; 
+                const commentCount = video.commentCount || 0;
+                return viewCount > 0 ? ((likeCount + commentCount) / viewCount) * 100 : 0;
+            }
+        } catch (error) {
+            console.warn('참여율 계산 오류:', error);
+            return 0;
+        }
+    }
+    
+    safeCalculateGrowthRate(video) {
+        try {
+            if (typeof this.calculateGrowthRate === 'function') {
+                return this.calculateGrowthRate(video);
+            } else {
+                // 직접 계산
+                const viewCount = video.viewCount || 0;
+                const subscriberCount = video.subscriberCount || 0;
+                return subscriberCount > 0 ? (viewCount / subscriberCount) * 100 : viewCount / 1000;
+            }
+        } catch (error) {
+            console.warn('성장률 계산 오류:', error);
+            return 0;
+        }
+    }
+    
+    safeParseDuration(video) {
+        try {
+            // 기존 parseDuration 메소드 활용
+            if (typeof video.duration === 'number') return video.duration;
+            if (video.contentDetails && video.contentDetails.duration) {
+                return this.parseDuration(video.contentDetails.duration);
+            }
+            if (typeof video.duration === 'string' && video.duration.startsWith('PT')) {
+                return this.parseDuration(video.duration);
+            }
+            return 0;
+        } catch (error) {
+            console.warn('길이 파싱 오류:', error);
+            return 0;
+        }
+    }
+
     
     removeDuplicateVideos(videos) {
         const seen = new Set();
@@ -1387,6 +1468,80 @@ class OptimizedYoutubeTrendsAnalyzer {
             return true;
         });
     }
+
+
+
+    // 🔥 누락된 메소드들 정의 추가 (calculateViralScore 메소드 앞에 삽입)
+    
+    // 참여율 계산 메소드
+    calculateEngagementRate(video) {
+        const viewCount = video.viewCount || 0;
+        const likeCount = video.likeCount || 0;
+        const commentCount = video.commentCount || 0;
+        
+        if (viewCount === 0) return 0;
+        
+        return ((likeCount + commentCount) / viewCount) * 100;
+    }
+    
+    // 성장률 계산 메소드  
+    calculateGrowthRate(video) {
+        const viewCount = video.viewCount || 0;
+        const subscriberCount = video.subscriberCount || 0;
+        
+        if (subscriberCount > 0) {
+            return (viewCount / subscriberCount) * 100;
+        } else {
+            // 구독자 수가 없는 경우 조회수 기반 성장률
+            return viewCount / 1000;
+        }
+    }
+    
+    // 신선도 점수 계산 메소드
+    calculateFreshnessScore(video) {
+        const publishedAt = video.publishedAt || video.publishDate;
+        if (!publishedAt) return 0;
+        
+        const publishDate = new Date(publishedAt);
+        const now = new Date();
+        const daysOld = Math.ceil((now - publishDate) / (1000 * 60 * 60 * 24));
+        
+        return Math.max(0, 100 - (daysOld * 2));
+    }
+    
+    // 영상 길이 파싱 메소드 (기존 parseDuration과 통합)
+    parseDurationFromVideo(video) {
+        // 이미 duration이 숫자로 있는 경우
+        if (typeof video.duration === 'number') {
+            return video.duration;
+        }
+        
+        // contentDetails에서 가져오는 경우
+        if (video.contentDetails && video.contentDetails.duration) {
+            return this.parseDuration(video.contentDetails.duration);
+        }
+        
+        // ISO 8601 duration 문자열인 경우
+        if (typeof video.duration === 'string' && video.duration.startsWith('PT')) {
+            return this.parseDuration(video.duration);
+        }
+        
+        // 기본값
+        return 0;
+    }
+    
+    // 일수 계산 헬퍼 메소드
+    calculateDaysOld(publishedAt) {
+        if (!publishedAt) return 999;
+        
+        const publishDate = new Date(publishedAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - publishDate);
+        
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+
     
     // 바이럴 점수 계산 (기존과 동일)
     async calculateViralScores() {
