@@ -1042,11 +1042,15 @@ class OptimizedYoutubeTrendsAnalyzer {
                 
                 // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
                 // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
-                this.fullBackgroundData = [...dedupedResults]; // 깊은 복사로 원본 보존
+                this.fullBackgroundData = JSON.parse(JSON.stringify(dedupedResults)); // 완전한 깊은 복사
                 this.backgroundDataStats.processedCount = dedupedResults.length;
+                this.backgroundDataStats.collectionTime = new Date().toISOString();
                 
                 // 기존 로직 유지 (하위 호환성)
                 this.allVideos = dedupedResults;
+                
+                console.log(`💾 백그라운드 데이터 보존 완료: ${this.fullBackgroundData.length}개`);
+                console.log('📊 보존된 데이터 샘플:', this.fullBackgroundData.slice(0, 3));
                 
                 // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
                 this.scanResults = dedupedResults.slice(0, count).map((video, index) => {
@@ -2120,26 +2124,87 @@ class OptimizedYoutubeTrendsAnalyzer {
             
             // 🔥 실제 선택된 데이터로 매핑 (수정된 부분)
             const backgroundData = dataToDownload.map((video, index) => {
-                const videoId = video.videoId || 'N/A';
+                const videoId = video.videoId || video.id || 'N/A';
                 const youtubeLink = videoId !== 'N/A' ? `https://www.youtube.com/watch?v=${videoId}` : 'N/A';
+                
+                // 🔥 안전한 수치 계산
+                const viewCount = parseInt(video.viewCount) || 0;
+                const likeCount = parseInt(video.likeCount) || 0;
+                const commentCount = parseInt(video.commentCount) || 0;
+                const subscriberCount = parseInt(video.subscriberCount) || 0;
+                
+                // 🔥 참여율 재계산 (안전한 계산)
+                let engagementRate = 0;
+                if (viewCount > 0) {
+                    engagementRate = ((likeCount + commentCount) / viewCount) * 100;
+                } else if (video.engagementRate && !isNaN(video.engagementRate)) {
+                    engagementRate = video.engagementRate;
+                }
+                
+                // 🔥 성장률 재계산
+                let growthRate = 0;
+                if (video.growthRate && !isNaN(video.growthRate)) {
+                    growthRate = video.growthRate;
+                } else if (subscriberCount > 0 && viewCount > 0) {
+                    // 조회수 대비 구독자 증가 추정
+                    growthRate = Math.min(((viewCount / subscriberCount) * 0.1), 100);
+                }
+                
+                // 🔥 바이럴 점수 재계산 (누락된 경우)
+                let viralScore = video.viralScore;
+                if (!viralScore || isNaN(viralScore)) {
+                    viralScore = Math.min(
+                        Math.round(
+                            (viewCount / 1000) * 0.3 +
+                            (likeCount / 10) * 0.4 +
+                            (commentCount / 5) * 0.3 +
+                            (engagementRate * 10)
+                        ), 
+                        1000
+                    );
+                }
+                
+                // 🔥 길이 포맷 개선
+                let durationText = 'N/A';
+                if (video.duration && !isNaN(video.duration)) {
+                    const duration = parseInt(video.duration);
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = duration % 60;
+                    durationText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                } else if (video.isShorts) {
+                    durationText = '<1:00 (쇼츠)';
+                }
+                
+                // 🔥 업로드일 포맷 통일
+                let publishDate = 'N/A';
+                if (video.publishedAt) {
+                    try {
+                        publishDate = new Date(video.publishedAt).toLocaleDateString('ko-KR');
+                    } catch (e) {
+                        publishDate = video.publishedAt;
+                    }
+                } else if (video.publishDate) {
+                    publishDate = video.publishDate;
+                }
                 
                 return {
                     '순위': index + 1,
                     '제목': video.title || '제목 없음',
                     'YouTube_링크': youtubeLink,
                     '채널': video.channelTitle || video.channel || '채널 없음',
-                    '바이럴점수': video.viralScore || 0,
-                    '조회수': video.viewCount || 0,
-                    '좋아요': video.likeCount || 0,
-                    '댓글수': video.commentCount || 0,
-                    '참여율': video.engagementRate ? `${video.engagementRate.toFixed(2)}%` : 'N/A',
-                    '성장률': video.growthRate ? `${video.growthRate.toFixed(1)}%` : 'N/A',
+                    '바이럴점수': Math.round(viralScore) || 0,
+                    '조회수': viewCount.toLocaleString('ko-KR'),
+                    '좋아요': likeCount.toLocaleString('ko-KR'),
+                    '댓글수': commentCount.toLocaleString('ko-KR'),
+                    '참여율': engagementRate > 0 ? `${engagementRate.toFixed(2)}%` : 'N/A',
+                    '성장률': growthRate > 0 ? `${growthRate.toFixed(1)}%` : 'N/A',
                     '형식': video.isShorts ? '쇼츠' : '롱폼',
-                    '길이': video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : 'N/A',
-                    '업로드일': video.publishedAt || video.publishDate || 'N/A',
+                    '길이': durationText,
+                    '업로드일': publishDate,
                     '검색키워드': video.searchKeyword || 'N/A',
                     '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터',
-                    '비디오ID': videoId
+                    '비디오ID': videoId,
+                    '구독자수': subscriberCount.toLocaleString('ko-KR')
                 };
             });
             
@@ -2147,20 +2212,30 @@ class OptimizedYoutubeTrendsAnalyzer {
             const mainSheet = XLSX.utils.json_to_sheet(backgroundData);
             
             // 하이퍼링크 추가 (YouTube_링크 컬럼에 실제 클릭 가능한 링크 설정)
+            // 🔥 하이퍼링크 설정 개선 (제목 컬럼에 클릭 가능한 링크)
             const range = XLSX.utils.decode_range(mainSheet['!ref']);
             for (let rowNum = range.s.r + 1; rowNum <= range.e.r; rowNum++) {
-                const linkCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 2 }); // YouTube_링크 컬럼 (C열)
                 const titleCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 1 }); // 제목 컬럼 (B열)
+                const linkCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 2 }); // YouTube_링크 컬럼 (C열)
                 
-                if (mainSheet[linkCellAddr] && mainSheet[linkCellAddr].v !== 'N/A') {
-                    const youtubeUrl = mainSheet[linkCellAddr].v;
-                    const title = mainSheet[titleCellAddr] ? mainSheet[titleCellAddr].v : 'YouTube 링크';
+                if (mainSheet[linkCellAddr] && mainSheet[linkCellAddr].v !== 'N/A' && 
+                    mainSheet[titleCellAddr] && mainSheet[titleCellAddr].v !== '제목 없음') {
                     
-                    // 하이퍼링크 설정
+                    const youtubeUrl = mainSheet[linkCellAddr].v;
+                    const title = mainSheet[titleCellAddr].v;
+                    
+                    // 🔥 제목 셀에 하이퍼링크 설정 (더 직관적)
+                    mainSheet[titleCellAddr] = {
+                        t: 's',
+                        v: title,
+                        l: { Target: youtubeUrl, Tooltip: `${title} - YouTube에서 보기` }
+                    };
+                    
+                    // 🔥 링크 컬럼에는 간단한 표시
                     mainSheet[linkCellAddr] = {
-                        t: 's', // string type
-                        v: title, // display text
-                        l: { Target: youtubeUrl } // hyperlink target
+                        t: 's',
+                        v: '🔗 링크',
+                        l: { Target: youtubeUrl, Tooltip: 'YouTube에서 보기' }
                     };
                 }
             }
@@ -2189,15 +2264,21 @@ class OptimizedYoutubeTrendsAnalyzer {
             XLSX.utils.book_append_sheet(workbook, mainSheet, '전체 백그라운드 데이터');
             
             // 통계 요약 시트
-            const realVideos = this.allVideos.filter(v => !v.isSimulated).length;
-            const mockVideos = this.allVideos.filter(v => v.isSimulated).length;
-            const shortsCount = this.allVideos.filter(v => v.isShorts).length;
+            // 🔥 실제 다운로드 데이터 기준으로 통계 계산
+            const realVideos = dataToDownload.filter(v => !v.isSimulated).length;
+            const mockVideos = dataToDownload.filter(v => v.isSimulated).length;
+            const shortsCount = dataToDownload.filter(v => v.isShorts).length;
+            const avgViralScore = dataToDownload.length > 0 ? 
+                Math.round(dataToDownload.reduce((sum, v) => sum + (parseInt(v.viralScore) || 0), 0) / dataToDownload.length) : 0;
+            const avgViewCount = dataToDownload.length > 0 ?
+                Math.round(dataToDownload.reduce((sum, v) => sum + (parseInt(v.viewCount) || 0), 0) / dataToDownload.length) : 0;
             
             // 🔥 백그라운드 데이터 상태 포함된 통계
+            // 🔥 정확한 통계 데이터
             const summaryData = [
                 ['항목', '값', '설명'],
                 ['📊 데이터 소스', dataSource, '다운로드된 데이터의 출처'],
-                ['🔥 전체 백그라운드 데이터', this.fullBackgroundData.length, '백그라운드에서 수집된 전체 데이터'],
+                ['🔥 전체 백그라운드 데이터', this.fullBackgroundData ? this.fullBackgroundData.length : 0, '백그라운드에서 수집된 전체 데이터'],
                 ['📺 화면 표시 데이터', this.scanResults ? this.scanResults.length : 0, '화면에 표시되는 제한된 데이터'],
                 ['💾 현재 다운로드 데이터', dataToDownload.length, '이 파일에 포함된 데이터 수'],
                 ['', '', ''],
@@ -2206,7 +2287,8 @@ class OptimizedYoutubeTrendsAnalyzer {
                 ['📱 쇼츠 개수', shortsCount, '60초 이하 Short 형태 영상'],
                 ['🎬 롱폼 개수', dataToDownload.length - shortsCount, '60초 초과 일반 영상'],
                 ['📊 쇼츠 비율', `${Math.round((shortsCount / dataToDownload.length) * 100)}%`, '전체 중 쇼츠 비중'],
-                ['🔥 평균 바이럴 점수', dataToDownload.length > 0 ? Math.round(dataToDownload.reduce((sum, v) => sum + (v.viralScore || 0), 0) / dataToDownload.length) : 0, '바이럴 가능성 점수 (0-1000)'],
+                ['🔥 평균 바이럴 점수', avgViralScore, '바이럴 가능성 점수 (0-1000)'],
+                ['👁️ 평균 조회수', avgViewCount.toLocaleString('ko-KR'), '평균 조회수'],
                 ['⚙️ API 할당량 사용', this.quotaUsed ? `${this.quotaUsed}/${this.quotaLimit}` : 'N/A', '사용된 YouTube API 할당량'],
                 ['⏰ 수집 시작 시간', this.backgroundDataStats.collectionTime || 'N/A', '백그라운드 데이터 수집 시작'],
                 ['📅 다운로드 시간', new Date().toLocaleString('ko-KR'), '이 파일이 생성된 시간'],
@@ -2218,8 +2300,9 @@ class OptimizedYoutubeTrendsAnalyzer {
             XLSX.utils.book_append_sheet(workbook, summarySheet, '전체 데이터 요약');
             
             // 카테고리별 분석 시트
+            // 🔥 실제 다운로드 데이터 기준 카테고리별 분석 시트
             const categories = {};
-            this.allVideos.forEach(video => {
+            dataToDownload.forEach(video => {
                 const category = video.searchKeyword || '기타';
                 if (!categories[category]) {
                     categories[category] = [];
@@ -2230,9 +2313,13 @@ class OptimizedYoutubeTrendsAnalyzer {
             const categoryData = Object.entries(categories).map(([category, videos]) => ({
                 '카테고리': category,
                 '영상수': videos.length,
-                '평균_바이럴점수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (v.viralScore || 0), 0) / videos.length) : 0,
-                '평균_조회수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (v.viewCount || 0), 0) / videos.length) : 0,
-                '쇼츠_비율': videos.length > 0 ? `${Math.round((videos.filter(v => v.isShorts).length / videos.length) * 100)}%` : '0%'
+                '평균_바이럴점수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viralScore) || 0), 0) / videos.length) : 0,
+                '평균_조회수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viewCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '평균_좋아요': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.likeCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '평균_댓글수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.commentCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '쇼츠_비율': videos.length > 0 ? `${Math.round((videos.filter(v => v.isShorts).length / videos.length) * 100)}%` : '0%',
+                '최고_바이럴점수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viralScore) || 0)) : 0,
+                '최고_조회수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viewCount) || 0)).toLocaleString('ko-KR') : '0'
             }));
             
             if (categoryData.length > 0) {
@@ -2262,10 +2349,19 @@ class OptimizedYoutubeTrendsAnalyzer {
             console.log(`📊 데이터 소스: ${dataSource}`);
             console.log(`🔍 완전성: ${isFullBackgroundData ? '완전한 백그라운드 데이터' : '부분 데이터'}`);
             
-        } catch (error) {
-            console.error('백그라운드 데이터 다운로드 오류:', error);
-            alert('백그라운드 데이터 다운로드 중 오류가 발생했습니다.');
-        }
+            } catch (error) {
+                console.error('백그라운드 데이터 다운로드 오류:', error);
+                console.error('오류 스택:', error.stack);
+                console.log('현재 데이터 상태:');
+                console.log('- fullBackgroundData:', this.fullBackgroundData ? this.fullBackgroundData.length : 'undefined');
+                console.log('- allVideos:', this.allVideos ? this.allVideos.length : 'undefined');
+                console.log('- scanResults:', this.scanResults ? this.scanResults.length : 'undefined');
+                
+                // 🔥 더 상세한 오류 메시지
+                const errorMessage = `백그라운드 데이터 다운로드 중 오류가 발생했습니다.\n\n오류 정보: ${error.message}\n\n데이터 상태:\n- 전체 백그라운드 데이터: ${this.fullBackgroundData ? this.fullBackgroundData.length : 0}개\n- 화면 표시 데이터: ${this.scanResults ? this.scanResults.length : 0}개`;
+                
+                alert(errorMessage);
+            }
     }
     
     // 기타 유틸리티 메서드들
