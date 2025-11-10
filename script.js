@@ -955,9 +955,11 @@ class OptimizedYoutubeTrendsAnalyzer {
                     topN: count // UI의 수치가 1~10000까지 그대로 반영
                   }
                 );
+
+
                 
                 // 결과를 기존 UI 포맷으로 매핑하여 재사용
-                this.scanResults = (ranked || []).map(v => {
+                const mappedResults = (ranked || []).map(v => {
                   const id = v.id || v.videoId || v?.contentDetails?.videoId || '';
                   return {
                     videoId: id,
@@ -971,14 +973,29 @@ class OptimizedYoutubeTrendsAnalyzer {
                       const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
                       return secs <= 60;
                     })(),
-                    viralScore: Math.round((v.__score || v.score || 0) * 10)
+                    viralScore: Math.round((v.__score || v.score || 0) * 10),
+                    searchKeyword: v.searchKeyword || 'N/A',
+                    isSimulated: v.isSimulated || false
                   };
                 });
                 
-                // 🔽 이 한 줄 추가 (렌더/정렬 전에 딱 1회만)
-                this.scanResults = this.dedupeRows(this.scanResults);
-
+                // 🔽 중복 제거
+                const dedupedResults = this.dedupeRows(mappedResults);
                 
+                // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
+                this.allVideos = dedupedResults;
+                
+                // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
+                this.scanResults = dedupedResults.slice(0, count).map((video, index) => ({
+                  ...video,
+                  rank: index + 1,
+                  channel: video.channelTitle || video.channel || 'N/A',
+                  publishDate: video.publishedAt || video.publishDate || 'N/A',
+                  engagementRate: this.calculateEngagementRate(video),
+                  growthRate: this.calculateGrowthRate(video),
+                  duration: this.parseDurationFromVideo(video)
+                }));
+                                
                 
                 // 공통 표시 루틴
                 if (typeof this.processAndDisplayResults === 'function') {
@@ -1847,8 +1864,18 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 백그라운드 전체 데이터 다운로드 (모든 수집된 데이터)
     downloadBackgroundData() {
-        if (!this.allVideos || this.allVideos.length === 0) {
-            alert('백그라운드에서 수집된 데이터가 없습니다.');
+        // 변경 후
+        let dataToDownload = [];
+        let dataSource = '';
+        
+        if (this.allVideos && this.allVideos.length > 0) {
+            dataToDownload = this.allVideos;
+            dataSource = '전체 백그라운드 데이터';
+        } else if (this.scanResults && this.scanResults.length > 0) {
+            dataToDownload = this.scanResults;
+            dataSource = '화면 표시 데이터 (백그라운드 데이터 없음)';
+        } else {
+            alert('다운로드할 데이터가 없습니다. 먼저 스캔을 실행해주세요.');
             return;
         }
         
