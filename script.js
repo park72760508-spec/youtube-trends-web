@@ -790,8 +790,9 @@ class OptimizedYoutubeTrendsAnalyzer {
         const downloadPDF = document.getElementById('downloadPDF');
         
         if (downloadExcel) downloadExcel.addEventListener('click', () => this.downloadExcel());
-        if (downloadCSV) downloadCSV.addEventListener('click', () => this.downloadCSV());
         if (downloadJSON) downloadJSON.addEventListener('click', () => this.downloadJSON());
+        const downloadBackgroundData = document.getElementById('downloadBackgroundData');
+        if (downloadBackgroundData) downloadBackgroundData.addEventListener('click', () => this.downloadBackgroundData());
         if (downloadPDF) downloadPDF.addEventListener('click', () => this.downloadPDF());
     }
     
@@ -1793,6 +1794,104 @@ class OptimizedYoutubeTrendsAnalyzer {
     downloadPDF() {
         alert('PDF 다운로드 기능은 현재 개발 중입니다. Excel 형식을 이용해주세요.');
     }
+
+
+
+    // 백그라운드 전체 데이터 다운로드 (모든 수집된 데이터)
+    downloadBackgroundData() {
+        if (!this.allVideos || this.allVideos.length === 0) {
+            alert('백그라운드에서 수집된 데이터가 없습니다.');
+            return;
+        }
+        
+        try {
+            const workbook = XLSX.utils.book_new();
+            
+            // 전체 백그라운드 데이터 매핑
+            const backgroundData = this.allVideos.map((video, index) => ({
+                '순위': index + 1,
+                '제목': video.title || '제목 없음',
+                '채널': video.channelTitle || video.channel || '채널 없음',
+                '바이럴점수': video.viralScore || 0,
+                '조회수': video.viewCount || 0,
+                '좋아요': video.likeCount || 0,
+                '댓글수': video.commentCount || 0,
+                '참여율': video.engagementRate ? `${video.engagementRate.toFixed(2)}%` : 'N/A',
+                '성장률': video.growthRate ? `${video.growthRate.toFixed(1)}%` : 'N/A',
+                '형식': video.isShorts ? '쇼츠' : '롱폼',
+                '길이': video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : 'N/A',
+                '업로드일': video.publishedAt || video.publishDate || 'N/A',
+                '검색키워드': video.searchKeyword || 'N/A',
+                '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터',
+                '비디오ID': video.videoId || 'N/A'
+            }));
+            
+            // 메인 시트 생성
+            const mainSheet = XLSX.utils.json_to_sheet(backgroundData);
+            XLSX.utils.book_append_sheet(workbook, mainSheet, '전체 백그라운드 데이터');
+            
+            // 통계 요약 시트
+            const realVideos = this.allVideos.filter(v => !v.isSimulated).length;
+            const mockVideos = this.allVideos.filter(v => v.isSimulated).length;
+            const shortsCount = this.allVideos.filter(v => v.isShorts).length;
+            
+            const summaryData = [
+                ['항목', '값'],
+                ['전체 수집 데이터 수', this.allVideos.length],
+                ['화면 표시 데이터 수', this.scanResults ? this.scanResults.length : 0],
+                ['실제 데이터', realVideos],
+                ['모의 데이터', mockVideos],
+                ['쇼츠 개수', shortsCount],
+                ['롱폼 개수', this.allVideos.length - shortsCount],
+                ['쇼츠 비율', `${Math.round((shortsCount / this.allVideos.length) * 100)}%`],
+                ['평균 바이럴 점수', this.allVideos.length > 0 ? Math.round(this.allVideos.reduce((sum, v) => sum + (v.viralScore || 0), 0) / this.allVideos.length) : 0],
+                ['API 할당량 사용', this.quotaUsed ? `${this.quotaUsed}/${this.quotaLimit}` : 'N/A'],
+                ['수집 일시', new Date().toLocaleString('ko-KR')]
+            ];
+            
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(workbook, summarySheet, '전체 데이터 요약');
+            
+            // 카테고리별 분석 시트
+            const categories = {};
+            this.allVideos.forEach(video => {
+                const category = video.searchKeyword || '기타';
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push(video);
+            });
+            
+            const categoryData = Object.entries(categories).map(([category, videos]) => ({
+                '카테고리': category,
+                '영상수': videos.length,
+                '평균_바이럴점수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (v.viralScore || 0), 0) / videos.length) : 0,
+                '평균_조회수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (v.viewCount || 0), 0) / videos.length) : 0,
+                '쇼츠_비율': videos.length > 0 ? `${Math.round((videos.filter(v => v.isShorts).length / videos.length) * 100)}%` : '0%'
+            }));
+            
+            if (categoryData.length > 0) {
+                const categorySheet = XLSX.utils.json_to_sheet(categoryData);
+                XLSX.utils.book_append_sheet(workbook, categorySheet, '카테고리별 분석');
+            }
+            
+            // 파일명 생성 및 다운로드
+            const fileName = `시니어_YouTube_백그라운드_전체데이터_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            
+            // 성공 메시지
+            this.showSuccessMessage(
+                '백그라운드 데이터 다운로드 완료!', 
+                `전체 ${this.allVideos.length}개의 수집된 데이터가 다운로드되었습니다.`
+            );
+            
+        } catch (error) {
+            console.error('백그라운드 데이터 다운로드 오류:', error);
+            alert('백그라운드 데이터 다운로드 중 오류가 발생했습니다.');
+        }
+    }
+
+
     
     // 기타 유틸리티 메서드들
     
