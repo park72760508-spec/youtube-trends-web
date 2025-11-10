@@ -846,302 +846,359 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 최적화된 스캔 시작
     // 최적화된 스캔 시작
-    async startOptimizedScan() {
-        // API 키 풀링 시스템 확인
-        const stats = this.apiKeyManager.getOverallStats();
-        if (stats.totalKeys === 0) {
-            this.showError('등록된 API 키가 없습니다. 위의 API 키 관리 섹션에서 키를 추가해주세요.');
-            return;
-        }
-        
-        if (stats.activeKeys === 0) {
-            this.showError(`
-                사용 가능한 API 키가 없습니다. 
-                
-                가능한 원인:
-                1. 모든 키의 일일 할당량 소진 (10,000 units/day)
-                2. API 키에서 YouTube Data API v3가 활성화되지 않음
-                3. API 키 권한 설정 문제
-                
-                해결 방법:
-                • Google Cloud Console에서 API 키 상태 확인
-                • YouTube Data API v3 활성화 확인
-                • 새로운 API 키 추가
-                • 내일 자정(UTC) 이후 재시도
-            `);
-            return;
-        }
-        
-        // 추가 검증: 실제 API 키 테스트
-        console.log('🔍 API 키 상태 검증 중...');
-        const testApiKey = this.getApiKey();
-        if (!testApiKey) {
-            this.showError('사용 가능한 API 키를 찾을 수 없습니다.');
-            return;
-        }
-        
-        // 간단한 API 테스트 (1 unit 소모)
-        try {
-            const testUrl = `${this.baseUrl}/channels?part=snippet&forUsername=test&key=${testApiKey}`;
-            const testResponse = await fetch(testUrl);
+        async startOptimizedScan() {
+            // API 키 풀링 시스템 확인
+            const stats = this.apiKeyManager.getOverallStats();
+            if (stats.totalKeys === 0) {
+                this.showError('등록된 API 키가 없습니다. 위의 API 키 관리 섹션에서 키를 추가해주세요.');
+                return;
+            }
             
-            if (testResponse.status === 403) {
-                this.apiKeyManager.handleApiKeyError(testApiKey, new Error('API 키 권한 오류'));
+            if (stats.activeKeys === 0) {
                 this.showError(`
-                    API 키 권한 오류가 발생했습니다.
+                    사용 가능한 API 키가 없습니다. 
                     
-                    확인 사항:
-                    1. Google Cloud Console에서 YouTube Data API v3가 활성화되어 있는지 확인
-                    2. API 키가 올바르게 생성되었는지 확인
-                    3. API 키의 일일 할당량이 남아있는지 확인
+                    가능한 원인:
+                    1. 모든 키의 일일 할당량 소진 (10,000 units/day)
+                    2. API 키에서 YouTube Data API v3가 활성화되지 않음
+                    3. API 키 권한 설정 문제
                     
-                    Google Cloud Console: https://console.developers.google.com/
+                    해결 방법:
+                    • Google Cloud Console에서 API 키 상태 확인
+                    • YouTube Data API v3 활성화 확인
+                    • 새로운 API 키 추가
+                    • 내일 자정(UTC) 이후 재시도
                 `);
                 return;
             }
             
-            this.updateQuotaUsage(testApiKey, 1);
-            console.log('✅ API 키 검증 완료');
-            
-        } catch (error) {
-            console.error('❌ API 키 테스트 실패:', error);
-            this.showError('API 키 연결 테스트에 실패했습니다. 네트워크 연결을 확인해주세요.');
-            return;
-        }
-        
-        if (this.isScanning) {
-            this.showError('이미 스캔이 진행 중입니다.');
-            return;
-        }
-
-
-        // 스캔 시작 시 백그라운드 데이터 초기화
-        this.isScanning = true;
-        this.allVideos = [];
-        this.scanResults = [];
-        
-        // 🔥 백그라운드 데이터 초기화
-        this.fullBackgroundData = [];
-        this.backgroundDataStats = {
-            totalCollected: 0,
-            processedCount: 0,
-            collectionTime: new Date().toISOString()
-        };
-        
-        
-        // UI 상태 변경
-        this.showScanProgress();
-        this.updateScanButton(true);
-        
-        try {
-            // 설정 값들 가져오기 (키워드는 선택된 것만)
-            const category = document.getElementById('scanCategory')?.value || 'all';
-            const format = document.getElementById('videoFormat')?.value || 'all';
-            const count = parseInt(document.getElementById('resultCount')?.value || '50');
-            const timeRange = document.getElementById('timeRange')?.value || 'week';
-            const viewCountFilter = document.getElementById('viewCountFilter')?.value || 'all';
-            
-            // 선택된 키워드 가져오기
-            const keywords = this.getSelectedKeywords();
-            
-            if (keywords.length === 0) {
-                this.showError('검색할 키워드를 선택해주세요.');
+            // 추가 검증: 실제 API 키 테스트
+            console.log('🔍 API 키 상태 검증 중...');
+            const testApiKey = this.getApiKey();
+            if (!testApiKey) {
+                this.showError('사용 가능한 API 키를 찾을 수 없습니다.');
                 return;
             }
             
-            const timeRangeText = {
-                '1day': '최근 1일',
-                '3days': '최근 3일', 
-                '1week': '최근 1주일',
-                '2weeks': '최근 2주일'
-            }[timeRange] || timeRange;
-            
-            console.log('🔍 최적화된 스캔 설정:', { 
-                category, 
-                format, 
-                count, 
-                timeRange: `${timeRange} (${timeRangeText})`, 
-                selectedKeywords: keywords.length,
-                keywords: keywords 
-            });
-            
-            // 할당량 확인
-            // 할당량 확인
-            // API 키 풀 할당량 확인
-            this.apiKeyManager.checkQuotaReset();
-            const stats = this.apiKeyManager.getOverallStats();
-            const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
-            
-            console.log(`💰 예상 할당량 비용: ${estimatedCost} (전체 잔여: ${stats.remainingQuota})`);
-            console.log(`🔑 API 키 풀 상태: ${stats.activeKeys}/${stats.totalKeys}개 활성`);
-            
-            if (stats.totalKeys === 0) {
-                this.showError('등록된 API 키가 없습니다. API 키를 먼저 추가해주세요.');
-                return;
-            }
-            
-            if (stats.remainingQuota <= 0) {
-                console.warn('🔴 모든 API 키의 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
-                this.showDemoModeNotice();
-                this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
-                // 데모 데이터임을 명확히 표시
-                this.allVideos.forEach(video => {
-                    video.isSimulated = true;
-                    video.title = "🎯 [데모] " + video.title;
-                });
-            } else {
-                // 할당량이 있으면 실제 데이터만 사용
-                console.log(`🟢 실제 데이터로 검색을 진행합니다. (활용 가능 할당량: ${stats.remainingQuota.toLocaleString()})`);
+            // 간단한 API 테스트 (1 unit 소모)
+            try {
+                const testUrl = `${this.baseUrl}/channels?part=snippet&forUsername=test&key=${testApiKey}`;
+                const testResponse = await fetch(testUrl);
                 
-                // 할당량이 부족해도 가능한 만큼만 실제 데이터 수집
-                const affordableKeywords = keywords.slice(0, Math.floor(stats.remainingQuota / 100));
-                if (affordableKeywords.length < keywords.length) {
-                    console.warn(`⚠️ 할당량 부족으로 ${affordableKeywords.length}개 키워드만 검색합니다.`);
-                    this.showSuccess(`${affordableKeywords.length}개 키워드로 검색을 진행합니다. (전체 ${keywords.length}개 중)`);
+                if (testResponse.status === 403) {
+                    this.apiKeyManager.handleApiKeyError(testApiKey, new Error('API 키 권한 오류'));
+                    this.showError(`
+                        API 키 권한 오류가 발생했습니다.
+                        
+                        확인 사항:
+                        1. Google Cloud Console에서 YouTube Data API v3가 활성화되어 있는지 확인
+                        2. API 키가 올바르게 생성되었는지 확인
+                        3. API 키의 일일 할당량이 남아있는지 확인
+                        
+                        Google Cloud Console: https://console.developers.google.com/
+                    `);
+                    return;
                 }
                 
-                //
-                // ... 옵션 파싱 완료: affordableKeywords, format, timeRange, count, viewCountFilter 등 ...
+                this.updateQuotaUsage(testApiKey, 1);
+                console.log('✅ API 키 검증 완료');
                 
-                // [NEW] 채널-우회 파이프라인으로 실행
-                // 🔥 백그라운드 수집량과 화면 표시량 분리 (핵심 수정!)
-                // 백그라운드에서는 항상 대용량 수집, 화면 표시만 사용자 설정값으로 제한
-                const backgroundCollectionLimit = 50000; // 백그라운드에서 수집할 최대 데이터 수
-                const displayLimit = count; // 화면에 표시할 데이터 수 (사용자 설정값)
+            } catch (error) {
+                console.error('❌ API 키 테스트 실패:', error);
+                this.showError('API 키 연결 테스트에 실패했습니다. 네트워크 연결을 확인해주세요.');
+                return;
+            }
+            
+            if (this.isScanning) {
+                this.showError('이미 스캔이 진행 중입니다.');
+                return;
+            }
+    
+            // 스캔 시작 시 백그라운드 데이터 초기화
+            this.isScanning = true;
+            this.allVideos = [];
+            this.scanResults = [];
+            
+            // 🔥 백그라운드 데이터 초기화
+            this.fullBackgroundData = [];
+            this.backgroundDataStats = {
+                totalCollected: 0,
+                processedCount: 0,
+                collectionTime: new Date().toISOString()
+            };
+            
+            // UI 상태 변경
+            this.showScanProgress();
+            this.updateScanButton(true);
+            
+            try {
+                // 설정 값들 가져오기 (키워드는 선택된 것만)
+                const category = document.getElementById('scanCategory')?.value || 'all';
+                const format = document.getElementById('videoFormat')?.value || 'all';
+                const count = parseInt(document.getElementById('resultCount')?.value || '50');
+                const timeRange = document.getElementById('timeRange')?.value || 'week';
+                const viewCountFilter = document.getElementById('viewCountFilter')?.value || 'all';
                 
-                console.log(`🎯 백그라운드 수집 설정: ${backgroundCollectionLimit}개 수집 → 화면 표시 ${displayLimit}개`);
+                // 선택된 키워드 가져오기
+                const keywords = this.getSelectedKeywords();
                 
-                // [NEW] 채널-우회 파이프라인으로 실행 (대용량 수집)
-                const ranked = await this.runChannelUploadPipeline(
-                  affordableKeywords,
-                  { 
+                if (keywords.length === 0) {
+                    this.showError('검색할 키워드를 선택해주세요.');
+                    return;
+                }
+                
+                const timeRangeText = {
+                    '1day': '최근 1일',
+                    '3days': '최근 3일', 
+                    '1week': '최근 1주일',
+                    '2weeks': '최근 2주일'
+                }[timeRange] || timeRange;
+                
+                console.log('🔍 최적화된 스캔 설정:', { 
+                    category, 
                     format, 
-                    timeRange, 
-                    perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000), // 최대 기본 1000
-                    topN: backgroundCollectionLimit // 🔥 수정: 화면 표시와 무관하게 대용량 수집
-                  }
-                );
-
-
-                
-                // 결과를 기존 UI 포맷으로 매핑하여 재사용
-                // 🔥 수집 결과 상세 로깅
-                console.log(`📈 원시 데이터 수집 결과: ${ranked ? ranked.length : 0}개`);
-                
-                // 결과를 기존 UI 포맷으로 매핑하여 재사용
-                const mappedResults = (ranked || []).map(v => {
-                  const id = v.id || v.videoId || v?.contentDetails?.videoId || '';
-                  return {
-                    videoId: id,
-                    title: v.snippet?.title || '',
-                    channelTitle: v.snippet?.channelTitle || '',
-                    publishedAt: v.snippet?.publishedAt || '',
-                    viewCount: Number(v.statistics?.viewCount || 0),
-                    likeCount: Number(v.statistics?.likeCount || 0),
-                    commentCount: Number(v.statistics?.commentCount || 0),
-                    isShorts: (() => {
-                      const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-                      return secs <= 60;
-                    })(),
-                    viralScore: Math.round((v.__score || v.score || 0) * 10),
-                    searchKeyword: v.searchKeyword || 'N/A',
-                    isSimulated: v.isSimulated || false
-                  };
+                    count, 
+                    timeRange: `${timeRange} (${timeRangeText})`, 
+                    selectedKeywords: keywords.length,
+                    keywords: keywords 
                 });
                 
-                // 🔽 중복 제거
-                const dedupedResults = this.dedupeRows(mappedResults);
+                // API 키 풀 할당량 확인
+                this.apiKeyManager.checkQuotaReset();
+                const stats = this.apiKeyManager.getOverallStats();
+                const estimatedCost = keywords.length * 100; // 키워드당 약 100 할당량
                 
-                // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
-                // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
-                // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
-                // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
-                this.fullBackgroundData = JSON.parse(JSON.stringify(dedupedResults)); // 완전한 깊은 복사
-                this.backgroundDataStats.processedCount = dedupedResults.length;
-                this.backgroundDataStats.collectionTime = new Date().toISOString();
-                this.backgroundDataStats.totalCollected = dedupedResults.length; // 🔥 추가: 총 수집량 기록
-                this.backgroundDataStats.displayLimit = displayLimit; // 🔥 추가: 화면 표시 제한값 기록
+                console.log(`💰 예상 할당량 비용: ${estimatedCost} (전체 잔여: ${stats.remainingQuota})`);
+                console.log(`🔑 API 키 풀 상태: ${stats.activeKeys}/${stats.totalKeys}개 활성`);
                 
-                // 기존 로직 유지 (하위 호환성)
-                this.allVideos = dedupedResults;
-                
-                // 🔥 상세한 수집 통계 로깅
-                console.log(`🎯 데이터 수집 완료!`);
-                console.log(`📊 총 수집된 데이터: ${this.fullBackgroundData.length}개`);
-                console.log(`📺 화면 표시 제한: ${displayLimit}개`);
-                console.log(`💾 백그라운드 보존: ${this.fullBackgroundData.length}개 (모든 수집 데이터)`);
-                console.log('🔍 보존된 데이터 샘플:', this.fullBackgroundData.slice(0, 3));
-                
-                // 사용자에게 수집 완료 알림
-                if (this.fullBackgroundData.length > displayLimit) {
-                    console.log(`✅ 백그라운드에서 ${this.fullBackgroundData.length}개 데이터를 수집했습니다! (화면에는 상위 ${displayLimit}개만 표시)`);
+                if (stats.totalKeys === 0) {
+                    this.showError('등록된 API 키가 없습니다. API 키를 먼저 추가해주세요.');
+                    return;
                 }
                 
-                // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
-                this.scanResults = dedupedResults.slice(0, displayLimit).map((video, index) => {
-
-                    // 🔥 안전한 계산 로직
-                    const viewCount = video.viewCount || 0;
-                    const likeCount = video.likeCount || 0;
-                    const commentCount = video.commentCount || 0;
-                    const subscriberCount = video.subscriberCount || 0;
+                if (stats.remainingQuota <= 0) {
+                    console.warn('🔴 모든 API 키의 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
+                    this.showDemoModeNotice();
+                    this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
+                    // 데모 데이터임을 명확히 표시
+                    this.allVideos.forEach(video => {
+                        video.isSimulated = true;
+                        video.title = "🎯 [데모] " + video.title;
+                    });
+                } else {
+                    // 할당량이 있으면 실제 데이터만 사용
+                    console.log(`🟢 실제 데이터로 검색을 진행합니다. (활용 가능 할당량: ${stats.remainingQuota.toLocaleString()})`);
                     
-                    // 참여율 계산
-                    const engagementRate = viewCount > 0 
-                        ? ((likeCount + commentCount) / viewCount) * 100 
-                        : 0;
-                    
-                    // 성장률 계산    
-                    const growthRate = subscriberCount > 0 
-                        ? (viewCount / subscriberCount) * 100 
-                        : viewCount / 1000;
-                    
-                    // 길이 파싱
-                    let duration = 0;
-                    if (typeof video.duration === 'number') {
-                        duration = video.duration;
-                    } else if (video.contentDetails && video.contentDetails.duration) {
-                        duration = this.parseDuration(video.contentDetails.duration);
-                    } else if (typeof video.duration === 'string' && video.duration.startsWith('PT')) {
-                        duration = this.parseDuration(video.duration);
+                    // 할당량이 부족해도 가능한 만큼만 실제 데이터 수집
+                    const affordableKeywords = keywords.slice(0, Math.floor(stats.remainingQuota / 100));
+                    if (affordableKeywords.length < keywords.length) {
+                        console.warn(`⚠️ 할당량 부족으로 ${affordableKeywords.length}개 키워드만 검색합니다.`);
+                        this.showSuccess(`${affordableKeywords.length}개 키워드로 검색을 진행합니다. (전체 ${keywords.length}개 중)`);
                     }
                     
-                    return {
-                        ...video,
-                        rank: index + 1,
-                        channel: video.channelTitle || video.channel || 'N/A',
-                        publishDate: video.publishedAt || video.publishDate || 'N/A',
-                        engagementRate: Math.round(engagementRate * 100) / 100, // 소수점 2자리
-                        growthRate: Math.round(growthRate * 100) / 100,         // 소수점 2자리  
-                        duration: duration
-                    };
-                });
-                                
-                
-                // 공통 표시 루틴
-                if (typeof this.processAndDisplayResults === 'function') {
-                  await this.processAndDisplayResults(count);
-                } else {
-                  this.displayResults?.();
-                  this.updateSummaryCards?.();
+                    // 🔥 백그라운드 수집량과 화면 표시량 분리 (핵심 수정!)
+                    // 백그라운드에서는 항상 대용량 수집, 화면 표시만 사용자 설정값으로 제한
+                    const backgroundCollectionLimit = 50000; // 백그라운드에서 수집할 최대 데이터 수
+                    const displayLimit = count; // 화면에 표시할 데이터 수 (사용자 설정값)
+                    
+                    console.log(`🎯 백그라운드 수집 설정: ${backgroundCollectionLimit}개 수집 → 화면 표시 ${displayLimit}개`);
+                    
+                    // [NEW] 채널-우회 파이프라인으로 실행 (대용량 수집)
+                    const ranked = await this.runChannelUploadPipeline(
+                      affordableKeywords,
+                      { 
+                        format, 
+                        timeRange, 
+                        perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000), // 최대 기본 1000
+                        topN: backgroundCollectionLimit // 🔥 수정: 화면 표시와 무관하게 대용량 수집
+                      }
+                    );
+    
+                    // 🔥 수집 결과 상세 로깅
+                    console.log(`📈 원시 데이터 수집 결과: ${ranked ? ranked.length : 0}개`);
+                    
+                    // 결과를 기존 UI 포맷으로 매핑하여 재사용
+                    const mappedResults = (ranked || []).map(v => {
+                      const id = v.id || v.videoId || v?.contentDetails?.videoId || '';
+                      return {
+                        videoId: id,
+                        title: v.snippet?.title || '',
+                        channelTitle: v.snippet?.channelTitle || '',
+                        publishedAt: v.snippet?.publishedAt || '',
+                        viewCount: Number(v.statistics?.viewCount || 0),
+                        likeCount: Number(v.statistics?.likeCount || 0),
+                        commentCount: Number(v.statistics?.commentCount || 0),
+                        isShorts: (() => {
+                          const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
+                          return secs <= 60;
+                        })(),
+                        viralScore: Math.round((v.__score || v.score || 0) * 10),
+                        searchKeyword: v.searchKeyword || 'N/A',
+                        isSimulated: v.isSimulated || false
+                      };
+                    });
+                    
+                    // 🔽 중복 제거
+                    const dedupedResults = this.dedupeRows(mappedResults);
+                    
+                    // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
+                    this.fullBackgroundData = JSON.parse(JSON.stringify(dedupedResults)); // 완전한 깊은 복사
+                    this.backgroundDataStats.processedCount = dedupedResults.length;
+                    this.backgroundDataStats.collectionTime = new Date().toISOString();
+                    this.backgroundDataStats.totalCollected = dedupedResults.length; // 🔥 추가: 총 수집량 기록
+                    this.backgroundDataStats.displayLimit = displayLimit; // 🔥 추가: 화면 표시 제한값 기록
+                    
+                    // 기존 로직 유지 (하위 호환성)
+                    this.allVideos = dedupedResults;
+                    
+                    // 🔥 상세한 수집 통계 로깅
+                    console.log(`🎯 데이터 수집 완료!`);
+                    console.log(`📊 총 수집된 데이터: ${this.fullBackgroundData.length}개`);
+                    console.log(`📺 화면 표시 제한: ${displayLimit}개`);
+                    console.log(`💾 백그라운드 보존: ${this.fullBackgroundData.length}개 (모든 수집 데이터)`);
+                    console.log('🔍 보존된 데이터 샘플:', this.fullBackgroundData.slice(0, 3));
+                    
+                    // 사용자에게 수집 완료 알림
+                    if (this.fullBackgroundData.length > displayLimit) {
+                        console.log(`✅ 백그라운드에서 ${this.fullBackgroundData.length}개 데이터를 수집했습니다! (화면에는 상위 ${displayLimit}개만 표시)`);
+                    }
+                    
+                    // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
+                    this.scanResults = dedupedResults.slice(0, displayLimit).map((video, index) => {
+                        // 🔥 안전한 계산 로직
+                        const viewCount = video.viewCount || 0;
+                        const likeCount = video.likeCount || 0;
+                        const commentCount = video.commentCount || 0;
+                        const subscriberCount = video.subscriberCount || 0;
+                        
+                        // 참여율 계산
+                        const engagementRate = viewCount > 0 
+                            ? ((likeCount + commentCount) / viewCount) * 100 
+                            : 0;
+                        
+                        // 성장률 계산    
+                        const growthRate = subscriberCount > 0 
+                            ? (viewCount / subscriberCount) * 100 
+                            : viewCount / 1000;
+                        
+                        // 길이 파싱
+                        let duration = 0;
+                        if (typeof video.duration === 'number') {
+                            duration = video.duration;
+                        } else if (video.contentDetails && video.contentDetails.duration) {
+                            duration = this.parseDuration(video.contentDetails.duration);
+                        } else if (typeof video.duration === 'string' && video.duration.startsWith('PT')) {
+                            duration = this.parseDuration(video.duration);
+                        }
+                        
+                        return {
+                            ...video,
+                            rank: index + 1,
+                            channel: video.channelTitle || video.channel || 'N/A',
+                            publishDate: video.publishedAt || video.publishDate || 'N/A',
+                            engagementRate: Math.round(engagementRate * 100) / 100, // 소수점 2자리
+                            growthRate: Math.round(growthRate * 100) / 100,         // 소수점 2자리  
+                            duration: duration
+                        };
+                    });
+                    
+                    // 🔥 안전한 공통 표시 루틴 (오류 방지)
+                    try {
+                        if (typeof this.processAndDisplayResults === 'function') {
+                            console.log('📊 결과 처리 및 표시 시작...');
+                            await this.processAndDisplayResults(count);
+                            console.log('✅ 결과 처리 및 표시 완료');
+                        } else {
+                            console.log('🔄 기본 결과 표시 방법 사용...');
+                            this.displayResults?.();
+                            this.updateSummaryCards?.();
+                            console.log('✅ 기본 결과 표시 완료');
+                        }
+                    } catch (error) {
+                        console.error('❌ 결과 처리 중 오류 발생:', error);
+                        
+                        // 오류 발생 시에도 기본적인 결과는 표시
+                        try {
+                            if (this.fullBackgroundData && this.fullBackgroundData.length > 0) {
+                                console.log('🔄 오류 복구: 기본 결과 표시 시도...');
+                                if (typeof this.showResultsManually === 'function') {
+                                    this.showResultsManually();
+                                }
+                                if (typeof this.updateSummaryCards === 'function') {
+                                    this.updateSummaryCards();
+                                }
+                                console.log('✅ 오류 복구 완료');
+                            }
+                        } catch (fallbackError) {
+                            console.error('❌ 기본 결과 표시도 실패:', fallbackError);
+                        }
+                    }
                 }
-
+                
+                console.log('✅ 최적화된 스캔 완료!');
+                
+            } catch (error) {
+                console.error('❌ 스캔 중 오류:', error);
+                console.error('오류 스택:', error.stack);
+                
+                // 🔥 오류 발생 시에도 수집된 데이터 상태 확인
+                const collectedCount = this.fullBackgroundData ? this.fullBackgroundData.length : 0;
+                const displayedCount = this.scanResults ? this.scanResults.length : 0;
+                
+                console.log(`📊 오류 발생 시점의 데이터 상태:`);
+                console.log(`- 백그라운드 수집: ${collectedCount}개`);
+                console.log(`- 화면 표시: ${displayedCount}개`);
+                
+                // 🔥 수집된 데이터가 있다면 그래도 결과 표시 시도
+                if (collectedCount > 0) {
+                    try {
+                        console.log('🔄 수집된 데이터로 기본 결과 표시 시도...');
+                        if (typeof this.showResultsManually === 'function') {
+                            this.showResultsManually();
+                        }
+                        if (typeof this.updateSummaryCards === 'function') {
+                            this.updateSummaryCards();
+                        }
+                        
+                        // 사용자에게 상황 안내
+                        this.showError(`검색 중 일부 오류가 발생했지만, ${collectedCount.toLocaleString('ko-KR')}개의 데이터는 수집되었습니다.\n\n📥 백데이터 다운로드는 정상적으로 가능합니다.\n\n🔍 오류 내용: ${error.message}`);
+                    } catch (recoveryError) {
+                        console.error('❌ 오류 복구도 실패:', recoveryError);
+                        this.showError(`스캔 중 오류가 발생했습니다: ${error.message}\n\n수집된 데이터: ${collectedCount}개`);
+                    }
+                } else {
+                    this.showError(`스캔 중 오류가 발생했습니다: ${error.message}`);
+                }
+            } finally {
+                // 🔥 안전한 정리 작업
+                this.isScanning = false;
+                
+                try {
+                    this.updateScanButton(false);
+                } catch (error) {
+                    console.error('❌ 스캔 버튼 업데이트 오류:', error);
+                }
+                
+                try {
+                    this.hideScanProgress();
+                } catch (error) {
+                    console.error('❌ 진행 상황 숨기기 오류:', error);
+                }
+                
+                // 🔥 최종 수집 통계 로깅
+                const finalCollectedCount = this.fullBackgroundData ? this.fullBackgroundData.length : 0;
+                const finalDisplayedCount = this.scanResults ? this.scanResults.length : 0;
+                
+                console.log(`🏁 스캔 완료 - 최종 통계:`);
+                console.log(`📊 백그라운드 수집: ${finalCollectedCount}개`);
+                console.log(`📺 화면 표시: ${finalDisplayedCount}개`);
+                console.log(`💾 백데이터 다운로드 가능: ${finalCollectedCount > 0 ? 'YES' : 'NO'}`);
+                
+                if (finalCollectedCount > finalDisplayedCount && finalCollectedCount > 0) {
+                    console.log(`✅ 백그라운드에서 추가로 ${finalCollectedCount - finalDisplayedCount}개 더 수집됨!`);
+                }
             }
-            
-            // 결과 후처리 및 표시
-            await this.processAndDisplayResults(count);
-            
-            console.log('✅ 최적화된 스캔 완료!');
-            
-        } catch (error) {
-            console.error('❌ 스캔 중 오류:', error);
-            this.showError(`스캔 중 오류가 발생했습니다: ${error.message}`);
-        } finally {
-            this.isScanning = false;
-            this.updateScanButton(false);
-            this.hideScanProgress();
         }
-    }
     
     // 데모 모드 안내 표시
     showDemoModeNotice() {
@@ -3721,12 +3778,46 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         // 결과 표시
         // UI 업데이트
-        this.displayResults();
-        this.showResultsSection();
-        this.createCharts();
+        // 🔥 안전한 UI 업데이트 (에러 방지)
+        try {
+            this.displayResults();
+        } catch (error) {
+            console.error('displayResults 오류:', error);
+        }
         
-        // 🔥 수집 통계 업데이트 추가
-        this.updateCollectionStats();
+        try {
+            // 함수 존재 여부 확인 후 호출
+            if (typeof this.showResultsSection === 'function') {
+                this.showResultsSection();
+            } else if (typeof this.showResults === 'function') {
+                this.showResults();
+            } else {
+                // 수동으로 결과 섹션 표시
+                this.showResultsManually();
+            }
+        } catch (error) {
+            console.error('결과 섹션 표시 오류:', error);
+            this.showResultsManually();
+        }
+        
+        try {
+            if (typeof this.createCharts === 'function') {
+                this.createCharts();
+            }
+        } catch (error) {
+            console.error('차트 생성 오류:', error);
+        }
+        
+        // 🔥 수집 통계 업데이트
+        try {
+            if (typeof this.updateCollectionStats === 'function') {
+                this.updateCollectionStats();
+            }
+        } catch (error) {
+            console.error('수집 통계 업데이트 오류:', error);
+        }
+
+        
     }
 
 
@@ -4199,6 +4290,37 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.displayCardView();
         this.displayTableView();
     }
+
+
+
+    // 🔥 결과 섹션 표시 함수 추가 (클래스 내부에 추가)
+    showResults() {
+        const resultsSection = document.getElementById('resultsSection');
+        const analysisSummary = document.getElementById('analysisSummary');
+        const scanProgress = document.getElementById('scanProgress');
+        
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+        }
+        
+        if (analysisSummary) {
+            analysisSummary.style.display = 'block';
+        }
+        
+        if (scanProgress) {
+            scanProgress.style.display = 'none';
+        }
+        
+        // 페이지 상단으로 스크롤
+        setTimeout(() => {
+            const element = resultsSection || analysisSummary;
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    }
+
+
     
     // 카드 뷰 표시
     displayCardView() {
@@ -4240,26 +4362,71 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 요약 카드 업데이트
-    updateSummaryCards() {
-        const totalVideos = this.scanResults.length;
-        const avgViralScore = totalVideos > 0 ? 
-            Math.round(this.scanResults.reduce((sum, v) => sum + v.viralScore, 0) / totalVideos) : 0;
-        const shortsCount = this.scanResults.filter(v => v.isShorts).length;
-        const shortsRatio = totalVideos > 0 ? Math.round((shortsCount / totalVideos) * 100) : 0;
-        const avgGrowthRate = totalVideos > 0 ? 
-            (this.scanResults.reduce((sum, v) => sum + v.growthRate, 0) / totalVideos).toFixed(1) : 0;
+    // 🔥 요약 카드 업데이트 (백그라운드 데이터 포함 개선)
+        updateSummaryCards() {
+            try {
+                // 🔥 백그라운드 데이터와 화면 표시 데이터 모두 고려
+                const totalVideos = this.fullBackgroundData ? this.fullBackgroundData.length : 0;
+                const displayedVideos = this.scanResults ? this.scanResults.length : 0;
+                
+                // 백그라운드 데이터 기준으로 통계 계산 (더 정확함)
+                const dataForStats = this.fullBackgroundData && this.fullBackgroundData.length > 0 
+                    ? this.fullBackgroundData 
+                    : this.scanResults || [];
+                    
+                const avgViralScore = dataForStats.length > 0 ? 
+                    Math.round(dataForStats.reduce((sum, v) => sum + (v.viralScore || 0), 0) / dataForStats.length) : 0;
+                const shortsCount = dataForStats.filter(v => v.isShorts).length;
+                const shortsRatio = dataForStats.length > 0 ? Math.round((shortsCount / dataForStats.length) * 100) : 0;
+                const avgGrowthRate = dataForStats.length > 0 ? 
+                    (dataForStats.reduce((sum, v) => sum + (v.growthRate || 0), 0) / dataForStats.length).toFixed(1) : 0;
+                
+                // UI 요소 업데이트
+                const totalVideosEl = document.getElementById('totalVideos');
+                const avgViralScoreEl = document.getElementById('avgViralScore');
+                const shortsRatioEl = document.getElementById('shortsRatio');
+                const avgGrowthRateEl = document.getElementById('avgGrowthRate');
+                
+                if (totalVideosEl) {
+                    totalVideosEl.textContent = totalVideos.toLocaleString('ko-KR');
+                }
+                if (avgViralScoreEl) {
+                    avgViralScoreEl.textContent = avgViralScore;
+                }
+                if (shortsRatioEl) {
+                    shortsRatioEl.textContent = `${shortsRatio}%`;
+                }
+                if (avgGrowthRateEl) {
+                    avgGrowthRateEl.textContent = `${avgGrowthRate}%`;
+                }
+                
+                // 🔥 화면 표시 영상 수 업데이트 (요소가 있다면)
+                const displayedVideosEl = document.getElementById('displayedVideos');
+                if (displayedVideosEl) {
+                    displayedVideosEl.textContent = displayedVideos.toLocaleString('ko-KR');
+                }
+                
+                // 🔥 수집 통계 표시 업데이트
+                const collectionStatsElement = document.getElementById('collectionStats');
+                if (collectionStatsElement && totalVideos > displayedVideos && totalVideos > 0) {
+                    collectionStatsElement.textContent = `📊 백그라운드 수집: ${totalVideos.toLocaleString('ko-KR')}개 (화면 표시: ${displayedVideos.toLocaleString('ko-KR')}개)`;
+                    collectionStatsElement.style.display = 'block';
+                    console.log(`📊 수집 통계 업데이트: 총 ${totalVideos}개, 표시 ${displayedVideos}개`);
+                } else if (collectionStatsElement) {
+                    collectionStatsElement.style.display = 'none';
+                }
+                
+                console.log(`📊 요약 카드 업데이트 완료 - 총 ${totalVideos}개, 표시 ${displayedVideos}개, 평균 바이럴 ${avgViralScore}`);
+                
+            } catch (error) {
+                console.error('❌ 요약 카드 업데이트 오류:', error);
+                
+                // 🔥 오류 발생 시 기본값으로 설정
+                const totalVideosEl = document.getElementById('totalVideos');
+                if (totalVideosEl) totalVideosEl.textContent = '0';
+            }
+        }
         
-        const totalVideosEl = document.getElementById('totalVideos');
-        const avgViralScoreEl = document.getElementById('avgViralScore');
-        const shortsRatioEl = document.getElementById('shortsRatio');
-        const avgGrowthRateEl = document.getElementById('avgGrowthRate');
-        
-        if (totalVideosEl) totalVideosEl.textContent = totalVideos;
-        if (avgViralScoreEl) avgViralScoreEl.textContent = avgViralScore;
-        if (shortsRatioEl) shortsRatioEl.textContent = `${shortsRatio}%`;
-        if (avgGrowthRateEl) avgGrowthRateEl.textContent = `${avgGrowthRate}%`;
-    }
-    
     // 결과 섹션 표시
     showResultsSections() {
         const resultsSection = document.getElementById('resultsSection');
@@ -4270,6 +4437,48 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (downloadSection) downloadSection.style.display = 'block';
         if (chartsSection) chartsSection.style.display = 'block';
     }
+
+
+
+        // 🔥 수동 결과 섹션 표시 함수 추가 (백업용)
+        showResultsManually() {
+            console.log('🔄 수동으로 결과 섹션을 표시합니다...');
+            
+            // 결과 섹션들 표시
+            const elementsToShow = [
+                'resultsSection',
+                'analysisSummary', 
+                'chartsSection'
+            ];
+            
+            const elementsToHide = [
+                'scanProgress',
+                'loadingOverlay'
+            ];
+            
+            elementsToShow.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.display = 'block';
+                    console.log(`✅ ${id} 표시됨`);
+                } else {
+                    console.warn(`⚠️ ${id} 요소를 찾을 수 없음`);
+                }
+            });
+            
+            elementsToHide.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.display = 'none';
+                    console.log(`✅ ${id} 숨김`);
+                }
+            });
+            
+            // 결과 요약 업데이트
+            this.updateSummaryCards();
+        }
+
+
     
     // 지속시간 포맷팅
     formatDuration(seconds) {
