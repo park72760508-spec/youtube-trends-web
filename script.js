@@ -1004,17 +1004,29 @@ class OptimizedYoutubeTrendsAnalyzer {
                 // ... 옵션 파싱 완료: affordableKeywords, format, timeRange, count, viewCountFilter 등 ...
                 
                 // [NEW] 채널-우회 파이프라인으로 실행
+                // 🔥 백그라운드 수집량과 화면 표시량 분리 (핵심 수정!)
+                // 백그라운드에서는 항상 대용량 수집, 화면 표시만 사용자 설정값으로 제한
+                const backgroundCollectionLimit = 50000; // 백그라운드에서 수집할 최대 데이터 수
+                const displayLimit = count; // 화면에 표시할 데이터 수 (사용자 설정값)
+                
+                console.log(`🎯 백그라운드 수집 설정: ${backgroundCollectionLimit}개 수집 → 화면 표시 ${displayLimit}개`);
+                
+                // [NEW] 채널-우회 파이프라인으로 실행 (대용량 수집)
                 const ranked = await this.runChannelUploadPipeline(
                   affordableKeywords,
                   { 
                     format, 
                     timeRange, 
                     perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000), // 최대 기본 1000
-                    topN: count // UI의 수치가 1~10000까지 그대로 반영
+                    topN: backgroundCollectionLimit // 🔥 수정: 화면 표시와 무관하게 대용량 수집
                   }
                 );
 
 
+                
+                // 결과를 기존 UI 포맷으로 매핑하여 재사용
+                // 🔥 수집 결과 상세 로깅
+                console.log(`📈 원시 데이터 수집 결과: ${ranked ? ranked.length : 0}개`);
                 
                 // 결과를 기존 UI 포맷으로 매핑하여 재사용
                 const mappedResults = (ranked || []).map(v => {
@@ -1042,18 +1054,32 @@ class OptimizedYoutubeTrendsAnalyzer {
                 
                 // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
                 // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
+                // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
+                // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
                 this.fullBackgroundData = JSON.parse(JSON.stringify(dedupedResults)); // 완전한 깊은 복사
                 this.backgroundDataStats.processedCount = dedupedResults.length;
                 this.backgroundDataStats.collectionTime = new Date().toISOString();
+                this.backgroundDataStats.totalCollected = dedupedResults.length; // 🔥 추가: 총 수집량 기록
+                this.backgroundDataStats.displayLimit = displayLimit; // 🔥 추가: 화면 표시 제한값 기록
                 
                 // 기존 로직 유지 (하위 호환성)
                 this.allVideos = dedupedResults;
                 
-                console.log(`💾 백그라운드 데이터 보존 완료: ${this.fullBackgroundData.length}개`);
-                console.log('📊 보존된 데이터 샘플:', this.fullBackgroundData.slice(0, 3));
+                // 🔥 상세한 수집 통계 로깅
+                console.log(`🎯 데이터 수집 완료!`);
+                console.log(`📊 총 수집된 데이터: ${this.fullBackgroundData.length}개`);
+                console.log(`📺 화면 표시 제한: ${displayLimit}개`);
+                console.log(`💾 백그라운드 보존: ${this.fullBackgroundData.length}개 (모든 수집 데이터)`);
+                console.log('🔍 보존된 데이터 샘플:', this.fullBackgroundData.slice(0, 3));
+                
+                // 사용자에게 수집 완료 알림
+                if (this.fullBackgroundData.length > displayLimit) {
+                    console.log(`✅ 백그라운드에서 ${this.fullBackgroundData.length}개 데이터를 수집했습니다! (화면에는 상위 ${displayLimit}개만 표시)`);
+                }
                 
                 // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
-                this.scanResults = dedupedResults.slice(0, count).map((video, index) => {
+                this.scanResults = dedupedResults.slice(0, displayLimit).map((video, index) => {
+
                     // 🔥 안전한 계산 로직
                     const viewCount = video.viewCount || 0;
                     const likeCount = video.likeCount || 0;
