@@ -2261,9 +2261,12 @@ class OptimizedYoutubeTrendsAnalyzer {
             ];
             mainSheet['!cols'] = wscols;
             
-            XLSX.utils.book_append_sheet(workbook, mainSheet, '전체 백그라운드 데이터');
+            // 🔥 개선된 시트 생성 및 순서 정리
+
+            // 1️⃣ 메인 데이터 시트 (이모지와 함께 직관적인 시트명)
+            XLSX.utils.book_append_sheet(workbook, mainSheet, '📊 전체 데이터');
             
-            // 통계 요약 시트
+            // 통계 계산 (공통으로 사용될 변수들)
             // 🔥 실제 다운로드 데이터 기준으로 통계 계산
             const realVideos = dataToDownload.filter(v => !v.isSimulated).length;
             const mockVideos = dataToDownload.filter(v => v.isSimulated).length;
@@ -2273,34 +2276,38 @@ class OptimizedYoutubeTrendsAnalyzer {
             const avgViewCount = dataToDownload.length > 0 ?
                 Math.round(dataToDownload.reduce((sum, v) => sum + (parseInt(v.viewCount) || 0), 0) / dataToDownload.length) : 0;
             
-            // 🔥 백그라운드 데이터 상태 포함된 통계
-            // 🔥 정확한 통계 데이터
+            // 2️⃣ 통계 요약 시트
             const summaryData = [
+                ['📈 기본 통계', '', ''],
                 ['항목', '값', '설명'],
                 ['📊 데이터 소스', dataSource, '다운로드된 데이터의 출처'],
                 ['🔥 전체 백그라운드 데이터', this.fullBackgroundData ? this.fullBackgroundData.length : 0, '백그라운드에서 수집된 전체 데이터'],
                 ['📺 화면 표시 데이터', this.scanResults ? this.scanResults.length : 0, '화면에 표시되는 제한된 데이터'],
                 ['💾 현재 다운로드 데이터', dataToDownload.length, '이 파일에 포함된 데이터 수'],
                 ['', '', ''],
+                ['📊 콘텐츠 분석', '', ''],
                 ['✅ 실제 데이터', realVideos, 'API에서 수집한 실제 YouTube 데이터'],
                 ['🎯 모의 데이터', mockVideos, '부족분 보완용 시뮬레이션 데이터'],
                 ['📱 쇼츠 개수', shortsCount, '60초 이하 Short 형태 영상'],
                 ['🎬 롱폼 개수', dataToDownload.length - shortsCount, '60초 초과 일반 영상'],
-                ['📊 쇼츠 비율', `${Math.round((shortsCount / dataToDownload.length) * 100)}%`, '전체 중 쇼츠 비중'],
+                ['📊 쇼츠 비율', dataToDownload.length > 0 ? `${Math.round((shortsCount / dataToDownload.length) * 100)}%` : '0%', '전체 중 쇼츠 비중'],
+                ['', '', ''],
+                ['🔥 성능 지표', '', ''],
                 ['🔥 평균 바이럴 점수', avgViralScore, '바이럴 가능성 점수 (0-1000)'],
-                ['👁️ 평균 조회수', avgViewCount.toLocaleString('ko-KR'), '평균 조회수'],
+                ['👁️ 평균 조회수', avgViewCount.toLocaleString('ko-KR'), '전체 영상 평균 조회수'],
+                ['⭐ 고품질 영상 비율', dataToDownload.length > 0 ? `${Math.round((dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 400).length / dataToDownload.length) * 100)}%` : '0%', '바이럴 점수 400 이상 비율'],
+                ['', '', ''],
+                ['⚙️ 시스템 정보', '', ''],
                 ['⚙️ API 할당량 사용', this.quotaUsed ? `${this.quotaUsed}/${this.quotaLimit}` : 'N/A', '사용된 YouTube API 할당량'],
                 ['⏰ 수집 시작 시간', this.backgroundDataStats.collectionTime || 'N/A', '백그라운드 데이터 수집 시작'],
                 ['📅 다운로드 시간', new Date().toLocaleString('ko-KR'), '이 파일이 생성된 시간'],
-                ['', '', ''],
-                ['🎯 백그라운드 수집 상태', isFullBackgroundData ? '✅ 완전한 백그라운드 데이터' : '⚠️ 제한된 데이터', '다운로드 데이터의 완전성']
+                ['🎯 데이터 완전성', isFullBackgroundData ? '✅ 완전한 백그라운드 데이터' : '⚠️ 제한된 데이터', '다운로드 데이터의 완전성']
             ];
             
             const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(workbook, summarySheet, '전체 데이터 요약');
+            XLSX.utils.book_append_sheet(workbook, summarySheet, '📈 데이터 통계');
             
-            // 카테고리별 분석 시트
-            // 🔥 실제 다운로드 데이터 기준 카테고리별 분석 시트
+            // 3️⃣ 키워드별 분석 시트 (카테고리별 분석 개선)
             const categories = {};
             dataToDownload.forEach(video => {
                 const category = video.searchKeyword || '기타';
@@ -2311,60 +2318,91 @@ class OptimizedYoutubeTrendsAnalyzer {
             });
             
             const categoryData = Object.entries(categories).map(([category, videos]) => ({
-                '카테고리': category,
-                '영상수': videos.length,
-                '평균_바이럴점수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viralScore) || 0), 0) / videos.length) : 0,
-                '평균_조회수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viewCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
-                '평균_좋아요': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.likeCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
-                '평균_댓글수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.commentCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
-                '쇼츠_비율': videos.length > 0 ? `${Math.round((videos.filter(v => v.isShorts).length / videos.length) * 100)}%` : '0%',
-                '최고_바이럴점수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viralScore) || 0)) : 0,
-                '최고_조회수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viewCount) || 0)).toLocaleString('ko-KR') : '0'
+                '🏷️ 키워드': category,
+                '📊 영상수': videos.length,
+                '🔥 평균_바이럴점수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viralScore) || 0), 0) / videos.length) : 0,
+                '👁️ 평균_조회수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.viewCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '👍 평균_좋아요': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.likeCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '💬 평균_댓글수': videos.length > 0 ? Math.round(videos.reduce((sum, v) => sum + (parseInt(v.commentCount) || 0), 0) / videos.length).toLocaleString('ko-KR') : '0',
+                '📱 쇼츠_비율': videos.length > 0 ? `${Math.round((videos.filter(v => v.isShorts).length / videos.length) * 100)}%` : '0%',
+                '🏆 최고_바이럴점수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viralScore) || 0)) : 0,
+                '🥇 최고_조회수': videos.length > 0 ? Math.max(...videos.map(v => parseInt(v.viewCount) || 0)).toLocaleString('ko-KR') : '0',
+                '⭐ 고품질_영상수': videos.filter(v => (parseInt(v.viralScore) || 0) >= 400).length,
+                '📊 성공률': videos.length > 0 ? `${Math.round((videos.filter(v => (parseInt(v.viralScore) || 0) >= 400).length / videos.length) * 100)}%` : '0%'
             }));
             
             if (categoryData.length > 0) {
                 const categorySheet = XLSX.utils.json_to_sheet(categoryData);
-                XLSX.utils.book_append_sheet(workbook, categorySheet, '카테고리별 분석');
+                XLSX.utils.book_append_sheet(workbook, categorySheet, '🏷️ 키워드별 분석');
             }
-
-
-            // ⬇️⬇️⬇️ 여기서부터 새로 추가되는 코드 ⬇️⬇️⬇️
             
-            // 🔥 데이터 완전성 검증 및 품질 정보 추가
+            // 4️⃣ 품질 분석 시트
             const qualityData = [
+                ['🔍 데이터 품질 분석', '', ''],
                 ['품질 지표', '값', '설명'],
-                ['', '', ''],
                 ['🔍 데이터 완전성', `${Math.round((dataToDownload.length / (this.fullBackgroundData?.length || dataToDownload.length)) * 100)}%`, '전체 수집 대비 다운로드 비율'],
-                ['📊 데이터 품질', realVideos > 0 ? '✅ 실제 API 데이터 포함' : '⚠️ 모의 데이터만 포함', '수집된 데이터의 신뢰성'],
+                ['📊 데이터 신뢰성', realVideos > 0 ? '✅ 실제 API 데이터 포함' : '⚠️ 모의 데이터만 포함', '수집된 데이터의 신뢰성'],
                 ['🎯 키워드 커버리지', Object.keys(categories).length, '수집된 고유 키워드 수'],
-                ['⚡ 최신성', dataToDownload.filter(v => {
+                ['', '', ''],
+                ['📅 시간별 분석', '', ''],
+                ['⚡ 최신성 (7일)', dataToDownload.filter(v => {
                     const publishDate = new Date(v.publishedAt || v.publishDate);
                     const daysDiff = (Date.now() - publishDate.getTime()) / (1000 * 60 * 60 * 24);
                     return daysDiff <= 7;
                 }).length, '최근 7일 내 업로드 영상 수'],
-                ['🔥 고성장 영상', dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 500).length, '바이럴 점수 500 이상 영상'],
-                ['📱 쇼츠 품질', shortsCount > 0 ? `${Math.round(dataToDownload.filter(v => v.isShorts && (parseInt(v.viralScore) || 0) >= 300).length / shortsCount * 100)}%` : 'N/A', '고품질 쇼츠 비율 (바이럴 300+)'],
-                ['🎬 롱폼 품질', (dataToDownload.length - shortsCount) > 0 ? `${Math.round(dataToDownload.filter(v => !v.isShorts && (parseInt(v.viralScore) || 0) >= 400).length / (dataToDownload.length - shortsCount) * 100)}%` : 'N/A', '고품질 롱폼 비율 (바이럴 400+)']
+                ['🗓️ 중기성 (30일)', dataToDownload.filter(v => {
+                    const publishDate = new Date(v.publishedAt || v.publishDate);
+                    const daysDiff = (Date.now() - publishDate.getTime()) / (1000 * 60 * 60 * 24);
+                    return daysDiff <= 30;
+                }).length, '최근 30일 내 업로드 영상 수'],
+                ['', '', ''],
+                ['🏆 성과별 분석', '', ''],
+                ['🔥 초고성장 영상 (800+)', dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 800).length, '바이럴 점수 800 이상 영상'],
+                ['⭐ 고성장 영상 (500+)', dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 500).length, '바이럴 점수 500 이상 영상'],
+                ['✅ 중성장 영상 (300+)', dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 300).length, '바이럴 점수 300 이상 영상'],
+                ['', '', ''],
+                ['📱 포맷별 품질', '', ''],
+                ['📱 고품질 쇼츠', shortsCount > 0 ? `${Math.round(dataToDownload.filter(v => v.isShorts && (parseInt(v.viralScore) || 0) >= 300).length / shortsCount * 100)}%` : 'N/A', '고품질 쇼츠 비율 (바이럴 300+)'],
+                ['🎬 고품질 롱폼', (dataToDownload.length - shortsCount) > 0 ? `${Math.round(dataToDownload.filter(v => !v.isShorts && (parseInt(v.viralScore) || 0) >= 400).length / (dataToDownload.length - shortsCount) * 100)}%` : 'N/A', '고품질 롱폼 비율 (바이럴 400+)'],
+                ['📊 전체 품질 점수', avgViralScore >= 500 ? '🏆 우수' : avgViralScore >= 300 ? '⭐ 양호' : avgViralScore >= 200 ? '✅ 보통' : '⚠️ 개선 필요', '전체 데이터 품질 등급']
             ];
-
-            // 품질 분석 시트 추가
+            
             const qualitySheet = XLSX.utils.aoa_to_sheet(qualityData);
             XLSX.utils.book_append_sheet(workbook, qualitySheet, '🔍 품질 분석');
-
-            // 메타데이터 시트 추가
+            
+            // 5️⃣ 메타데이터 및 시스템 정보 시트
             const metaData = [
-                ['메타 정보', '값'],
+                ['ℹ️ 파일 정보', ''],
+                ['', ''],
+                ['시스템 정보', '값'],
                 ['생성 도구', '시니어 YouTube 트렌드 분석기 Pro'],
-                ['파일 버전', '2.0 (백그라운드 데이터 수정)'],
+                ['파일 버전', '2.1 (시트 구성 개선)'],
                 ['생성 시간', new Date().toISOString()],
+                ['한국 시간', new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })],
+                ['', ''],
+                ['데이터 수집 정보', '값'],
                 ['데이터 소스', dataSource],
                 ['API 호출 수', this.backgroundDataStats.apiCallsCount || 'N/A'],
-                ['수집 시간', this.backgroundDataStats.collectionTime || 'N/A']
+                ['수집 시작 시간', this.backgroundDataStats.collectionTime || 'N/A'],
+                ['수집 완료 시간', new Date().toISOString()],
+                ['', ''],
+                ['파일 구성', '값'],
+                ['전체 시트 수', '5개'],
+                ['📊 전체 데이터', '메인 데이터 (제목 클릭 시 YouTube 링크)'],
+                ['📈 데이터 통계', '기본 통계 및 성능 지표'],
+                ['🏷️ 키워드별 분석', '검색 키워드별 상세 분석'],
+                ['🔍 품질 분석', '데이터 품질 및 성과 분석'],
+                ['ℹ️ 파일 정보', '시스템 정보 및 메타데이터'],
+                ['', ''],
+                ['사용법 안내', '값'],
+                ['제목 링크', '📊 전체 데이터 시트에서 제목을 클릭하면 해당 YouTube 영상으로 이동'],
+                ['정렬 기능', 'Excel의 데이터 > 정렬 기능으로 원하는 기준으로 재정렬 가능'],
+                ['필터 기능', 'Excel의 데이터 > 필터 기능으로 조건에 맞는 데이터만 표시 가능'],
+                ['차트 생성', '데이터를 선택 후 삽입 > 차트로 시각화 가능']
             ];
+            
             const metaSheet = XLSX.utils.aoa_to_sheet(metaData);
             XLSX.utils.book_append_sheet(workbook, metaSheet, 'ℹ️ 파일 정보');
-            
-            // ⬆️⬆️⬆️ 여기까지 새로 추가되는 코드 ⬆️⬆️⬆️
             
 
             
