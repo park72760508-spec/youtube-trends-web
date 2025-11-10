@@ -2326,6 +2326,47 @@ class OptimizedYoutubeTrendsAnalyzer {
                 const categorySheet = XLSX.utils.json_to_sheet(categoryData);
                 XLSX.utils.book_append_sheet(workbook, categorySheet, '카테고리별 분석');
             }
+
+
+            // ⬇️⬇️⬇️ 여기서부터 새로 추가되는 코드 ⬇️⬇️⬇️
+            
+            // 🔥 데이터 완전성 검증 및 품질 정보 추가
+            const qualityData = [
+                ['품질 지표', '값', '설명'],
+                ['', '', ''],
+                ['🔍 데이터 완전성', `${Math.round((dataToDownload.length / (this.fullBackgroundData?.length || dataToDownload.length)) * 100)}%`, '전체 수집 대비 다운로드 비율'],
+                ['📊 데이터 품질', realVideos > 0 ? '✅ 실제 API 데이터 포함' : '⚠️ 모의 데이터만 포함', '수집된 데이터의 신뢰성'],
+                ['🎯 키워드 커버리지', Object.keys(categories).length, '수집된 고유 키워드 수'],
+                ['⚡ 최신성', dataToDownload.filter(v => {
+                    const publishDate = new Date(v.publishedAt || v.publishDate);
+                    const daysDiff = (Date.now() - publishDate.getTime()) / (1000 * 60 * 60 * 24);
+                    return daysDiff <= 7;
+                }).length, '최근 7일 내 업로드 영상 수'],
+                ['🔥 고성장 영상', dataToDownload.filter(v => (parseInt(v.viralScore) || 0) >= 500).length, '바이럴 점수 500 이상 영상'],
+                ['📱 쇼츠 품질', shortsCount > 0 ? `${Math.round(dataToDownload.filter(v => v.isShorts && (parseInt(v.viralScore) || 0) >= 300).length / shortsCount * 100)}%` : 'N/A', '고품질 쇼츠 비율 (바이럴 300+)'],
+                ['🎬 롱폼 품질', (dataToDownload.length - shortsCount) > 0 ? `${Math.round(dataToDownload.filter(v => !v.isShorts && (parseInt(v.viralScore) || 0) >= 400).length / (dataToDownload.length - shortsCount) * 100)}%` : 'N/A', '고품질 롱폼 비율 (바이럴 400+)']
+            ];
+
+            // 품질 분석 시트 추가
+            const qualitySheet = XLSX.utils.aoa_to_sheet(qualityData);
+            XLSX.utils.book_append_sheet(workbook, qualitySheet, '🔍 품질 분석');
+
+            // 메타데이터 시트 추가
+            const metaData = [
+                ['메타 정보', '값'],
+                ['생성 도구', '시니어 YouTube 트렌드 분석기 Pro'],
+                ['파일 버전', '2.0 (백그라운드 데이터 수정)'],
+                ['생성 시간', new Date().toISOString()],
+                ['데이터 소스', dataSource],
+                ['API 호출 수', this.backgroundDataStats.apiCallsCount || 'N/A'],
+                ['수집 시간', this.backgroundDataStats.collectionTime || 'N/A']
+            ];
+            const metaSheet = XLSX.utils.aoa_to_sheet(metaData);
+            XLSX.utils.book_append_sheet(workbook, metaSheet, 'ℹ️ 파일 정보');
+            
+            // ⬆️⬆️⬆️ 여기까지 새로 추가되는 코드 ⬆️⬆️⬆️
+            
+
             
             // 파일명 생성 및 다운로드
             // 🔥 개선된 파일명 (데이터 유형 표시)
