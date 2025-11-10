@@ -349,6 +349,15 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.baseUrl = 'https://www.googleapis.com/youtube/v3';
         this.allVideos = [];
         this.scanResults = [];
+        
+        // 🔥 백그라운드 전체 데이터 보존 변수 추가
+        this.fullBackgroundData = []; // 원본 전체 수집 데이터 보존
+        this.backgroundDataStats = {
+            totalCollected: 0,
+            processedCount: 0,
+            collectionTime: null
+        };
+        
         this.isScanning = false;
         this.charts = {};
         
@@ -866,10 +875,21 @@ class OptimizedYoutubeTrendsAnalyzer {
             this.showError('이미 스캔이 진행 중입니다.');
             return;
         }
-        
+
+
+        // 스캔 시작 시 백그라운드 데이터 초기화
         this.isScanning = true;
         this.allVideos = [];
         this.scanResults = [];
+        
+        // 🔥 백그라운드 데이터 초기화
+        this.fullBackgroundData = [];
+        this.backgroundDataStats = {
+            totalCollected: 0,
+            processedCount: 0,
+            collectionTime: new Date().toISOString()
+        };
+        
         
         // UI 상태 변경
         this.showScanProgress();
@@ -983,6 +1003,11 @@ class OptimizedYoutubeTrendsAnalyzer {
                 const dedupedResults = this.dedupeRows(mappedResults);
                 
                 // 🔥 백그라운드 전체 데이터 저장 (UI 제한 전 모든 데이터)
+                // 🔥 백그라운드 전체 데이터 별도 보존 (핵심 수정!)
+                this.fullBackgroundData = [...dedupedResults]; // 깊은 복사로 원본 보존
+                this.backgroundDataStats.processedCount = dedupedResults.length;
+                
+                // 기존 로직 유지 (하위 호환성)
                 this.allVideos = dedupedResults;
                 
                 // 🔽 화면 표시용 제한된 결과 설정 (rank 추가)
@@ -1409,11 +1434,14 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     selectTopResults(count) {
-        this.allVideos.sort((a, b) => b.viralScore - a.viralScore);
-        const topResults = this.allVideos.slice(0, count);
+        // 🔥 원본 데이터 손실 방지 - 복사본으로 작업
+        const sortedVideos = [...this.allVideos].sort((a, b) => b.viralScore - a.viralScore);
+        const topResults = sortedVideos.slice(0, count);
         topResults.forEach((video, index) => {
             video.rank = index + 1;
         });
+        
+        // 🔥 원본 this.allVideos는 건드리지 않고 결과만 반환
         return topResults;
     }
     
@@ -1864,26 +1892,41 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 백그라운드 전체 데이터 다운로드 (모든 수집된 데이터)
     downloadBackgroundData() {
-        // 변경 후
-        let dataToDownload = [];
-        let dataSource = '';
-        
-        if (this.allVideos && this.allVideos.length > 0) {
-            dataToDownload = this.allVideos;
-            dataSource = '전체 백그라운드 데이터';
-        } else if (this.scanResults && this.scanResults.length > 0) {
-            dataToDownload = this.scanResults;
-            dataSource = '화면 표시 데이터 (백그라운드 데이터 없음)';
-        } else {
-            alert('다운로드할 데이터가 없습니다. 먼저 스캔을 실행해주세요.');
-            return;
-        }
-        
         try {
+            // 🔥 우선순위 기반 데이터 소스 선택 (완전히 새로운 로직)
+            let dataToDownload = [];
+            let dataSource = '';
+            let isFullBackgroundData = false;
+            
+            // 1순위: 전체 백그라운드 데이터 (새로 추가된 보존 변수)
+            if (this.fullBackgroundData && this.fullBackgroundData.length > 0) {
+                dataToDownload = this.fullBackgroundData;
+                dataSource = `전체 백그라운드 데이터 (${this.fullBackgroundData.length}개)`;
+                isFullBackgroundData = true;
+                console.log(`📊 전체 백그라운드 데이터 사용: ${this.fullBackgroundData.length}개`);
+            }
+            // 2순위: 기존 allVideos (fallback)
+            else if (this.allVideos && this.allVideos.length > 0) {
+                dataToDownload = this.allVideos;
+                dataSource = `처리된 데이터 (${this.allVideos.length}개)`;
+                console.log(`⚠️ 처리된 데이터 사용: ${this.allVideos.length}개`);
+            }
+            // 3순위: 화면 표시 데이터
+            else if (this.scanResults && this.scanResults.length > 0) {
+                dataToDownload = this.scanResults;
+                dataSource = `화면 표시 데이터만 (${this.scanResults.length}개)`;
+                console.log(`⚠️ 화면 표시 데이터만 사용: ${this.scanResults.length}개`);
+            } else {
+                alert('다운로드할 데이터가 없습니다. 먼저 스캔을 실행해주세요.');
+                return;
+            }
+            
+            console.log(`📥 백그라운드 데이터 다운로드 시작: ${dataSource}`);
+            
             const workbook = XLSX.utils.book_new();
             
-            // 전체 백그라운드 데이터 매핑
-            const backgroundData = this.allVideos.map((video, index) => {
+            // 🔥 실제 선택된 데이터로 매핑 (수정된 부분)
+            const backgroundData = dataToDownload.map((video, index) => {
                 const videoId = video.videoId || 'N/A';
                 const youtubeLink = videoId !== 'N/A' ? `https://www.youtube.com/watch?v=${videoId}` : 'N/A';
                 
@@ -1957,18 +2000,25 @@ class OptimizedYoutubeTrendsAnalyzer {
             const mockVideos = this.allVideos.filter(v => v.isSimulated).length;
             const shortsCount = this.allVideos.filter(v => v.isShorts).length;
             
+            // 🔥 백그라운드 데이터 상태 포함된 통계
             const summaryData = [
-                ['항목', '값'],
-                ['전체 수집 데이터 수', this.allVideos.length],
-                ['화면 표시 데이터 수', this.scanResults ? this.scanResults.length : 0],
-                ['실제 데이터', realVideos],
-                ['모의 데이터', mockVideos],
-                ['쇼츠 개수', shortsCount],
-                ['롱폼 개수', this.allVideos.length - shortsCount],
-                ['쇼츠 비율', `${Math.round((shortsCount / this.allVideos.length) * 100)}%`],
-                ['평균 바이럴 점수', this.allVideos.length > 0 ? Math.round(this.allVideos.reduce((sum, v) => sum + (v.viralScore || 0), 0) / this.allVideos.length) : 0],
-                ['API 할당량 사용', this.quotaUsed ? `${this.quotaUsed}/${this.quotaLimit}` : 'N/A'],
-                ['수집 일시', new Date().toLocaleString('ko-KR')]
+                ['항목', '값', '설명'],
+                ['📊 데이터 소스', dataSource, '다운로드된 데이터의 출처'],
+                ['🔥 전체 백그라운드 데이터', this.fullBackgroundData.length, '백그라운드에서 수집된 전체 데이터'],
+                ['📺 화면 표시 데이터', this.scanResults ? this.scanResults.length : 0, '화면에 표시되는 제한된 데이터'],
+                ['💾 현재 다운로드 데이터', dataToDownload.length, '이 파일에 포함된 데이터 수'],
+                ['', '', ''],
+                ['✅ 실제 데이터', realVideos, 'API에서 수집한 실제 YouTube 데이터'],
+                ['🎯 모의 데이터', mockVideos, '부족분 보완용 시뮬레이션 데이터'],
+                ['📱 쇼츠 개수', shortsCount, '60초 이하 Short 형태 영상'],
+                ['🎬 롱폼 개수', dataToDownload.length - shortsCount, '60초 초과 일반 영상'],
+                ['📊 쇼츠 비율', `${Math.round((shortsCount / dataToDownload.length) * 100)}%`, '전체 중 쇼츠 비중'],
+                ['🔥 평균 바이럴 점수', dataToDownload.length > 0 ? Math.round(dataToDownload.reduce((sum, v) => sum + (v.viralScore || 0), 0) / dataToDownload.length) : 0, '바이럴 가능성 점수 (0-1000)'],
+                ['⚙️ API 할당량 사용', this.quotaUsed ? `${this.quotaUsed}/${this.quotaLimit}` : 'N/A', '사용된 YouTube API 할당량'],
+                ['⏰ 수집 시작 시간', this.backgroundDataStats.collectionTime || 'N/A', '백그라운드 데이터 수집 시작'],
+                ['📅 다운로드 시간', new Date().toLocaleString('ko-KR'), '이 파일이 생성된 시간'],
+                ['', '', ''],
+                ['🎯 백그라운드 수집 상태', isFullBackgroundData ? '✅ 완전한 백그라운드 데이터' : '⚠️ 제한된 데이터', '다운로드 데이터의 완전성']
             ];
             
             const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
@@ -1998,14 +2048,26 @@ class OptimizedYoutubeTrendsAnalyzer {
             }
             
             // 파일명 생성 및 다운로드
-            const fileName = `시니어_YouTube_백그라운드_전체데이터_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            // 🔥 개선된 파일명 (데이터 유형 표시)
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const dataType = isFullBackgroundData ? '완전백데이터' : '제한데이터';
+            const fileName = `시니어_YouTube_${dataType}_${dataToDownload.length}개_${timestamp}.xlsx`;
+            
             XLSX.writeFile(workbook, fileName);
             
-            // 성공 메시지
+            // 🔥 개선된 성공 메시지
+            const detailMessage = isFullBackgroundData ? 
+                `✅ 백그라운드에서 수집된 완전한 ${dataToDownload.length}개 데이터가 다운로드되었습니다.\n📊 수집 통계 및 카테고리별 분석 포함` :
+                `⚠️ 제한된 ${dataToDownload.length}개 데이터가 다운로드되었습니다.\n전체 백그라운드 데이터가 손실되었을 가능성이 있습니다.`;
+            
             this.showSuccessMessage(
                 '백그라운드 데이터 다운로드 완료!', 
-                `전체 ${this.allVideos.length}개의 수집된 데이터가 다운로드되었습니다.`
+                detailMessage
             );
+            
+            console.log(`✅ 백그라운드 데이터 다운로드 완료: ${fileName}`);
+            console.log(`📊 데이터 소스: ${dataSource}`);
+            console.log(`🔍 완전성: ${isFullBackgroundData ? '완전한 백그라운드 데이터' : '부분 데이터'}`);
             
         } catch (error) {
             console.error('백그라운드 데이터 다운로드 오류:', error);
