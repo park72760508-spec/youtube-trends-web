@@ -787,11 +787,12 @@ class OptimizedYoutubeTrendsAnalyzer {
         const downloadExcel = document.getElementById('downloadExcel');
         const downloadCSV = document.getElementById('downloadCSV');
         const downloadJSON = document.getElementById('downloadJSON');
+        const downloadBackgroundData = document.getElementById('downloadBackgroundData');
         const downloadPDF = document.getElementById('downloadPDF');
         
         if (downloadExcel) downloadExcel.addEventListener('click', () => this.downloadExcel());
+        if (downloadCSV) downloadCSV.addEventListener('click', () => this.downloadCSV());
         if (downloadJSON) downloadJSON.addEventListener('click', () => this.downloadJSON());
-        const downloadBackgroundData = document.getElementById('downloadBackgroundData');
         if (downloadBackgroundData) downloadBackgroundData.addEventListener('click', () => this.downloadBackgroundData());
         if (downloadPDF) downloadPDF.addEventListener('click', () => this.downloadPDF());
     }
@@ -1678,24 +1679,70 @@ class OptimizedYoutubeTrendsAnalyzer {
         try {
             const workbook = XLSX.utils.book_new();
             
-            const mainData = this.scanResults.map(video => ({
-                '순위': video.rank,
-                '제목': video.title,
-                '채널': video.channel,
-                '바이럴점수': video.viralScore,
-                '조회수': video.viewCount,
-                '좋아요': video.likeCount,
-                '댓글수': video.commentCount,
-                '참여율': `${video.engagementRate.toFixed(2)}%`,
-                '성장률': `${video.growthRate.toFixed(1)}%`,
-                '형식': video.isShorts ? '쇼츠' : '롱폼',
-                '길이': `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}`,
-                '업로드일': video.publishDate,
-                '검색키워드': video.searchKeyword,
-                '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터'
-            }));
+            const mainData = this.scanResults.map(video => {
+                const videoId = video.videoId || 'N/A';
+                const youtubeLink = videoId !== 'N/A' ? `https://www.youtube.com/watch?v=${videoId}` : 'N/A';
+                
+                return {
+                    '순위': video.rank,
+                    '제목': video.title,
+                    'YouTube_링크': youtubeLink,
+                    '채널': video.channel,
+                    '바이럴점수': video.viralScore,
+                    '조회수': video.viewCount,
+                    '좋아요': video.likeCount,
+                    '댓글수': video.commentCount,
+                    '참여율': `${video.engagementRate.toFixed(2)}%`,
+                    '성장률': `${video.growthRate.toFixed(1)}%`,
+                    '형식': video.isShorts ? '쇼츠' : '롱폼',
+                    '길이': `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}`,
+                    '업로드일': video.publishDate,
+                    '검색키워드': video.searchKeyword,
+                    '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터'
+                };
+            });
             
             const mainSheet = XLSX.utils.json_to_sheet(mainData);
+            
+            // 하이퍼링크 추가 (YouTube_링크 컬럼에 실제 클릭 가능한 링크 설정)
+            const range = XLSX.utils.decode_range(mainSheet['!ref']);
+            for (let rowNum = range.s.r + 1; rowNum <= range.e.r; rowNum++) {
+                const linkCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 2 }); // YouTube_링크 컬럼 (C열)
+                const titleCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 1 }); // 제목 컬럼 (B열)
+                
+                if (mainSheet[linkCellAddr] && mainSheet[linkCellAddr].v !== 'N/A') {
+                    const youtubeUrl = mainSheet[linkCellAddr].v;
+                    const title = mainSheet[titleCellAddr] ? mainSheet[titleCellAddr].v : 'YouTube 링크';
+                    
+                    // 하이퍼링크 설정
+                    mainSheet[linkCellAddr] = {
+                        t: 's', // string type
+                        v: title, // display text
+                        l: { Target: youtubeUrl } // hyperlink target
+                    };
+                }
+            }
+            
+            // 컬럼 너비 자동 조정
+            const wscols = [
+                { wch: 5 },   // 순위
+                { wch: 50 },  // 제목 
+                { wch: 25 },  // YouTube_링크
+                { wch: 20 },  // 채널
+                { wch: 12 },  // 바이럴점수
+                { wch: 12 },  // 조회수
+                { wch: 10 },  // 좋아요
+                { wch: 10 },  // 댓글수
+                { wch: 10 },  // 참여율
+                { wch: 10 },  // 성장률
+                { wch: 8 },   // 형식
+                { wch: 10 },  // 길이
+                { wch: 20 },  // 업로드일
+                { wch: 15 },  // 검색키워드
+                { wch: 12 }   // 데이터타입
+            ];
+            mainSheet['!cols'] = wscols;
+            
             XLSX.utils.book_append_sheet(workbook, mainSheet, '최상위 핫한 영상');
             
             const realVideos = this.scanResults.filter(v => !v.isSimulated).length;
@@ -1783,7 +1830,10 @@ class OptimizedYoutubeTrendsAnalyzer {
                 shortsRatio: Math.round((this.scanResults.filter(v => v.isShorts).length / this.scanResults.length) * 100),
                 avgGrowthRate: (this.scanResults.reduce((sum, v) => sum + v.growthRate, 0) / this.scanResults.length).toFixed(1)
             },
-            results: this.scanResults
+            results: this.scanResults.map(video => ({
+                ...video,
+                youtubeUrl: video.videoId ? `https://www.youtube.com/watch?v=${video.videoId}` : null
+            }))
         };
         
         const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
@@ -1794,9 +1844,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     downloadPDF() {
         alert('PDF 다운로드 기능은 현재 개발 중입니다. Excel 형식을 이용해주세요.');
     }
-
-
-
+    
     // 백그라운드 전체 데이터 다운로드 (모든 수집된 데이터)
     downloadBackgroundData() {
         if (!this.allVideos || this.allVideos.length === 0) {
@@ -1808,26 +1856,73 @@ class OptimizedYoutubeTrendsAnalyzer {
             const workbook = XLSX.utils.book_new();
             
             // 전체 백그라운드 데이터 매핑
-            const backgroundData = this.allVideos.map((video, index) => ({
-                '순위': index + 1,
-                '제목': video.title || '제목 없음',
-                '채널': video.channelTitle || video.channel || '채널 없음',
-                '바이럴점수': video.viralScore || 0,
-                '조회수': video.viewCount || 0,
-                '좋아요': video.likeCount || 0,
-                '댓글수': video.commentCount || 0,
-                '참여율': video.engagementRate ? `${video.engagementRate.toFixed(2)}%` : 'N/A',
-                '성장률': video.growthRate ? `${video.growthRate.toFixed(1)}%` : 'N/A',
-                '형식': video.isShorts ? '쇼츠' : '롱폼',
-                '길이': video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : 'N/A',
-                '업로드일': video.publishedAt || video.publishDate || 'N/A',
-                '검색키워드': video.searchKeyword || 'N/A',
-                '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터',
-                '비디오ID': video.videoId || 'N/A'
-            }));
+            const backgroundData = this.allVideos.map((video, index) => {
+                const videoId = video.videoId || 'N/A';
+                const youtubeLink = videoId !== 'N/A' ? `https://www.youtube.com/watch?v=${videoId}` : 'N/A';
+                
+                return {
+                    '순위': index + 1,
+                    '제목': video.title || '제목 없음',
+                    'YouTube_링크': youtubeLink,
+                    '채널': video.channelTitle || video.channel || '채널 없음',
+                    '바이럴점수': video.viralScore || 0,
+                    '조회수': video.viewCount || 0,
+                    '좋아요': video.likeCount || 0,
+                    '댓글수': video.commentCount || 0,
+                    '참여율': video.engagementRate ? `${video.engagementRate.toFixed(2)}%` : 'N/A',
+                    '성장률': video.growthRate ? `${video.growthRate.toFixed(1)}%` : 'N/A',
+                    '형식': video.isShorts ? '쇼츠' : '롱폼',
+                    '길이': video.duration ? `${Math.floor(video.duration / 60)}:${(video.duration % 60).toString().padStart(2, '0')}` : 'N/A',
+                    '업로드일': video.publishedAt || video.publishDate || 'N/A',
+                    '검색키워드': video.searchKeyword || 'N/A',
+                    '데이터타입': video.isSimulated ? '모의데이터' : '실제데이터',
+                    '비디오ID': videoId
+                };
+            });
             
             // 메인 시트 생성
             const mainSheet = XLSX.utils.json_to_sheet(backgroundData);
+            
+            // 하이퍼링크 추가 (YouTube_링크 컬럼에 실제 클릭 가능한 링크 설정)
+            const range = XLSX.utils.decode_range(mainSheet['!ref']);
+            for (let rowNum = range.s.r + 1; rowNum <= range.e.r; rowNum++) {
+                const linkCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 2 }); // YouTube_링크 컬럼 (C열)
+                const titleCellAddr = XLSX.utils.encode_cell({ r: rowNum, c: 1 }); // 제목 컬럼 (B열)
+                
+                if (mainSheet[linkCellAddr] && mainSheet[linkCellAddr].v !== 'N/A') {
+                    const youtubeUrl = mainSheet[linkCellAddr].v;
+                    const title = mainSheet[titleCellAddr] ? mainSheet[titleCellAddr].v : 'YouTube 링크';
+                    
+                    // 하이퍼링크 설정
+                    mainSheet[linkCellAddr] = {
+                        t: 's', // string type
+                        v: title, // display text
+                        l: { Target: youtubeUrl } // hyperlink target
+                    };
+                }
+            }
+            
+            // 컬럼 너비 자동 조정
+            const wscols = [
+                { wch: 5 },   // 순위
+                { wch: 60 },  // 제목 
+                { wch: 25 },  // YouTube_링크
+                { wch: 25 },  // 채널
+                { wch: 12 },  // 바이럴점수
+                { wch: 15 },  // 조회수
+                { wch: 10 },  // 좋아요
+                { wch: 10 },  // 댓글수
+                { wch: 10 },  // 참여율
+                { wch: 10 },  // 성장률
+                { wch: 8 },   // 형식
+                { wch: 10 },  // 길이
+                { wch: 20 },  // 업로드일
+                { wch: 15 },  // 검색키워드
+                { wch: 12 },  // 데이터타입
+                { wch: 15 }   // 비디오ID
+            ];
+            mainSheet['!cols'] = wscols;
+            
             XLSX.utils.book_append_sheet(workbook, mainSheet, '전체 백그라운드 데이터');
             
             // 통계 요약 시트
@@ -1890,8 +1985,6 @@ class OptimizedYoutubeTrendsAnalyzer {
             alert('백그라운드 데이터 다운로드 중 오류가 발생했습니다.');
         }
     }
-
-
     
     // 기타 유틸리티 메서드들
     
