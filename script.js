@@ -10,6 +10,14 @@
             this.currentKeyIndex = 0;
             this.keyQuotaUsage = this.loadKeyQuotaUsage();
             this.quotaLimit = 10000; // 키당 일일 할당량
+            
+            // 🔥 할당량 관리 설정 (새로 추가)
+            this.quotaSettings = {
+                limitModeThreshold: 0.97,    // 97% 사용시 제한 모드
+                disableThreshold: 0.98,      // 98% 사용시 사용 불가
+                warningThreshold: 0.90       // 90% 사용시 경고 표시
+            };
+
             this.quotaResetTime = this.getQuotaResetTime();
             
             // 키별 상태 추적
@@ -154,8 +162,11 @@
                 const keyStatus = this.keyStatus.get(currentKey);
                 
                 // 키가 사용 가능한지 확인
-                if (keyStatus === 'active' && keyUsage < (this.quotaLimit - 500)) {
-                    console.log(`🔑 사용 중인 API 키: ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit})`);
+                // 🔥 키가 사용 가능한지 확인 (98% 사용시 사용 불가)
+                const usageThreshold = Math.floor(this.quotaLimit * 0.98); // 98% 기준
+                if (keyStatus === 'active' && keyUsage < usageThreshold) {
+                    const usagePercent = ((keyUsage / this.quotaLimit) * 100).toFixed(1);
+                    console.log(`🔑 사용 중인 API 키: ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit}, ${usagePercent}%)`);
                     return currentKey;
                 }
                 
@@ -196,9 +207,12 @@
             this.saveKeyQuotaUsage();
             
             // 할당량 한계 확인
-            if (newUsage >= (this.quotaLimit - 1000)) {
+            // 🔥 할당량 한계 확인 (97% 사용시 제한 모드)
+            const limitThreshold = Math.floor(this.quotaLimit * 0.97); // 97% 기준
+            if (newUsage >= limitThreshold) {
                 this.keyStatus.set(apiKey, 'limited');
-                console.warn(`⚠️ API 키 할당량 거의 소진: ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit})`);
+                const usagePercent = ((newUsage / this.quotaLimit) * 100).toFixed(1);
+                console.warn(`⚠️ API 키 할당량 97% 초과로 제한 모드: ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
             }
             
             console.log(`📊 할당량 업데이트: ${apiKey.substr(0, 10)}... +${units} (총: ${newUsage}/${this.quotaLimit})`);
@@ -326,14 +340,25 @@
             `;
         }
         
-        getStatusText(status) {
+        getStatusText(status, usage = 0) {
+            const usagePercent = this.quotaLimit > 0 ? (usage / this.quotaLimit) * 100 : 0;
+            
             switch (status) {
-                case 'active': return '🟢 활성';
-                case 'limited': return '🟡 제한';
-                case 'error': return '🔴 에러';
+                case 'active': 
+                    if (usagePercent >= (this.quotaSettings.warningThreshold * 100)) {
+                        return '🟡 주의';
+                    }
+                    return '🟢 활성';
+                case 'limited': return '🔴 제한 (97%+)';
+                case 'error': return '❌ 에러';
                 default: return '❓ 알 수 없음';
             }
         }
+
+
+
+
+        
     }
     // ★★★★★ MultiApiKeyManager 클래스 끝 ★★★★★
 
