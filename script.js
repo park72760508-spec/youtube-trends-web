@@ -2502,6 +2502,23 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
     
+
+
+        // 🔥 수집 통계 업데이트 함수 추가
+        updateCollectionStats() {
+            const statsElement = document.getElementById('collectionStats');
+            if (statsElement && this.fullBackgroundData && this.fullBackgroundData.length > 0) {
+                const displayLimit = this.backgroundDataStats.displayLimit || 50;
+                if (this.fullBackgroundData.length > displayLimit) {
+                    statsElement.textContent = `📊 백그라운드 수집: ${this.fullBackgroundData.length}개 (화면 표시: ${displayLimit}개)`;
+                    statsElement.style.display = 'block';
+                } else {
+                    statsElement.style.display = 'none';
+                }
+            }
+        }
+
+
     
     downloadBlob(blob, fileName) {
         const url = URL.createObjectURL(blob);
@@ -3703,9 +3720,13 @@ class OptimizedYoutubeTrendsAnalyzer {
             .slice(0, maxCount);
         
         // 결과 표시
+        // UI 업데이트
         this.displayResults();
-        this.updateSummaryCards();
-        this.showResultsSections();
+        this.showResultsSection();
+        this.createCharts();
+        
+        // 🔥 수집 통계 업데이트 추가
+        this.updateCollectionStats();
     }
 
 
