@@ -163,10 +163,13 @@
                 
                 // 키가 사용 가능한지 확인
                 // 🔥 키가 사용 가능한지 확인 (98% 사용시 사용 불가)
-                const usageThreshold = Math.floor(this.quotaLimit * 0.98); // 98% 기준
+                // 키가 사용 가능한지 확인
+                // 🔥 설정 기반 키 사용 가능 여부 확인 (disableThreshold 기준)
+                const usageThreshold = Math.floor(this.quotaLimit * this.quotaSettings.disableThreshold);
                 if (keyStatus === 'active' && keyUsage < usageThreshold) {
                     const usagePercent = ((keyUsage / this.quotaLimit) * 100).toFixed(1);
-                    console.log(`🔑 사용 중인 API 키: ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit}, ${usagePercent}%)`);
+                    const thresholdPercent = (this.quotaSettings.disableThreshold * 100).toFixed(0);
+                    console.log(`🔑 사용 중인 API 키 (${thresholdPercent}% 이하): ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit}, ${usagePercent}%)`);
                     return currentKey;
                 }
                 
@@ -208,11 +211,21 @@
             
             // 할당량 한계 확인
             // 🔥 할당량 한계 확인 (97% 사용시 제한 모드)
-            const limitThreshold = Math.floor(this.quotaLimit * 0.97); // 97% 기준
+            // 🔥 설정 기반 할당량 관리
+            const limitThreshold = Math.floor(this.quotaLimit * this.quotaSettings.limitModeThreshold);
+            const warningThreshold = Math.floor(this.quotaLimit * this.quotaSettings.warningThreshold);
+            const usagePercent = ((newUsage / this.quotaLimit) * 100).toFixed(1);
+            
+            // 제한 모드 설정 (limitModeThreshold 기준)
             if (newUsage >= limitThreshold) {
                 this.keyStatus.set(apiKey, 'limited');
-                const usagePercent = ((newUsage / this.quotaLimit) * 100).toFixed(1);
-                console.warn(`⚠️ API 키 할당량 97% 초과로 제한 모드: ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
+                const limitPercent = (this.quotaSettings.limitModeThreshold * 100).toFixed(0);
+                console.warn(`⚠️ API 키 제한 모드 (${limitPercent}%+ 사용): ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
+            }
+            // 경고 모드 설정 (warningThreshold 기준)
+            else if (newUsage >= warningThreshold) {
+                const warningPercent = (this.quotaSettings.warningThreshold * 100).toFixed(0);
+                console.warn(`🟡 API 키 주의 (${warningPercent}%+ 사용): ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
             }
             
             console.log(`📊 할당량 업데이트: ${apiKey.substr(0, 10)}... +${units} (총: ${newUsage}/${this.quotaLimit})`);
