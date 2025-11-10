@@ -4492,6 +4492,26 @@ class OptimizedYoutubeTrendsAnalyzer {
             return `${minutes}:${secs.toString().padStart(2, '0')}`;
         }
     }
+
+
+
+    // 🔥 안전한 함수 호출 유틸리티 추가
+    safeCallMethod(methodName, ...args) {
+        try {
+            if (typeof this[methodName] === 'function') {
+                console.log(`📞 ${methodName} 함수 호출`);
+                return this[methodName](...args);
+            } else {
+                console.warn(`⚠️ ${methodName} 함수가 존재하지 않습니다.`);
+                return null;
+            }
+        } catch (error) {
+            console.error(`❌ ${methodName} 함수 호출 중 오류:`, error);
+            return null;
+        }
+    }
+
+
     
     // 에러 메시지 표시
     showError(message) {
