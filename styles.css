@@ -1968,3 +1968,26 @@ body {
     margin-top: 6px;
     display: inline-block;
 }
+
+
+/* 백데이터 다운로드 버튼 스타일 추가 */
+.download-btn.background {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    border-color: #7c3aed;
+}
+
+.download-btn.background:hover {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+    transform: translateY(-3px);
+}
+
+.download-btn.background i {
+    color: #ffffff;
+}
+
+.download-btn.background:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+
