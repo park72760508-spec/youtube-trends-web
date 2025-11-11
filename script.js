@@ -2992,7 +2992,6 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
     }
 
-    }
 
 
     // 백그라운드 시뮬레이션 정지 (새로 추가)
