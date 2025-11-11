@@ -988,15 +988,44 @@ class OptimizedYoutubeTrendsAnalyzer {
                     return;
                 }
                 
-                if (stats.remainingQuota <= 0) {
-                    console.warn('🔴 모든 API 키의 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
-                    this.showDemoModeNotice();
-                    this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
-                    // 데모 데이터임을 명확히 표시
-                    this.allVideos.forEach(video => {
-                        video.isSimulated = true;
-                        video.title = "🎯 [데모] " + video.title;
-                    });
+            if (stats.remainingQuota <= 0) {
+              console.warn('🔴 모든 API 키의 할당량이 완전히 소진되었습니다. 데모 모드로 실행합니다.');
+              this.showDemoModeNotice();
+            
+              // 1) 모의데이터 생성
+              this.allVideos = this.mockDataGenerator.generateRealisticData(category, count);
+            
+              // 2) 데모 표시 플래그
+              this.allVideos.forEach(video => {
+                video.isSimulated = true;
+                video.title = "🎯 [데모] " + video.title;
+              });
+            
+              // 3) 🔥 백그라운드(원본) 풀 보존 + 통계 갱신
+              this.fullBackgroundData = Array.isArray(this.allVideos) ? JSON.parse(JSON.stringify(this.allVideos)) : [];
+              this.backgroundDataStats = this.backgroundDataStats || {};
+              this.backgroundDataStats.totalCollected = this.fullBackgroundData.length;
+              this.backgroundDataStats.processedCount = this.fullBackgroundData.length;
+              this.backgroundDataStats.collectionTime = new Date().toISOString();
+            
+              // 4) 🔥 실시간 카운터 반영
+              this.realTimeCounters = this.realTimeCounters || {
+                backgroundData: 0,
+                detectedVideos: 0,
+                processingRate: 0,
+                lastUpdateTime: Date.now(),
+                rateCalculationBuffer: []
+              };
+              this.realTimeCounters.backgroundData = this.fullBackgroundData.length;
+              this.realTimeCounters.detectedVideos = Math.max(
+                this.realTimeCounters.detectedVideos || 0,
+                (this.scanResults?.length || 0)
+              );
+            
+              // 5) 🔥 DOM 즉시 업데이트
+              if (typeof this.updateRealtimeDisplay === 'function') {
+                this.updateRealtimeDisplay();  // #backgroundDataCount, #detectedVideos, #processingRate 반영
+              }
                 } else {
                     // 할당량이 있으면 실제 데이터만 사용
                     console.log(`🟢 실제 데이터로 검색을 진행합니다. (활용 가능 할당량: ${stats.remainingQuota.toLocaleString()})`);
