@@ -4487,7 +4487,7 @@ class OptimizedYoutubeTrendsAnalyzer {
       el.classList?.add('updating');
       el.textContent = text;
       setTimeout(() => el.classList?.remove('updating'), 180);
-    },
+    }
     
     // 2) 처리속도(X/초) 갱신 타이머
     startRealtimeCounters() {
