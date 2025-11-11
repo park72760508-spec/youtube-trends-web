@@ -3058,6 +3058,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     // OptimizedYoutubeTrendsAnalyzer 클래스에 추가할 메서드들
     
     // 키워드 티어별 선택 메서드
+    // 키워드 티어별 선택 메서드
     getSelectedKeywords(category, tier) {
         let keywords = [];
         
@@ -3066,10 +3067,19 @@ class OptimizedYoutubeTrendsAnalyzer {
                 keywords = this.optimizedKeywords.tier1;
                 break;
             case 'tier1+2':
-                keywords = [...this.optimizedKeywords.tier1, ...this.optimizedKeywords.tier2];
+                // 배열 전개로 티어1+티어2 결합
+                keywords = [
+                    ...this.optimizedKeywords.tier1,
+                    ...this.optimizedKeywords.tier2
+                ];
                 break;
             case 'all':
-                keywords = [...this.optimizedKeywords.tier1, ...this.optimizedKeywords.tier2, ...this.optimizedKeywords.tier3];
+                // 배열 전개로 티어1+2+3 결합
+                keywords = [
+                    ...this.optimizedKeywords.tier1,
+                    ...this.optimizedKeywords.tier2,
+                    ...this.optimizedKeywords.tier3
+                ];
                 break;
             default:
                 keywords = this.optimizedKeywords.tier1;
@@ -3084,6 +3094,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         console.log(`🎯 선택된 키워드 (${tier}):`, keywords);
         return keywords;
     }
+
     
     // YouTube 링크 생성 메서드
     generateYouTubeLink(videoId) {
