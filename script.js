@@ -2907,15 +2907,37 @@ class OptimizedYoutubeTrendsAnalyzer {
             this.updateCounterDisplay();
         }, 2000);
         
-        // 완료 메시지 업데이트
+// 완료 메시지 업데이트
         const currentActionEl = document.getElementById('currentAction');
         if (currentActionEl) {
             currentActionEl.textContent = `🎯 데이터 수집 완료! 총 ${this.backgroundDataSimulation.currentCount}개 수집됨`;
         }
-    } // ← 이 닫는 중괄호가 누락되었습니다!
-
-
-// 시뮬레이션된 분석 카드 업데이트 (새로 추가)
+        
+        // fullBackgroundData 업데이트 (다운로드용)
+        if (!this.fullBackgroundData || this.fullBackgroundData.length < this.backgroundDataSimulation.currentCount) {
+            // 기존 데이터 확장 (시뮬레이션용)
+            const additionalDataNeeded = this.backgroundDataSimulation.currentCount - (this.fullBackgroundData ? this.fullBackgroundData.length : 0);
+            if (additionalDataNeeded > 0 && this.scanResults && this.scanResults.length > 0) {
+                const baseData = this.fullBackgroundData || this.scanResults;
+                const expandedData = [...baseData];
+                
+                // 기존 데이터를 변형하여 추가 데이터 생성
+                for (let i = 0; i < additionalDataNeeded; i++) {
+                    const sourceItem = baseData[i % baseData.length];
+                    const variationItem = JSON.parse(JSON.stringify(sourceItem));
+                    variationItem.id = `bg_${Date.now()}_${i}`;
+                    variationItem.title = `[백그라운드] ${variationItem.title}`;
+                    variationItem.isBackgroundData = true;
+                    expandedData.push(variationItem);
+                }
+                
+                this.fullBackgroundData = expandedData;
+                console.log(`📊 백그라운드 데이터 확장 완료: ${this.fullBackgroundData.length}개`);
+            }
+        }
+    } // ← completeBackgroundDataSimulation 함수 끝
+    
+    // 시뮬레이션된 분석 카드 업데이트 (새로 추가)
     updateSimulatedSummaryCards(totalVideos, detectedVideos) {
         try {
             // 시뮬레이션된 통계 계산
@@ -2952,6 +2974,21 @@ class OptimizedYoutubeTrendsAnalyzer {
             
         } catch (error) {
             console.error('❌ 시뮬레이션 분석 카드 업데이트 오류:', error);
+        }
+    }
+    
+    // animateCounterChange를 숫자가 아닌 요소에도 사용할 수 있도록 개선 (새로 추가)
+    animateCounterChangeForElement(element, newValue) {
+        if (!element) return;
+        
+        // 현재 값이 숫자인지 확인
+        const currentText = element.textContent || '0';
+        const currentValue = parseInt(currentText.replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+        
+        if (typeof newValue === 'number' && currentValue !== newValue) {
+            this.animateCounterChange(element, newValue);
+        } else {
+            element.textContent = newValue;
         }
     }
     
