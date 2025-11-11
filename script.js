@@ -5274,7 +5274,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     
       // 🔥 백데이터 업데이트 라인 제거
       // if (bgEl) bgEl.textContent = totalCollected.toLocaleString('ko-KR');
-
+    }  // ✅ 메서드 닫는 중괄호 추가
     
   
 }  // ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 끝 부분 ★★★★★
