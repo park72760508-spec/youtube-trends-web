@@ -3792,7 +3792,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     
       for (const keyword of keywords) {
         if (!this.isScanning) break; // 중지 버튼 체크
-        try {
+try {
           console.log(`🔍 키워드 검색 중: ${keyword}`);
           
           // 캐시 확인
@@ -3811,34 +3811,33 @@ class OptimizedYoutubeTrendsAnalyzer {
             }
           }
           
-        // ... runFullScan 내부
-        // ... runFullScan 내부
-        if (videos && videos.length > 0) {
-          // 배열 전개(push ...videos)
-          this.allVideos.push(...videos);
-          foundVideos += videos.length;
-          
-          // ▶ 스캔 진행률 업데이트 + 실시간 카운터 추가
-          this.bumpCountersOnBatch({
-            addedBackground: videos.length,
-            addedDetected: 0  // 검출은 나중에 계산
-          });
-          this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경!
+          // ✅ try 블록 안으로 이동
+          if (videos && videos.length > 0) {
+            // 배열 전개(push ...videos)
+            this.allVideos.push(...videos);
+            foundVideos += videos.length;
+            
+            // ▶ 스캔 진행률 업데이트 + 실시간 카운터 추가
+            this.bumpCountersOnBatch({
+              addedBackground: videos.length,
+              addedDetected: 0  // 검출은 나중에 계산
+            });
+            this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경!
+          }
     
-        processedKeywords++;
-        
-        // ★ 실시간 카운터(백데이터/검출/속도) 갱신 추가
-        this.updateRealtimeCounters(foundVideos, processedKeywords);
-        
-        // 진행 상황 업데이트
-        this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-        this.updateCurrentAction?.(`"${keyword}" 처리 중`);
-        
-        // API 요청 간 지연
-        await this.delay(500);
-
+          processedKeywords++;
           
-        } catch (error) {
+          // ★ 실시간 카운터(백데이터/검출/속도) 갱신 추가
+          this.updateRealtimeCounters(foundVideos, processedKeywords);
+          
+          // 진행 상황 업데이트
+          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+          
+          // API 요청 간 지연
+          await this.delay(500);
+          
+        } catch (error) {  // ✅ 이제 올바른 try-catch 구조
           console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
         }
       }
