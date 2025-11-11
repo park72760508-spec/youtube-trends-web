@@ -1071,7 +1071,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                         commentCount: Number(v.statistics?.commentCount || 0),
                         isShorts: (() => {
                           const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-                          return secs <= 60;
+                          return secs <= 180;
                         })(),
                         viralScore: Math.round((v.__score || v.score || 0) * 10),
                         searchKeyword: v.searchKeyword || 'N/A',
@@ -1521,7 +1521,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         
         // 영상 길이 파싱
         const duration = this.parseDuration(contentDetails.duration || 'PT0M');
-        const isShorts = duration <= 60;
+        const isShorts = duration <= 180;
         
         // 업로드 날짜
         const publishedAt = new Date(snippet.publishedAt);
@@ -2334,7 +2334,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                     const seconds = duration % 60;
                     durationText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 } else if (video.isShorts) {
-                    durationText = '<1:00 (쇼츠)';
+                    durationText = '<3:00 (쇼츠)';
                 }
                 
                 // 🔥 업로드일 포맷 통일
@@ -2450,8 +2450,8 @@ class OptimizedYoutubeTrendsAnalyzer {
                 ['📊 콘텐츠 분석', '', ''],
                 ['✅ 실제 데이터', realVideos, 'API에서 수집한 실제 YouTube 데이터'],
                 ['🎯 모의 데이터', mockVideos, '부족분 보완용 시뮬레이션 데이터'],
-                ['📱 쇼츠 개수', shortsCount, '60초 이하 Short 형태 영상'],
-                ['🎬 롱폼 개수', dataToDownload.length - shortsCount, '60초 초과 일반 영상'],
+                ['📱 쇼츠 개수', shortsCount, '180초 이하 Short 형태 영상'],
+                ['🎬 롱폼 개수', dataToDownload.length - shortsCount, '180초 초과 일반 영상'],
                 ['📊 쇼츠 비율', dataToDownload.length > 0 ? `${Math.round((shortsCount / dataToDownload.length) * 100)}%` : '0%', '전체 중 쇼츠 비중'],
                 ['', '', ''],
                 ['🔥 성능 지표', '', ''],
@@ -3450,8 +3450,8 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (!t || (now - t) > rangeMs) return false;
         if (format === 'shorts' || format === 'long') {
           const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-          if (format === 'shorts' && secs > 60) return false;
-          if (format === 'long' && secs <= 60) return false;
+          if (format === 'shorts' && secs > 180) return false;
+          if (format === 'long' && secs <= 180) return false;
         }
         return true;
       });
@@ -3652,8 +3652,8 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (!t || (now - t) > rangeMs) return false;
         if (format === 'shorts' || format === 'long') {
           const secs = this.parseISODurationToSec(v.contentDetails?.duration || 'PT0S');
-          if (format === 'shorts' && secs > 60) return false;
-          if (format === 'long' && secs <= 60) return false;
+          if (format === 'shorts' && secs > 180) return false;
+          if (format === 'long' && secs <= 180) return false;
         }
         return true;
       });
@@ -4088,7 +4088,7 @@ class OptimizedYoutubeTrendsAnalyzer {
                 }
                 
                 const duration = this.parseDuration(contentDetails.duration);
-                const isShorts = duration <= 60;
+                const isShorts = duration <= 180;
                 
                 const videoData = {
                     id: item.id.videoId,
@@ -5406,7 +5406,7 @@ class MockDataGenerator {
         const subscriberCount = Math.floor(viewCount * (0.1 + Math.random() * 0.5));
         
         const isShorts = Math.random() < 0.4;
-        const duration = isShorts ? Math.floor(Math.random() * 60) + 15 : Math.floor(Math.random() * 600) + 120;
+        const duration = isShorts ? Math.floor(Math.random() * 180) + 15 : Math.floor(Math.random() * 600) + 120;
         
         const daysAgo = Math.floor(Math.random() * 7) + 1;
         const publishedAt = new Date(Date.now() - (daysAgo * 24 * 60 * 60 * 1000));
@@ -5456,7 +5456,7 @@ class MockDataGenerator {
             if (Math.random() < patterns.shortsRatio) {
                 video.isShorts = true;
                 video.format = 'shorts';
-                video.duration = Math.floor(Math.random() * 45) + 15;
+                video.duration = Math.floor(Math.random() * 165) + 15;
             }
         }
         
