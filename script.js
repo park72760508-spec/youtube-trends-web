@@ -2537,61 +2537,6 @@ class OptimizedYoutubeTrendsAnalyzer {
     // 기타 유틸리티 메서드들
     
     
-    // 진행 상황 업데이트 함수 부분)
-    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
-        const progressSection = document.getElementById('scanProgress');
-        if (progressSection && progressSection.style.display === 'none') {
-            progressSection.style.display = 'block';
-        }
-        
-        const progressBar = document.getElementById('progressBar');
-        const scannedKeywordsEl = document.getElementById('scannedKeywords');
-        const foundVideosEl = document.getElementById('foundVideos');
-        const calculatedScoresEl = document.getElementById('calculatedScores');
-        const currentActionEl = document.getElementById('currentAction');
-        
-        // 기본 진행바 업데이트
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
-            progressBar.textContent = `${Math.round(percent)}%`;
-        }
-        
-        if (scannedKeywordsEl) {
-            scannedKeywordsEl.textContent = `${scannedKeywords} / ${totalKeywords}`;
-        }
-        
-        if (foundVideosEl) {
-            foundVideosEl.textContent = foundVideos.toLocaleString();
-        }
-        
-        if (calculatedScoresEl) {
-            calculatedScoresEl.textContent = foundVideos.toLocaleString();
-        }
-        
-        // 실시간 카운터 업데이트
-        this.updateRealtimeCounters(foundVideos, scannedKeywords);
-        
-        if (currentActionEl) {
-            if (percent >= 100) {
-                currentActionEl.textContent = '🎯 기본 스캔 완료! 백그라운드 데이터 수집 중...';
-                // 100% 완료 후 백그라운드 애니메이션 시작
-                this.showPostProgressAnimation();
-                
-                // 분석 결과 섹션 표시
-                const analysisSummary = document.getElementById('analysisSummary');
-                if (analysisSummary) {
-                    analysisSummary.style.display = 'block';
-                }
-                
-                // 백그라운드 데이터 수집 시뮬레이션 시작 (약간의 지연 후)
-                setTimeout(() => {
-                    this.startBackgroundDataSimulation();
-                }, 500);
-            } else {
-                currentActionEl.textContent = action || `🔍 키워드 검색 중... (${scannedKeywords}/${totalKeywords})`;
-            }
-        }
-    }
     
     // 실시간 카운터 업데이트 함수 (새로 추가)
     // 실시간 카운터 업데이트 함수 (개선된 버전)
@@ -3739,144 +3684,168 @@ class OptimizedYoutubeTrendsAnalyzer {
     
 
     // runFullScan 메서드 추가 (클래스 내부에)
+    // runFullScan 메서드 추가 (클래스 내부에)
     async runFullScan(keywords, format, timeRange, count, viewCountFilter = 'all') {
-        console.log('🚀 전체 스캔 시작:', { 
-            keywords: keywords.length, 
-            format, 
-            timeRange, 
-            count, 
-            viewCountFilter: this.getViewCountFilterText(viewCountFilter)
+      console.log('🚀 전체 스캔 시작:', { 
+        keywords: keywords.length, 
+        format, 
+        timeRange, 
+        count, 
+        viewCountFilter: this.getViewCountFilterText(viewCountFilter)
+      });
+      
+      const totalKeywords = keywords.length;
+      let processedKeywords = 0;
+      let foundVideos = 0;
+    
+      // ▶ 초기값 DOM 반영 + 처리속도 타이머 시작
+      this.updateScanProgress(0, totalKeywords, 0);
+      this.startRealtimeCounters();
+      this.updateCurrentAction?.('백데이터 수집 시작');
+    
+      for (const keyword of keywords) {
+        if (!this.isScanning) break; // 중지 버튼 체크
+        try {
+          console.log(`🔍 키워드 검색 중: ${keyword}`);
+          
+          // 캐시 확인
+          const cacheKey = this.getCacheKey(keyword, format, timeRange);
+          let videos = this.getFromCache(cacheKey);
+          
+          if (!videos) {
+            // API 호출
+            if (this.canUseQuota(100)) {
+              videos = await this.searchVideosForKeyword(keyword, format, timeRange, viewCountFilter);
+              // 할당량 업데이트는 searchVideosForKeyword에서 자동 처리됨
+              this.saveToCache(cacheKey, videos);
+            } else {
+              console.warn(`⚠️ 할당량 부족으로 ${keyword}를 모의 데이터로 대체합니다.`);
+              videos = this.mockDataGenerator.generateForKeyword(keyword, 5);
+            }
+          }
+          
+          if (videos && videos.length > 0) {
+            // 배열 전개(push ...items)
+            this.allVideos.push(...videos);
+            foundVideos += videos.length;
+          }
+    
+          processedKeywords++;
+          
+          // 진행 상황 업데이트
+          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+          
+          // API 요청 간 지연
+          await this.delay(500);
+          
+        } catch (error) {
+          console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
+        }
+      }
+    
+      // ▶ 루프 종료: 처리속도 타이머 정리
+      this.stopRealtimeCounters();
+      this.updateCurrentAction?.('🔧 백그라운드 데이터 추가 분석 중…');
+      
+      // 모든 API 키 실패 시 데모 모드 자동 전환
+      if (this.allVideos.length === 0 && processedKeywords > 0) {
+        console.warn('🔴 모든 키워드 검색이 실패했습니다. 데모 모드로 전환합니다.');
+        
+        this.showSuccess(`
+          API 키 문제로 인해 데모 모드로 전환되었습니다.
+          
+          실제 데이터를 보시려면:
+          1. API 키 상태를 확인하세요
+          2. 새로운 API 키를 추가하세요  
+          3. 내일 다시 시도해보세요
+        `, 'API 문제 감지');
+        
+        // 데모 데이터 생성
+        const category = document.getElementById('scanCategory')?.value || 'all';
+        this.allVideos = this.mockDataGenerator.generateRealisticData(category, count || 50);
+        this.allVideos.forEach(video => {
+          video.isSimulated = true;
+          video.title = "🎯 [데모] " + video.title;
         });
         
-        const totalKeywords = keywords.length;
-        let processedKeywords = 0;
-        let foundVideos = 0;
-        
-        for (const keyword of keywords) {
-            if (!this.isScanning) break; // 중지 버튼 체크
-            
-            try {
-                console.log(`🔍 키워드 검색 중: ${keyword}`);
-                
-                // 캐시 확인
-                const cacheKey = this.getCacheKey(keyword, format, timeRange);
-                let videos = this.getFromCache(cacheKey);
-                
-                if (!videos) {
-                    // API 호출
-                    if (this.canUseQuota(100)) {
-                        videos = await this.searchVideosForKeyword(keyword, format, timeRange, viewCountFilter);
-                        // 할당량 업데이트는 searchVideosForKeyword에서 자동 처리됨
-                        this.saveToCache(cacheKey, videos);
-                    } else {
-                        console.warn(`⚠️ 할당량 부족으로 ${keyword}를 모의 데이터로 대체합니다.`);
-                        videos = this.mockDataGenerator.generateForKeyword(keyword, 5);
-                    }
-                }
-                
-                if (videos && videos.length > 0) {
-                    this.allVideos.push(...videos);
-                    foundVideos += videos.length;
-                }
-                
-                processedKeywords++;
-                
-                // 진행 상황 업데이트
-                this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-                
-                // API 요청 간 지연
-                await this.delay(500);
-                
-            } catch (error) {
-                console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
-            }
-        }
-        
-        // ★★★ 여기가 삽입 위치 ★★★
-        // 모든 API 키 실패 시 데모 모드 자동 전환
-        if (this.allVideos.length === 0 && processedKeywords > 0) {
-            console.warn('🔴 모든 키워드 검색이 실패했습니다. 데모 모드로 전환합니다.');
-            
-            this.showSuccess(`
-                API 키 문제로 인해 데모 모드로 전환되었습니다.
-                
-                실제 데이터를 보시려면:
-                1. API 키 상태를 확인하세요
-                2. 새로운 API 키를 추가하세요  
-                3. 내일 다시 시도해보세요
-            `, 'API 문제 감지');
-            
-            // 데모 데이터 생성
-            const category = document.getElementById('scanCategory')?.value || 'all';
-            this.allVideos = this.mockDataGenerator.generateRealisticData(category, count || 50);
-            this.allVideos.forEach(video => {
-                video.isSimulated = true;
-                video.title = "🎯 [데모] " + video.title;
-            });
-            
-            console.log(`📊 데모 데이터 ${this.allVideos.length}개 생성 완료`);
-        }
-        
-        // 바이럴 점수 계산 및 결과 정리
-        await this.processAndDisplayResults(count, viewCountFilter);
+        console.log(`📊 데모 데이터 ${this.allVideos.length}개 생성 완료`);
+      }
+      
+      // 바이럴 점수 계산 및 결과 정리
+      await this.processAndDisplayResults(count, viewCountFilter);
     }
+
+    
     
     // runSmartMode 메서드 추가
+    // runSmartMode 메서드 추가
     async runSmartMode(category, format, count, limitedKeywords) {
-        console.log('🧠 스마트 모드 실행:', { category, format, count, keywords: limitedKeywords.length });
-        
-        // 제한된 키워드로만 검색
-        const totalKeywords = limitedKeywords.length;
-        let processedKeywords = 0;
-        let foundVideos = 0;
-        
-        for (const keyword of limitedKeywords) {
-            if (!this.isScanning) break;
-            
-            try {
-                console.log(`🔍 스마트 검색: ${keyword}`);
-                
-                // 스마트 모드에서는 더 짧은 기간 사용 (API 효율성)
-                const smartTimeRange = timeRange === '2weeks' ? '1week' : 
-                                      timeRange === '1week' ? '3days' : 
-                                      timeRange === '3days' ? '1day' : '1day';
-                const cacheKey = this.getCacheKey(keyword, format, smartTimeRange);
-                let videos = this.getFromCache(cacheKey);
-                
-                if (!videos) {
-                    if (this.canUseQuota(100)) {
-                        videos = await this.searchVideosForKeyword(keyword, format, 'week');
-                        this.saveToCache(cacheKey, videos);
-                    } else {
-                        break; // 할당량 부족시 중단
-                    }
-                }
-                
-                if (videos && videos.length > 0) {
-                    this.allVideos.push(...videos);
-                    foundVideos += videos.length;
-                }
-                
-                processedKeywords++;
-                this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-                
-                await this.delay(300);
-                
-            } catch (error) {
-                console.error(`❌ 스마트 모드 검색 실패:`, error);
+      console.log('🧠 스마트 모드 실행:', { category, format, count, keywords: limitedKeywords.length });
+      
+      // 제한된 키워드로만 검색
+      const totalKeywords = limitedKeywords.length;
+      let processedKeywords = 0;
+      let foundVideos = 0;
+    
+      // ▶ 초기값 DOM 반영 + 처리속도 타이머 시작
+      this.updateScanProgress(0, totalKeywords, 0);
+      this.startRealtimeCounters();
+      this.updateCurrentAction?.('스마트 스캔 시작');
+    
+      for (const keyword of limitedKeywords) {
+        if (!this.isScanning) break;
+        try {
+          console.log(`🔍 스마트 검색: ${keyword}`);
+          
+          // 스마트 모드에서는 더 짧은 기간 사용 (API 효율성)
+          const smartTimeRange = timeRange === '2weeks' ? '1week' : 
+                                 timeRange === '1week'  ? '3days' : 
+                                 timeRange === '3days'  ? '1day'  : '1day';
+          const cacheKey = this.getCacheKey(keyword, format, smartTimeRange);
+          let videos = this.getFromCache(cacheKey);
+          
+          if (!videos) {
+            if (this.canUseQuota(100)) {
+              // 스마트 모드: 최근 위주
+              videos = await this.searchVideosForKeyword(keyword, format, 'week');
+              this.saveToCache(cacheKey, videos);
+            } else {
+              break; // 할당량 부족시 중단
             }
+          }
+          
+          if (videos && videos.length > 0) {
+            this.allVideos.push(...videos);
+            foundVideos += videos.length;
+          }
+    
+          processedKeywords++;
+          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+    
+          await this.delay(300);
+          
+        } catch (error) {
+          console.error(`❌ 스마트 모드 검색 실패:`, error);
         }
-        
-        // 부족한 데이터는 모의 데이터로 보충
-        const remainingCount = Math.max(0, count - this.allVideos.length);
-        if (remainingCount > 0) {
-            console.log(`📊 모의 데이터 ${remainingCount}개 생성`);
-            const mockVideos = this.mockDataGenerator.generateRealisticData(category, remainingCount);
-            this.allVideos.push(...mockVideos);
-        }
-        
-        await this.processAndDisplayResults(count);
+      }
+    
+      // ▶ 루프 종료: 처리속도 타이머 정리
+      this.stopRealtimeCounters();
+      this.updateCurrentAction?.('🔧 백그라운드 데이터 추가 분석 중…');
+      
+      // 부족한 데이터는 모의 데이터로 보충
+      const remainingCount = Math.max(0, count - this.allVideos.length);
+      if (remainingCount > 0) {
+        console.log(`📊 모의 데이터 ${remainingCount}개 생성`);
+        const mockVideos = this.mockDataGenerator.generateRealisticData(category, remainingCount);
+        this.allVideos.push(...mockVideos);
+      }
+      
+      await this.processAndDisplayResults(count);
     }
+
     
     // searchVideosForKeyword 메서드 추가 (실제 API 호출)
     async searchVideosForKeyword(keyword, format, timeRange) {
@@ -4499,52 +4468,116 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
-    // ===== 누락된 핵심 메서드들 추가 =====
-        
-    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
+    // ===== 실시간 카운터/진행률/처리속도 표시 — 통째로 교체 =====
+    
+    // 1) 숫자 표시를 부드럽게 갱신
+    updateCounterDisplay(el, text) {
+      if (!el) return;
+      el.classList?.add('updating');
+      el.textContent = text;
+      setTimeout(() => el.classList?.remove('updating'), 180);
+    },
+    
+    // 2) 처리속도(X/초) 갱신 타이머
+    startRealtimeCounters() {
+      this._rtLastProcessed = 0;
+      this._rtTickId = setInterval(() => {
+        try {
+          const rateEl = document.getElementById('processingRate');
+          // 우선순위: processedKeywords -> scannedKeywords(구버전)
+          const processedEl =
+            document.getElementById('processedKeywords') ||
+            document.getElementById('scannedKeywords');
+    
+          const currProcessed = Number(
+            (processedEl?.textContent || '0').toString().replace(/[^\d]/g, '')
+          ) || 0;
+    
+          const delta = currProcessed - (this._rtLastProcessed || 0);
+          this._rtLastProcessed = currProcessed;
+    
+          if (rateEl) this.updateCounterDisplay(rateEl, `${Math.max(0, delta)}/초`);
+        } catch (e) {
+          console.warn('processingRate tick error:', e);
+        }
+      }, 1000);
+    },
+    
+    stopRealtimeCounters() {
+      if (this._rtTickId) {
+        clearInterval(this._rtTickId);
+        this._rtTickId = null;
+      }
+      this._rtLastProcessed = 0;
+    },
+    
+    // 3) 진행 상황 통합 갱신 (새 규격 + 구규격 ID 모두 지원)
+    updateScanProgress(processedKeywords, totalKeywords, foundVideos, forcedPercent) {
       const progressBar = document.getElementById('progressBar');
-      const scannedKeywordsEl = document.getElementById('scannedKeywords');
-      const foundVideosEl = document.getElementById('foundVideos');
-      const calculatedScoresEl = document.getElementById('calculatedScores');
-      const currentActionEl = document.getElementById('currentAction');
     
-      // ===== 진행 수치 보정(클램프) =====
-      const safeTotal = Math.max(1, Number(totalKeywords || 0));
-      const safeScanned = Math.max(0, Math.min(Number(scannedKeywords || 0), safeTotal));
+      // 새 규격
+      const processedEl = document.getElementById('processedKeywords');
+      const totalEl     = document.getElementById('totalKeywords');
+      const foundEl     = document.getElementById('foundVideos');
+      const quotaEl     = document.getElementById('quotaUsage');
     
-      // percent가 넘어와도, 기본은 "진짜 진행률"을 우선 사용
-      let computedPercent = Math.round((safeScanned / safeTotal) * 100);
-      if (!Number.isFinite(computedPercent)) computedPercent = 0;
+      // 구 규격(겸용)
+      const scannedEl   = document.getElementById('scannedKeywords');      // "x / y" 형식
+      const scoresEl    = document.getElementById('calculatedScores');     // (없으면 무시)
     
-      // 외부에서 강제 percent를 주면 둘 중 더 작은 값 사용 (100% 초과 방지)
-      if (Number.isFinite(percent)) {
-        computedPercent = Math.min(computedPercent, Math.round(Math.max(0, Math.min(percent, 100))));
+      const safeTotal     = Math.max(1, Number(totalKeywords || 0));
+      const safeProcessed = Math.max(0, Math.min(Number(processedKeywords || 0), safeTotal));
+    
+      // 진행률 계산
+      let percent = Math.round((safeProcessed / safeTotal) * 100);
+      if (!Number.isFinite(percent)) percent = 0;
+    
+      // 필요 시 외부 강제 퍼센트 적용(100% 초과 방지, 더 작은 값 우선)
+      if (Number.isFinite(forcedPercent)) {
+        percent = Math.min(percent, Math.max(0, Math.min(100, Math.round(forcedPercent))));
       }
-      computedPercent = Math.max(0, Math.min(computedPercent, 100));
     
-      // ===== UI 반영 =====
+      // 새 규격 표시
+      if (processedEl) this.updateCounterDisplay(processedEl, String(safeProcessed));
+      if (totalEl)     this.updateCounterDisplay(totalEl,     String(safeTotal));
+      if (foundEl)     this.updateCounterDisplay(foundEl,     String(Number(foundVideos || 0)));
+      if (quotaEl)     this.updateCounterDisplay(quotaEl,     String(Number(this.quotaUsed || 0)));
+    
+      // 구 규격 표시(겸용): "x / y"
+      if (scannedEl)   this.updateCounterDisplay(scannedEl,   `${safeProcessed} / ${safeTotal}`);
+      if (scoresEl)    this.updateCounterDisplay(scoresEl,    `${safeProcessed}`);
+    
+      // 진행바
       if (progressBar) {
-        progressBar.style.width = `${computedPercent}%`;
-        progressBar.textContent = `${computedPercent}%`;
-      }
-      if (scannedKeywordsEl) {
-        scannedKeywordsEl.textContent = `${safeScanned} / ${safeTotal}`;
-      }
-      if (foundVideosEl) {
-        const fv = Number(foundVideos || 0);
-        foundVideosEl.textContent = Number.isFinite(fv) ? fv.toLocaleString() : '0';
-      }
-      if (calculatedScoresEl) {
-        // 기존 코드가 foundVideos를 그대로 넣던 문제 수정: '점수 계산된 건수'가 없다면 최소 스캔 진행 수로 표시
-        calculatedScoresEl.textContent = `${safeScanned}`;
-      }
-      if (currentActionEl) {
-        currentActionEl.textContent = action || '';
+        progressBar.style.width = `${percent}%`;
+        progressBar.textContent = `${percent}%`;
       }
     
-      // 콘솔 로그(보정값 기준)
-      console.log(`📊 진행률: ${safeScanned}/${safeTotal} (${computedPercent}%)  ${action || ''}`);
-    }
+      // 디버깅 로그
+      // console.log(`📊 진행률: ${safeProcessed}/${safeTotal} (${percent}%)`);
+    },
+    
+    // 4) 현재 작업 상태 문구
+    updateCurrentAction(text) {
+      const el = document.getElementById('currentAction');
+      if (el) el.textContent = text || '';
+    },
+    
+    // 5) [호환용] 기존 updateProgress 시그니처 유지
+    //    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action)
+    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
+      // 기존 호출부 호환: scannedKeywords → processedKeywords로 간주
+      const safeTotal     = Math.max(1, Number(totalKeywords || 0));
+      const safeProcessed = Math.max(0, Math.min(Number(scannedKeywords || 0), safeTotal));
+    
+      // 상태 문구 먼저 갱신
+      this.updateCurrentAction(action);
+    
+      // 통합 갱신 함수 호출(필요 시 percent를 강제값으로 전달)
+      const forcedPercent = Number.isFinite(percent) ? percent : undefined;
+      this.updateScanProgress(safeProcessed, safeTotal, foundVideos, forcedPercent);
+    },
+
 
     
     // 중복 제거 메서드
