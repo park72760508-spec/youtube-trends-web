@@ -115,7 +115,7 @@
             this.saveApiKeys();
             this.saveKeyQuotaUsage();
             
-            console.log(`✅ API 키 추가됨: ${trimmedKey.substr(0, 10)}...`);
+            console.log(`✅ API 키 추가됨: ${trimmedKey.substring(0, 10)}...`);
             return true;
         }
         
@@ -139,7 +139,7 @@
             this.saveApiKeys();
             this.saveKeyQuotaUsage();
             
-            console.log(`🗑️ API 키 제거됨: ${removedKey.substr(0, 10)}...`);
+            console.log(`🗑️ API 키 제거됨: ${removedKey.substring(0, 10)}...`);
             return true;
         }
         
@@ -169,7 +169,7 @@
                 if (keyStatus === 'active' && keyUsage < usageThreshold) {
                     const usagePercent = ((keyUsage / this.quotaLimit) * 100).toFixed(1);
                     const thresholdPercent = (this.quotaSettings.disableThreshold * 100).toFixed(0);
-                    console.log(`🔑 사용 중인 API 키 (${thresholdPercent}% 이하): ${currentKey.substr(0, 10)}... (${keyUsage}/${this.quotaLimit}, ${usagePercent}%)`);
+                    console.log(`🔑 사용 중인 API 키 (${thresholdPercent}% 이하): ${currentKey.substring(0, 10)}... (${keyUsage}/${this.quotaLimit}, ${usagePercent}%)`);
                     return currentKey;
                 }
                 
@@ -191,7 +191,7 @@
             }
             
             if (bestKey) {
-                console.log(`⚠️ 최선의 키 선택: ${bestKey.substr(0, 10)}... (${lowestUsage}/${this.quotaLimit})`);
+                console.log(`⚠️ 최선의 키 선택: ${bestKey.substring(0, 10)}... (${lowestUsage}/${this.quotaLimit})`);
                 return bestKey;
             }
             
@@ -5248,10 +5248,10 @@ class MockDataGenerator {
         const publishedAt = new Date(Date.now() - (daysAgo * 24 * 60 * 60 * 1000));
         
         return {
-            id: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: `mock_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             title: title,
             channel: channel,
-            channelId: `mock_channel_${Math.random().toString(36).substr(2, 9)}`,
+            channelId: `mock_channel_${Math.random().toString(36).substring(2, 9)}`,
             thumbnail: `https://img.youtube.com/vi/mock_thumbnail/hqdefault.jpg`,
             description: `${title}에 대한 자세한 내용입니다.`,
             
