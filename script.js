@@ -493,6 +493,10 @@ class OptimizedYoutubeTrendsAnalyzer {
             rateCalculationBuffer: []
         };
 
+          // 🔥 실시간 처리율 타이머 시작
+          this.startLiveMetricsUpdater(); // <--- 추가
+
+        
         // === 운영 기본값(최초 1회) ===
         if (!localStorage.getItem('hot_maxChannels')) {
           localStorage.setItem('hot_maxChannels','100'); // 기본 100, UI에서 10~1000 조정
@@ -1109,6 +1113,16 @@ class OptimizedYoutubeTrendsAnalyzer {
                             duration: duration
                         };
                     });
+
+
+                    // 🔥 실시간 카운터에 반영 (배치 결과 기준)
+                    this.bumpCountersOnBatch({
+                      addedBackground: this.fullBackgroundData?.length || 0,     // 백데이터 총량 반영
+                      addedDetected: this.scanResults?.length || 0               // 검출(표시) 영상 수
+                    });
+                    // 통계에 맞춰 즉시 DOM 업데이트
+                    this.updateLiveCountersUI();
+
                     
                     // 🔥 안전한 공통 표시 루틴 (오류 방지)
                     try {
@@ -1122,6 +1136,8 @@ class OptimizedYoutubeTrendsAnalyzer {
                             this.updateSummaryCards?.();
                             console.log('✅ 기본 결과 표시 완료');
                         }
+                            this.updateLiveCountersUI()
+                        
                     } catch (error) {
                         console.error('❌ 결과 처리 중 오류 발생:', error);
                         
@@ -1192,7 +1208,12 @@ class OptimizedYoutubeTrendsAnalyzer {
                 } catch (error) {
                     console.error('❌ 진행 상황 숨기기 오류:', error);
                 }
-                
+
+
+                // 🔥 실시간 타이머 정지 및 최종 UI 동기화
+                this.stopLiveMetricsUpdater();
+                this.updateLiveCountersUI();
+                                
                 // 🔥 최종 수집 통계 로깅
                 const finalCollectedCount = this.fullBackgroundData ? this.fullBackgroundData.length : 0;
                 const finalDisplayedCount = this.scanResults ? this.scanResults.length : 0;
@@ -1336,24 +1357,27 @@ class OptimizedYoutubeTrendsAnalyzer {
             );
             
             try {
+                const prevLen = videos.length;
                 const batchResults = await Promise.all(batchPromises);
                 
+                let added = 0;
                 for (const result of batchResults) {
-                    if (result && result.length > 0) {
-                        videos.push(...result);
-                    }
+                  if (result && result.length > 0) {
+                    videos.push(...result);
+                    added += result.length;
+                  }
                 }
                 
-                this.updateProgress(
-                    ((i + batch.length) / keywords.length) * 70,
-                    keywords.length,
-                    i + batch.length,
-                    videos.length,
-                    `배치 검색 중... (${i + batch.length}/${keywords.length})`
-                );
+                // 🔥 배치 단위 실시간 카운터 bump
+                this.bumpCountersOnBatch({
+                  addedBackground: added,              // 백그라운드 수집량 증가
+                  addedDetected: 0                     // 검출(표시)은 후단에서 제한/정렬 후 반영
+                });
+                this.updateLiveCountersUI();
                 
-                // 배치 간 딜레이
+                this.updateProgress(...);
                 await this.delay(1500);
+
                 
             } catch (error) {
                 console.warn(`배치 검색 오류:`, error);
@@ -1383,7 +1407,14 @@ class OptimizedYoutubeTrendsAnalyzer {
         try {
             const result = await this.searchVideosForKeyword(keyword, format, timeRange);
             this.saveToCache(cacheKey, result);
+            
+            // 🔥 키워드 단위로도 실시간 반영
+            if (Array.isArray(result) && result.length > 0) {
+              this.bumpCountersOnBatch({ addedBackground: result.length, addedDetected: 0 });
+              this.updateLiveCountersUI();
+            }
             return result;
+
         } catch (error) {
             console.error(`키워드 "${keyword}" 검색 실패:`, error);
             
@@ -5141,8 +5172,63 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (viewCount >= 10000) return 2;         // 1만 이상: +2점
         return 0;                                 // 그 외: +0점
     }    
+
+
     
+    // === 실시간 메트릭 유틸 ===
+    startLiveMetricsUpdater() {
+      if (this._metricsTimer) return;
+      this._metricsTimer = setInterval(() => {
+        // 1) processingRate 계산 (최근 1초 버퍼 합계)
+        const now = Date.now();
+        const windowMs = 1000;
+        this.realTimeCounters.rateCalculationBuffer =
+          (this.realTimeCounters.rateCalculationBuffer || []).filter(t => now - t < windowMs);
+        this.realTimeCounters.processingRate = this.realTimeCounters.rateCalculationBuffer.length;
     
+        // 2) DOM 반영
+        this.updateLiveCountersUI();
+      }, 1000);
+    }
+    
+    stopLiveMetricsUpdater() {
+      if (this._metricsTimer) {
+        clearInterval(this._metricsTimer);
+        this._metricsTimer = null;
+      }
+    }
+    
+    bumpCountersOnBatch({ addedBackground = 0, addedDetected = 0 }) {
+      // 누적 증가
+      this.realTimeCounters.backgroundData += addedBackground;
+      this.realTimeCounters.detectedVideos += addedDetected;
+    
+      // 처리율 버퍼 채우기 (added 만큼 타임스탬프 push)
+      const now = Date.now();
+      for (let i = 0; i < (addedBackground + addedDetected); i++) {
+        this.realTimeCounters.rateCalculationBuffer.push(now);
+      }
+    }
+    
+    updateLiveCountersUI() {
+      // 안전한 셀렉터(없으면 skip)
+      const bgEl = document.querySelector('#backgroundDataCount, [data-metric="backgroundData"]');
+      const detEl = document.querySelector('#detectedVideosCount, [data-metric="detectedVideos"]');
+      const rateEl = document.querySelector('#processingRate, [data-metric="processingRate"]');
+      const foundEl = document.querySelector('#discoveredVideosCount, [data-metric="discoveredVideos"]');
+    
+      // 화면 수치는 보존된 전체/현재 표시값 기반
+      const totalCollected = this.backgroundDataStats?.totalCollected || this.realTimeCounters.backgroundData || 0;
+      const detected = this.scanResults?.length || this.realTimeCounters.detectedVideos || 0;
+      const rate = this.realTimeCounters.processingRate || 0;
+      const discovered = (this.allVideos?.length || 0); // 또는 정책상 fullBackgroundData.length
+    
+      if (bgEl)   bgEl.textContent = totalCollected.toLocaleString('ko-KR');
+      if (detEl)  detEl.textContent = detected.toLocaleString('ko-KR');
+      if (rateEl) rateEl.textContent = `${rate.toLocaleString('ko-KR')}/초`;
+      if (foundEl)foundEl.textContent = discovered.toLocaleString('ko-KR');
+    }
+
     
   
 }  // ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 끝 부분 ★★★★★
