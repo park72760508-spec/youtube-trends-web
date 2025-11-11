@@ -3060,6 +3060,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     
 
         // 🔥 수집 통계 업데이트 함수 추가
+        // 🔥 수집 통계 업데이트 함수 추가
         updateCollectionStats() {
             const statsElement = document.getElementById('collectionStats');
             if (statsElement && this.fullBackgroundData && this.fullBackgroundData.length > 0) {
