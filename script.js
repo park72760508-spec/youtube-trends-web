@@ -2915,7 +2915,7 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
 
-    // 시뮬레이션된 분석 카드 업데이트 (새로 추가)
+// 시뮬레이션된 분석 카드 업데이트 (새로 추가)
     updateSimulatedSummaryCards(totalVideos, detectedVideos) {
         try {
             // 시뮬레이션된 통계 계산
