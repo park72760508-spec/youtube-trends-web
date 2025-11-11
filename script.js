@@ -4512,7 +4512,7 @@ class OptimizedYoutubeTrendsAnalyzer {
           console.warn('processingRate tick error:', e);
         }
       }, 1000);
-    },
+    }
     
     stopRealtimeCounters() {
       if (this._rtTickId) {
@@ -4520,7 +4520,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         this._rtTickId = null;
       }
       this._rtLastProcessed = 0;
-    },
+    }
     
     // 3) 진행 상황 통합 갱신 (새 규격 + 구규격 ID 모두 지원)
     updateScanProgress(processedKeywords, totalKeywords, foundVideos, forcedPercent) {
@@ -4566,13 +4566,13 @@ class OptimizedYoutubeTrendsAnalyzer {
     
       // 디버깅 로그
       // console.log(`📊 진행률: ${safeProcessed}/${safeTotal} (${percent}%)`);
-    },
+    }
     
     // 4) 현재 작업 상태 문구
     updateCurrentAction(text) {
       const el = document.getElementById('currentAction');
       if (el) el.textContent = text || '';
-    },
+    }
     
     // 5) [호환용] 기존 updateProgress 시그니처 유지
     //    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action)
@@ -4587,7 +4587,7 @@ class OptimizedYoutubeTrendsAnalyzer {
       // 통합 갱신 함수 호출(필요 시 percent를 강제값으로 전달)
       const forcedPercent = Number.isFinite(percent) ? percent : undefined;
       this.updateScanProgress(safeProcessed, safeTotal, foundVideos, forcedPercent);
-    },
+    }
 
 
     
