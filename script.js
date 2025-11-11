@@ -2991,49 +2991,10 @@ class OptimizedYoutubeTrendsAnalyzer {
             element.textContent = newValue;
         }
     }
-    
-    // animateCounterChange를 숫자가 아닌 요소에도 사용할 수 있도록 개선 (새로 추가)
-    animateCounterChangeForElement(element, newValue) {
-        if (!element) return;
-        
-        // 현재 값이 숫자인지 확인
-        const currentText = element.textContent || '0';
-        const currentValue = parseInt(currentText.replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
-        
-        if (typeof newValue === 'number' && currentValue !== newValue) {
-            this.animateCounterChange(element, newValue);
-        } else {
-            element.textContent = newValue;
-        }
+
     }
 
 
-
-        
-        // fullBackgroundData 업데이트 (다운로드용)
-        if (!this.fullBackgroundData || this.fullBackgroundData.length < this.backgroundDataSimulation.currentCount) {
-            // 기존 데이터 확장 (시뮬레이션용)
-            const additionalDataNeeded = this.backgroundDataSimulation.currentCount - (this.fullBackgroundData ? this.fullBackgroundData.length : 0);
-            if (additionalDataNeeded > 0 && this.scanResults && this.scanResults.length > 0) {
-                const baseData = this.fullBackgroundData || this.scanResults;
-                const expandedData = [...baseData];
-                
-                // 기존 데이터를 변형하여 추가 데이터 생성
-                for (let i = 0; i < additionalDataNeeded; i++) {
-                    const sourceItem = baseData[i % baseData.length];
-                    const variationItem = JSON.parse(JSON.stringify(sourceItem));
-                    variationItem.id = `bg_${Date.now()}_${i}`;
-                    variationItem.title = `[백그라운드] ${variationItem.title}`;
-                    variationItem.isBackgroundData = true;
-                    expandedData.push(variationItem);
-                }
-                
-                this.fullBackgroundData = expandedData;
-                console.log(`📊 백그라운드 데이터 확장 완료: ${this.fullBackgroundData.length}개`);
-            }
-        }
-    }
-    
     // 백그라운드 시뮬레이션 정지 (새로 추가)
     stopBackgroundDataSimulation() {
         if (this.backgroundDataSimulation) {
@@ -3045,10 +3006,6 @@ class OptimizedYoutubeTrendsAnalyzer {
             this.backgroundDataSimulationInterval = null;
         }
         
-        if (this.processingSpeedSimulationInterval) {
-            clearInterval(this.processingSpeedSimulationInterval);
-            this.processingSpeedSimulationInterval = null;
-        }
         
         // 처리 속도 0으로 리셋
         this.realTimeCounters.processingRate = 0;
@@ -3059,20 +3016,7 @@ class OptimizedYoutubeTrendsAnalyzer {
 
     
 
-        // 🔥 수집 통계 업데이트 함수 추가
-        // 🔥 수집 통계 업데이트 함수 추가
-        updateCollectionStats() {
-            const statsElement = document.getElementById('collectionStats');
-            if (statsElement && this.fullBackgroundData && this.fullBackgroundData.length > 0) {
-                const displayLimit = this.backgroundDataStats.displayLimit || 50;
-                if (this.fullBackgroundData.length > displayLimit) {
-                    statsElement.textContent = `📊 백그라운드 수집: ${this.fullBackgroundData.length}개 (화면 표시: ${displayLimit}개)`;
-                    statsElement.style.display = 'block';
-                } else {
-                    statsElement.style.display = 'none';
-                }
-            }
-        }
+
 
 
     
