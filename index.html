@@ -302,28 +302,89 @@
             </section>
 
             <!-- 스캔 진행 상황 -->
+            <!-- 스캔 진행 상황 -->
             <section class="scan-progress" id="scanProgress" style="display: none;">
                 <div class="progress-container">
-                    <h3>🔍 전체 시니어 채널 스캔 진행 중...</h3>
+                    <h3>🔥 전체 시니어 채널 스캔 진행 중</h3>
+                    
+                    <!-- 새로운 실시간 카운터 영역 추가 -->
+                    <div class="realtime-counters">
+                        <div class="counter-group">
+                            <div class="counter-item primary">
+                                <div class="counter-icon">📊</div>
+                                <div class="counter-content">
+                                    <span class="counter-label">백데이터 수집</span>
+                                    <span class="counter-value" id="backgroundDataCount">0</span>
+                                </div>
+                                <div class="counter-animation">
+                                    <div class="pulse-dot"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="counter-item secondary">
+                                <div class="counter-icon">🎯</div>
+                                <div class="counter-content">
+                                    <span class="counter-label">검출 영상</span>
+                                    <span class="counter-value" id="detectedVideos">0</span>
+                                </div>
+                                <div class="counter-animation">
+                                    <div class="pulse-dot"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="counter-item accent">
+                                <div class="counter-icon">⚡</div>
+                                <div class="counter-content">
+                                    <span class="counter-label">처리 속도</span>
+                                    <span class="counter-value" id="processingRate">0/초</span>
+                                </div>
+                                <div class="counter-animation">
+                                    <div class="pulse-dot"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="progress-stats">
                         <div class="stat">
-                            <span class="label">스캔된 키워드</span>
-                            <span class="value" id="scannedKeywords">0 / 0</span>
+                            <span class="label">처리된 키워드</span>
+                            <span class="value" id="processedKeywords">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">전체 키워드</span>
+                            <span class="value" id="totalKeywords">0</span>
                         </div>
                         <div class="stat">
                             <span class="label">발견된 영상</span>
                             <span class="value" id="foundVideos">0</span>
                         </div>
                         <div class="stat">
-                            <span class="label">바이럴 점수 계산</span>
-                            <span class="value" id="calculatedScores">0</span>
+                            <span class="label">API 할당량 사용</span>
+                            <span class="value" id="quotaUsage">0</span>
                         </div>
                     </div>
+                    
                     <div class="progress-bar-container">
                         <div class="progress-bar" id="progressBar">0%</div>
                     </div>
-                    <div class="current-action" id="currentAction">스캔 준비 중...</div>
-                    <div class="collection-stats" id="collectionStats" style="display: none; color: #10b981; font-weight: bold; margin-top: 12px; padding: 8px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; text-align: center; font-size: 14px;"></div>
+                    
+                    <!-- 진행 후 계속 작업 애니메이션 -->
+                    <div class="post-progress-animation" id="postProgressAnimation" style="display: none;">
+                        <div class="working-indicator">
+                            <div class="working-spinner"></div>
+                            <div class="working-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                        <div class="working-text">
+                            <h4>🔥 백그라운드 데이터 수집 중...</h4>
+                            <p id="backgroundWorkStatus">고품질 데이터를 위해 추가 분석이 진행되고 있습니다</p>
+                        </div>
+                    </div>
+                    
+                    <div class="current-action" id="currentAction">스캔을 시작합니다...</div>
                 </div>
             </section>
 
