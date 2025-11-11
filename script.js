@@ -3778,11 +3778,12 @@ class OptimizedYoutubeTrendsAnalyzer {
             }
           }
           
-          if (videos && videos.length > 0) {
-            // 배열 전개(push ...items)
-            this.allVideos.push(...videos);
-            foundVideos += videos.length;
-          }
+        // ... runFullScan 내부
+        if (videos && videos.length > 0) {
+          // 배열 전개(push ...videos)
+          this.allVideos.push(...videos);
+          foundVideos += videos.length;
+        }
     
         processedKeywords++;
         
@@ -3873,10 +3874,12 @@ class OptimizedYoutubeTrendsAnalyzer {
             }
           }
           
-          if (videos && videos.length > 0) {
-            this.allVideos.push(...videos);
-            foundVideos += videos.length;
-          }
+        // ... runSmartMode 내부
+        if (videos && videos.length > 0) {
+          this.allVideos.push(...videos);
+          foundVideos += videos.length;
+        }
+
     
             processedKeywords++;
             
@@ -4543,11 +4546,13 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 2) 처리속도(X/초) 갱신 타이머
     startRealtimeCounters() {
+      // 중복 실행 가드
+      if (this._rtTickId) return;
+    
       this._rtLastProcessed = 0;
       this._rtTickId = setInterval(() => {
         try {
           const rateEl = document.getElementById('processingRate');
-          // 우선순위: processedKeywords -> scannedKeywords(구버전)
           const processedEl =
             document.getElementById('processedKeywords') ||
             document.getElementById('scannedKeywords');
@@ -4565,6 +4570,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
       }, 1000);
     }
+
     
     stopRealtimeCounters() {
       if (this._rtTickId) {
