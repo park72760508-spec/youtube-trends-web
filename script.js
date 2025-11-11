@@ -3059,41 +3059,42 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 키워드 티어별 선택 메서드
     // 키워드 티어별 선택 메서드
+    // 키워드 티어별 선택 메서드
     getSelectedKeywords(category, tier) {
-        let keywords = [];
-        
-        switch (tier) {
-            case 'tier1':
-                keywords = this.optimizedKeywords.tier1;
-                break;
-            case 'tier1+2':
-                // 배열 전개로 티어1+티어2 결합
-                keywords = [
-                    ...this.optimizedKeywords.tier1,
-                    ...this.optimizedKeywords.tier2
-                ];
-                break;
-            case 'all':
-                // 배열 전개로 티어1+2+3 결합
-                keywords = [
-                    ...this.optimizedKeywords.tier1,
-                    ...this.optimizedKeywords.tier2,
-                    ...this.optimizedKeywords.tier3
-                ];
-                break;
-            default:
-                keywords = this.optimizedKeywords.tier1;
-        }
-        
-        // 카테고리별 키워드 필터링 (기존 로직과 연동)
-        if (category !== 'all') {
-            const categoryKeywords = this.getCategoryKeywords(category);
-            keywords = keywords.filter(k => categoryKeywords.includes(k));
-        }
-        
-        console.log(`🎯 선택된 키워드 (${tier}):`, keywords);
-        return keywords;
+      let keywords = [];
+      
+      switch (tier) {
+        case 'tier1':
+          keywords = this.optimizedKeywords.tier1;
+          break;
+        case 'tier1+2':
+          // 배열 전개로 합치기
+          keywords = [
+            ...this.optimizedKeywords.tier1,
+            ...this.optimizedKeywords.tier2
+          ];
+          break;
+        case 'all':
+          // 배열 전개로 합치기
+          keywords = [
+            ...this.optimizedKeywords.tier1,
+            ...this.optimizedKeywords.tier2,
+            ...this.optimizedKeywords.tier3
+          ];
+          break;
+        default:
+          keywords = this.optimizedKeywords.tier1;
+      }
+    
+      // (이하 동일)
+      if (category !== 'all') {
+        const categoryKeywords = this.getCategoryKeywords(category);
+        keywords = keywords.filter(k => categoryKeywords.includes(k));
+      }
+      console.log(`🎯 선택된 키워드 (${tier}):`, keywords);
+      return keywords;
     }
+
 
     
     // YouTube 링크 생성 메서드
