@@ -1971,6 +1971,7 @@ body {
 
 
 /* 백데이터 다운로드 버튼 스타일 추가 */
+/* 백데이터 다운로드 버튼 스타일 추가 */
 .download-btn.background {
     background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     border-color: #7c3aed;
@@ -1991,3 +1992,231 @@ body {
     box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
 }
 
+/* === 새로운 실시간 카운터 및 애니메이션 스타일 === */
+
+/* 실시간 카운터 영역 */
+.realtime-counters {
+    margin: 24px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--primary-color);
+}
+
+.counter-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.counter-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    border-left: 4px solid;
+}
+
+.counter-item.primary {
+    border-left-color: var(--primary-color);
+}
+
+.counter-item.secondary {
+    border-left-color: var(--secondary-color);
+}
+
+.counter-item.accent {
+    border-left-color: var(--accent-color);
+}
+
+.counter-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+    animation: counterIconPulse 2s ease-in-out infinite;
+}
+
+.counter-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.counter-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.counter-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.counter-animation {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+.pulse-dot {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--secondary-color);
+    animation: pulseAnimation 1.5s ease-in-out infinite;
+}
+
+/* 진행 완료 후 작업 애니메이션 */
+.post-progress-animation {
+    margin: 24px 0;
+    padding: 24px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--accent-color);
+    text-align: center;
+}
+
+.working-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.working-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(245, 158, 11, 0.2);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spinAnimation 1s linear infinite;
+}
+
+.working-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.working-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    animation: dotAnimation 1.4s ease-in-out infinite;
+}
+
+.working-dots span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.working-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.working-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+.working-text h4 {
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.working-text p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* === 애니메이션 키프레임 === */
+
+@keyframes counterIconPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes pulseAnimation {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+}
+
+@keyframes spinAnimation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes dotAnimation {
+    0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 카운터 값 변경 애니메이션 */
+.counter-value {
+    transition: all 0.3s ease;
+}
+
+.counter-value.updating {
+    color: var(--secondary-color);
+    transform: scale(1.1);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .counter-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .working-indicator {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .counter-item {
+        padding: 12px;
+    }
+    
+    .counter-icon {
+        font-size: 1.5rem;
+    }
+    
+    .counter-value {
+        font-size: 1.2rem;
+    }
+}
