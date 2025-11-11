@@ -2600,11 +2600,11 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
         
         // UI 업데이트
-        this.updateCounterDisplay();
+        this.updateRealtimeDisplay();
     }
     
     // 카운터 디스플레이 업데이트 (새로 추가)
-    updateCounterDisplay() {
+    updateRealtimeDisplay() {
         const backgroundDataElement = document.getElementById('backgroundDataCount');
         const detectedVideosElement = document.getElementById('detectedVideos');
         const processingRateElement = document.getElementById('processingRate');
@@ -3742,14 +3742,18 @@ class OptimizedYoutubeTrendsAnalyzer {
             foundVideos += videos.length;
           }
     
-          processedKeywords++;
-          
-          // 진행 상황 업데이트
-          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
-          
-          // API 요청 간 지연
-          await this.delay(500);
+        processedKeywords++;
+        
+        // ★ 실시간 카운터(백데이터/검출/속도) 갱신 추가
+        this.updateRealtimeCounters(foundVideos, processedKeywords);
+        
+        // 진행 상황 업데이트
+        this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+        this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+        
+        // API 요청 간 지연
+        await this.delay(500);
+
           
         } catch (error) {
           console.error(`❌ 키워드 ${keyword} 검색 실패:`, error);
@@ -3832,9 +3836,14 @@ class OptimizedYoutubeTrendsAnalyzer {
             foundVideos += videos.length;
           }
     
-          processedKeywords++;
-          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+            processedKeywords++;
+            
+            // ★ 실시간 카운터 갱신 추가
+            this.updateRealtimeCounters(foundVideos, processedKeywords);
+            
+            this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+            this.updateCurrentAction?.(`"${keyword}" 처리 중`);
+
     
           await this.delay(300);
           
@@ -4553,7 +4562,10 @@ class OptimizedYoutubeTrendsAnalyzer {
       if (processedEl) this.updateCounterDisplay(processedEl, String(safeProcessed));
       if (totalEl)     this.updateCounterDisplay(totalEl,     String(safeTotal));
       if (foundEl)     this.updateCounterDisplay(foundEl,     String(Number(foundVideos || 0)));
-      if (quotaEl)     this.updateCounterDisplay(quotaEl,     String(Number(this.quotaUsed || 0)));
+      if (quotaEl) {
+        const used = this.getQuotaUsed(); // ← 새 헬퍼
+        this.updateCounterDisplay(quotaEl, String(used));
+      }
     
       // 구 규격 표시(겸용): "x / y"
       if (scannedEl)   this.updateCounterDisplay(scannedEl,   `${safeProcessed} / ${safeTotal}`);
@@ -4589,6 +4601,23 @@ class OptimizedYoutubeTrendsAnalyzer {
       const forcedPercent = Number.isFinite(percent) ? percent : undefined;
       this.updateScanProgress(safeProcessed, safeTotal, foundVideos, forcedPercent);
     }
+
+
+
+        // === API 사용량 읽어오기(표시용) ===
+        getQuotaUsed() {
+          try {
+            if (this.apiKeyManager && typeof this.apiKeyManager.getOverallStats === 'function') {
+              const stats = this.apiKeyManager.getOverallStats();
+              return Number(stats?.totalQuotaUsed || 0);
+            }
+          } catch (e) {
+            console.warn('getQuotaUsed() 실패:', e);
+          }
+          return 0;
+        }
+
+
 
 
     
