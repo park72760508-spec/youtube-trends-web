@@ -1448,10 +1448,10 @@ class OptimizedYoutubeTrendsAnalyzer {
             const result = await this.searchVideosForKeyword(keyword, format, timeRange);
             this.saveToCache(cacheKey, result);
             
-            // 🔥 키워드 단위로도 실시간 반영
+        // 🔥 키워드 단위로도 실시간 반영
             if (Array.isArray(result) && result.length > 0) {
               this.bumpCountersOnBatch({ addedBackground: result.length, addedDetected: 0 });
-              this.updateLiveCountersUI();
+              this.updateRealtimeDisplay(); // ✅ 백데이터 업데이트 메서드로 변경
             }
             return result;
 
@@ -3812,11 +3812,18 @@ class OptimizedYoutubeTrendsAnalyzer {
           }
           
         // ... runFullScan 내부
+        // ... runFullScan 내부
         if (videos && videos.length > 0) {
           // 배열 전개(push ...videos)
           this.allVideos.push(...videos);
           foundVideos += videos.length;
-        }
+          
+          // ▶ 스캔 진행률 업데이트 + 실시간 카운터 추가
+          this.bumpCountersOnBatch({
+            addedBackground: videos.length,
+            addedDetected: 0  // 검출은 나중에 계산
+          });
+          this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경!
     
         processedKeywords++;
         
@@ -3908,10 +3915,17 @@ class OptimizedYoutubeTrendsAnalyzer {
           }
           
         // ... runSmartMode 내부
+        // ... runSmartMode 내부
         if (videos && videos.length > 0) {
           this.allVideos.push(...videos);
           foundVideos += videos.length;
-        }
+          
+          // ▶ 실시간 카운터 즉시 반영
+          this.bumpCountersOnBatch({
+            addedBackground: videos.length,
+            addedDetected: 0
+          });
+          this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경
 
     
             processedKeywords++;
@@ -5261,19 +5275,20 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     updateLiveCountersUI() {
-      // 🔥 백데이터는 updateRealtimeDisplay에서만 처리하므로 제거
-      // const bgEl = document.querySelector('#backgroundDataCount, [data-metric="backgroundData"]');
+      // ✅ 백데이터 업데이트 복원 (이중 업데이트 방지)
+      const bgEl = document.querySelector('#backgroundDataCount, [data-metric="backgroundData"]');
       const detEl = document.querySelector('#detectedVideosCount, [data-metric="detectedVideos"]');
       const rateEl = document.querySelector('#processingRate, [data-metric="processingRate"]');
       const foundEl = document.querySelector('#discoveredVideosCount, [data-metric="discoveredVideos"]');
     
-      // 화면 수치는 보존된 전체/현재 표시값 기반 (백데이터 제외)
+      // 화면 수치는 보존된 전체/현재 표시값 기준
+      const totalCollected = this.fullBackgroundData ? this.fullBackgroundData.length : this.allVideos.length;
       const detected = this.scanResults?.length || this.realTimeCounters.detectedVideos || 0;
       const rate = this.realTimeCounters.processingRate || 0;
       const discovered = (this.allVideos?.length || 0);
     
-      // 🔥 백데이터 업데이트 라인 제거
-      // if (bgEl) bgEl.textContent = totalCollected.toLocaleString('ko-KR');
+      // ✅ 백데이터 업데이트 복원
+      if (bgEl) bgEl.textContent = totalCollected.toLocaleString('ko-KR');
     }  // ✅ 메서드 닫는 중괄호 추가
     
   
