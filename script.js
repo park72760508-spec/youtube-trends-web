@@ -478,12 +478,20 @@ class OptimizedYoutubeTrendsAnalyzer {
 
     
     // 초기화
-    // 초기화
     init() {
         console.log('🎯 API 키 풀링 시스템 시작');
         this.setupEventListeners();
         this.showOptimizedWelcomeMessage();
         this.displayQuotaStatus();
+
+        // 실시간 카운터 초기화 (새로 추가)
+        this.realTimeCounters = {
+            backgroundData: 0,
+            detectedVideos: 0,
+            processingRate: 0,
+            lastUpdateTime: Date.now(),
+            rateCalculationBuffer: []
+        };
 
         // === 운영 기본값(최초 1회) ===
         if (!localStorage.getItem('hot_maxChannels')) {
@@ -2529,14 +2537,20 @@ class OptimizedYoutubeTrendsAnalyzer {
     // 기타 유틸리티 메서드들
     
     
-    
+    // 진행 상황 업데이트 함수 부분)
     updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
+        const progressSection = document.getElementById('scanProgress');
+        if (progressSection && progressSection.style.display === 'none') {
+            progressSection.style.display = 'block';
+        }
+        
         const progressBar = document.getElementById('progressBar');
         const scannedKeywordsEl = document.getElementById('scannedKeywords');
         const foundVideosEl = document.getElementById('foundVideos');
         const calculatedScoresEl = document.getElementById('calculatedScores');
         const currentActionEl = document.getElementById('currentAction');
         
+        // 기본 진행바 업데이트
         if (progressBar) {
             progressBar.style.width = `${percent}%`;
             progressBar.textContent = `${Math.round(percent)}%`;
@@ -2554,8 +2568,147 @@ class OptimizedYoutubeTrendsAnalyzer {
             calculatedScoresEl.textContent = foundVideos.toLocaleString();
         }
         
+        // 실시간 카운터 업데이트
+        this.updateRealtimeCounters(foundVideos, scannedKeywords);
+        
         if (currentActionEl) {
-            currentActionEl.textContent = action;
+            if (percent >= 100) {
+                currentActionEl.textContent = '🎯 기본 스캔 완료! 백그라운드 데이터 수집 중...';
+                // 100% 완료 후 백그라운드 애니메이션 시작
+                this.showPostProgressAnimation();
+            } else {
+                currentActionEl.textContent = action || `🔍 키워드 검색 중... (${scannedKeywords}/${totalKeywords})`;
+            }
+        }
+    }
+    
+    // 실시간 카운터 업데이트 함수 (새로 추가)
+    updateRealtimeCounters(videosFound, processed) {
+        // 실시간 카운터 초기화 (처음 호출시)
+        if (!this.realTimeCounters) {
+            this.realTimeCounters = {
+                backgroundData: 0,
+                detectedVideos: 0,
+                processingRate: 0,
+                lastUpdateTime: Date.now(),
+                rateCalculationBuffer: []
+            };
+        }
+        
+        // 백데이터 카운트 업데이트 (전체 수집 데이터)
+        this.realTimeCounters.backgroundData = this.fullBackgroundData ? this.fullBackgroundData.length : videosFound * 2.5; // 추정치
+        
+        // 검출 영상 카운트 업데이트
+        this.realTimeCounters.detectedVideos = videosFound;
+        
+        // 처리 속도 계산
+        const now = Date.now();
+        const timeDiff = now - this.realTimeCounters.lastUpdateTime;
+        
+        if (timeDiff > 0) {
+            this.realTimeCounters.rateCalculationBuffer.push({
+                count: processed,
+                timestamp: now
+            });
+            
+            // 최근 5초간의 데이터만 유지
+            const fiveSecondsAgo = now - 5000;
+            this.realTimeCounters.rateCalculationBuffer = this.realTimeCounters.rateCalculationBuffer
+                .filter(item => item.timestamp > fiveSecondsAgo);
+            
+            // 처리 속도 계산 (초당 처리량)
+            if (this.realTimeCounters.rateCalculationBuffer.length >= 2) {
+                const buffer = this.realTimeCounters.rateCalculationBuffer;
+                const earliest = buffer[0];
+                const latest = buffer[buffer.length - 1];
+                const timeSpan = (latest.timestamp - earliest.timestamp) / 1000; // 초
+                const countDiff = latest.count - earliest.count;
+                
+                this.realTimeCounters.processingRate = timeSpan > 0 ? (countDiff / timeSpan).toFixed(1) : 0;
+            }
+            
+            this.realTimeCounters.lastUpdateTime = now;
+        }
+        
+        // UI 업데이트
+        this.updateCounterDisplay();
+    }
+    
+    // 카운터 디스플레이 업데이트 (새로 추가)
+    updateCounterDisplay() {
+        const backgroundDataElement = document.getElementById('backgroundDataCount');
+        const detectedVideosElement = document.getElementById('detectedVideos');
+        const processingRateElement = document.getElementById('processingRate');
+        
+        if (backgroundDataElement) {
+            this.animateCounterChange(backgroundDataElement, Math.floor(this.realTimeCounters.backgroundData));
+        }
+        
+        if (detectedVideosElement) {
+            this.animateCounterChange(detectedVideosElement, this.realTimeCounters.detectedVideos);
+        }
+        
+        if (processingRateElement) {
+            processingRateElement.textContent = `${this.realTimeCounters.processingRate}/초`;
+        }
+    }
+    
+    // 카운터 값 변경 애니메이션 (새로 추가)
+    animateCounterChange(element, newValue) {
+        const currentValue = parseInt(element.textContent.replace(/,/g, '')) || 0;
+        
+        if (currentValue !== newValue) {
+            element.classList.add('updating');
+            
+            // 숫자 증가 애니메이션
+            const startValue = currentValue;
+            const endValue = newValue;
+            const duration = 500; // 0.5초
+            const startTime = Date.now();
+            
+            const updateNumber = () => {
+                const now = Date.now();
+                const progress = Math.min((now - startTime) / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3); // ease-out
+                
+                const currentDisplayValue = Math.floor(startValue + (endValue - startValue) * easeProgress);
+                element.textContent = currentDisplayValue.toLocaleString();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateNumber);
+                } else {
+                    element.classList.remove('updating');
+                }
+            };
+            
+            requestAnimationFrame(updateNumber);
+        }
+    }
+    
+    // 진행 완료 후 백그라운드 애니메이션 표시 (새로 추가)
+    showPostProgressAnimation() {
+        const postProgressElement = document.getElementById('postProgressAnimation');
+        const backgroundStatusElement = document.getElementById('backgroundWorkStatus');
+        
+        if (postProgressElement) {
+            postProgressElement.style.display = 'block';
+            
+            // 다양한 상태 메시지를 순환하며 표시
+            const statusMessages = [
+                '고품질 데이터를 위해 추가 분석이 진행되고 있습니다',
+                '채널 메타데이터를 수집하고 있습니다',
+                '영상 품질 점수를 계산하고 있습니다',
+                '트렌드 패턴을 분석하고 있습니다',
+                '최종 결과를 정리하고 있습니다'
+            ];
+            
+            let messageIndex = 0;
+            this.backgroundMessageInterval = setInterval(() => {
+                if (backgroundStatusElement && this.isScanning) {
+                    messageIndex = (messageIndex + 1) % statusMessages.length;
+                    backgroundStatusElement.textContent = statusMessages[messageIndex];
+                }
+            }, 3000); // 3초마다 메시지 변경
         }
     }
     
@@ -4534,11 +4687,50 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     
     // 스캔 중지
+    // 스캔 중지 (개선된 버전)
     stopScan() {
+        console.log('🛑 스캔 중지 요청');
         this.isScanning = false;
-        console.log('⏹️ 스캔이 중지되었습니다.');
+        
+        // AbortController가 있다면 중지
+        if (this.abortController) {
+            this.abortController.abort();
+            console.log('🔄 진행 중인 API 요청들을 중지했습니다.');
+        }
+        
+        // 백그라운드 메시지 애니메이션 정리
+        if (this.backgroundMessageInterval) {
+            clearInterval(this.backgroundMessageInterval);
+            this.backgroundMessageInterval = null;
+            console.log('⏹️ 백그라운드 메시지 애니메이션 중지');
+        }
+        
+        // 백그라운드 애니메이션 요소 숨기기
+        const postProgressElement = document.getElementById('postProgressAnimation');
+        if (postProgressElement) {
+            postProgressElement.style.display = 'none';
+        }
+        
+        // 실시간 카운터 리셋
+        this.realTimeCounters = {
+            backgroundData: 0,
+            detectedVideos: 0,
+            processingRate: 0,
+            lastUpdateTime: Date.now(),
+            rateCalculationBuffer: []
+        };
+        
+        // 실시간 카운터 UI도 리셋
+        this.updateCounterDisplay();
+        
+        // 기존 UI 상태 복원
         this.updateScanButton(false);
         this.hideScanProgress();
+        
+        // 성공 메시지 표시
+        this.showSuccess('스캔이 중지되었습니다.', '중지 완료');
+        
+        console.log('✅ 스캔 중지 및 정리 작업이 완료되었습니다.');
     }
     
     // 조회수 필터 텍스트 반환
