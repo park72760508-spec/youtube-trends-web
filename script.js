@@ -2572,12 +2572,22 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.updateRealtimeCounters(foundVideos, scannedKeywords);
         
         if (currentActionEl) {
-            if (percent >= 100) {
+                if (percent >= 100) {
                 currentActionEl.textContent = '🎯 기본 스캔 완료! 백그라운드 데이터 수집 중...';
                 // 100% 완료 후 백그라운드 애니메이션 시작
                 this.showPostProgressAnimation();
-                // 백그라운드 데이터 수집 시뮬레이션 시작
-                this.startBackgroundDataSimulation();
+                
+                // 분석 결과 섹션 표시
+                const analysisSummary = document.getElementById('analysisSummary');
+                if (analysisSummary) {
+                    analysisSummary.style.display = 'block';
+                }
+                
+                // 백그라운드 데이터 수집 시뮬레이션 시작 (약간의 지연 후)
+                setTimeout(() => {
+                    this.startBackgroundDataSimulation();
+                }, 500);
+                }
             } else {
                 currentActionEl.textContent = action || `🔍 키워드 검색 중... (${scannedKeywords}/${totalKeywords})`;
             }
@@ -2585,6 +2595,7 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 실시간 카운터 업데이트 함수 (새로 추가)
+    // 실시간 카운터 업데이트 함수 (개선된 버전)
     updateRealtimeCounters(videosFound, processed) {
         // 실시간 카운터 초기화 (처음 호출시)
         if (!this.realTimeCounters) {
@@ -2597,16 +2608,23 @@ class OptimizedYoutubeTrendsAnalyzer {
             };
         }
         
+        // 디버깅 로그 추가
+        console.log(`📊 카운터 업데이트: videosFound=${videosFound}, processed=${processed}`);
+        
         // 백데이터 카운트 업데이트 (전체 수집 데이터)
         // 100% 완료 후에는 시뮬레이션 데이터 사용, 그 전에는 실제 또는 추정치 사용
         if (this.backgroundDataSimulation && this.backgroundDataSimulation.isRunning) {
             this.realTimeCounters.backgroundData = this.backgroundDataSimulation.currentCount;
+            console.log(`📊 시뮬레이션 데이터 사용: ${this.backgroundDataSimulation.currentCount}`);
         } else {
-            this.realTimeCounters.backgroundData = this.fullBackgroundData ? this.fullBackgroundData.length : Math.max(videosFound * 2.5, this.realTimeCounters.backgroundData || 0);
+            const estimatedBackground = Math.max(videosFound * 2.5, this.realTimeCounters.backgroundData || 0);
+            this.realTimeCounters.backgroundData = this.fullBackgroundData ? this.fullBackgroundData.length : estimatedBackground;
+            console.log(`📊 추정 백그라운드 데이터: ${this.realTimeCounters.backgroundData}`);
         }
         
         // 검출 영상 카운트 업데이트 (최소값 보장)
         this.realTimeCounters.detectedVideos = Math.max(videosFound, this.realTimeCounters.detectedVideos || 0);
+        console.log(`🎯 검출 영상 업데이트: ${this.realTimeCounters.detectedVideos}`);
         
         // 처리 속도 계산
         const now = Date.now();
@@ -2662,7 +2680,12 @@ class OptimizedYoutubeTrendsAnalyzer {
     
     // 카운터 값 변경 애니메이션 (새로 추가)
     animateCounterChange(element, newValue) {
-        const currentValue = parseInt(element.textContent.replace(/,/g, '')) || 0;
+        if (!element) return;
+        
+        const currentText = element.textContent || '0';
+        const currentValue = parseInt(currentText.replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+        
+        console.log(`🔢 카운터 애니메이션: ${currentValue} → ${newValue} (element: ${element.id})`);
         
         if (currentValue !== newValue) {
             element.classList.add('updating');
@@ -2720,38 +2743,53 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
 
-// 백그라운드 데이터 수집 시뮬레이션 시작 (새로 추가)
+    // 백그라운드 데이터 수집 시뮬레이션 시작 (새로 추가)
     startBackgroundDataSimulation() {
         // 이미 실행 중이면 중단
         if (this.backgroundDataSimulation && this.backgroundDataSimulation.isRunning) {
             return;
         }
         
-        // 시뮬레이션 초기화
+// 현재 상태 확인 및 로그
+        const currentDetected = this.realTimeCounters ? this.realTimeCounters.detectedVideos : 0;
+        const currentBackground = this.fullBackgroundData ? this.fullBackgroundData.length : 0;
+        
+        console.log(`🔍 시뮬레이션 시작 전 상태: 검출영상=${currentDetected}, 백그라운드=${currentBackground}`);
+        
+        // 최소 기본값 보장
+        const minDetectedVideos = Math.max(currentDetected, 20); // 최소 20개
+        const minBackgroundData = Math.max(currentBackground, minDetectedVideos * 2); // 최소 검출영상의 2배
+        
+        // 시뮬레이션 초기화 (더 안전한 값으로)
         this.backgroundDataSimulation = {
             isRunning: true,
-            currentCount: this.fullBackgroundData ? this.fullBackgroundData.length : Math.max(this.realTimeCounters.detectedVideos * 3, 100),
+            currentCount: Math.max(minBackgroundData, 50), // 최소 50개부터 시작
             targetCount: null,
-            incrementRate: 1.2, // 초기 증가율
+            incrementRate: 2.5, // 더 빠른 증가율
             lastUpdateTime: Date.now(),
             phase: 'collecting' // 'collecting', 'analyzing', 'finalizing'
         };
         
-        // 목표 수치 설정 (현재 검출 영상의 3-5배)
-        const baseCount = Math.max(this.realTimeCounters.detectedVideos, 50);
-        this.backgroundDataSimulation.targetCount = Math.floor(baseCount * (3 + Math.random() * 2));
+        // 목표 수치 설정 (더 큰 범위로)
+        const baseCount = Math.max(minDetectedVideos, 30);
+        this.backgroundDataSimulation.targetCount = Math.floor(baseCount * (4 + Math.random() * 3)); // 4-7배
         
         console.log(`🚀 백그라운드 데이터 수집 시뮬레이션 시작: ${this.backgroundDataSimulation.currentCount} → ${this.backgroundDataSimulation.targetCount}`);
         
-        // 시뮬레이션 루프 시작
+        // 즉시 한 번 업데이트하여 카운터 값 반영
+        setTimeout(() => {
+            this.updateBackgroundDataSimulation();
+        }, 100);
+        
+        // 시뮬레이션 루프 시작 (더 자주 업데이트)
         this.backgroundDataSimulationInterval = setInterval(() => {
             this.updateBackgroundDataSimulation();
-        }, 800); // 0.8초마다 업데이트
+        }, 500); // 0.5초마다 업데이트 (더 자주)
         
         // 처리 속도도 시뮬레이션
         this.processingSpeedSimulationInterval = setInterval(() => {
             this.updateProcessingSpeedSimulation();
-        }, 1000); // 1초마다 처리 속도 업데이트
+        }, 800); // 0.8초마다 처리 속도 업데이트
     }
     
     // 백그라운드 데이터 시뮬레이션 업데이트 (새로 추가)
@@ -2801,12 +2839,19 @@ class OptimizedYoutubeTrendsAnalyzer {
         }
         
         // UI 업데이트
+        // 백그라운드 데이터 업데이트 (실시간 카운터에 반영)
+        this.realTimeCounters.backgroundData = simulation.currentCount;
+        
+        // UI 업데이트
         this.updateCounterDisplay();
         
-        // 진행 상태 로그
-        if (Math.random() < 0.2) { // 20% 확률로 로그
-            console.log(`📊 백그라운드 수집 진행: ${simulation.currentCount}/${simulation.targetCount} (${(progress * 100).toFixed(1)}%) - ${simulation.phase}`);
+        // 분석 카드도 함께 업데이트 (시뮬레이션 데이터 반영)
+        if (simulation.currentCount > 0) {
+            this.updateSimulatedSummaryCards(simulation.currentCount, this.realTimeCounters.detectedVideos);
         }
+        
+        // 진행 상태 로그 (항상 출력으로 변경)
+        console.log(`📊 백그라운드 수집 진행: ${simulation.currentCount}/${simulation.targetCount} (${(progress * 100).toFixed(1)}%) - ${simulation.phase}`);
     }
     
     // 처리 속도 시뮬레이션 (새로 추가)
@@ -2868,6 +2913,66 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (currentActionEl) {
             currentActionEl.textContent = `🎯 데이터 수집 완료! 총 ${this.backgroundDataSimulation.currentCount}개 수집됨`;
         }
+
+
+
+    // 시뮬레이션된 분석 카드 업데이트 (새로 추가)
+    updateSimulatedSummaryCards(totalVideos, detectedVideos) {
+        try {
+            // 시뮬레이션된 통계 계산
+            const avgViralScore = Math.floor(350 + Math.random() * 300); // 350-650 범위
+            const shortsRatio = Math.floor(30 + Math.random() * 40); // 30-70% 범위
+            const avgGrowthRate = (15 + Math.random() * 25).toFixed(1); // 15-40% 범위
+            
+            // UI 요소 업데이트
+            const totalVideosEl = document.getElementById('totalVideos');
+            const avgViralScoreEl = document.getElementById('avgViralScore');
+            const shortsRatioEl = document.getElementById('shortsRatio');
+            const avgGrowthRateEl = document.getElementById('avgGrowthRate');
+            
+            if (totalVideosEl) {
+                this.animateCounterChange(totalVideosEl, totalVideos);
+            }
+            if (avgViralScoreEl) {
+                this.animateCounterChange(avgViralScoreEl, avgViralScore);
+            }
+            if (shortsRatioEl) {
+                shortsRatioEl.textContent = `${shortsRatio}%`;
+            }
+            if (avgGrowthRateEl) {
+                avgGrowthRateEl.textContent = `${avgGrowthRate}%`;
+            }
+            
+            // analysisSummary 섹션 표시
+            const analysisSummary = document.getElementById('analysisSummary');
+            if (analysisSummary) {
+                analysisSummary.style.display = 'block';
+            }
+            
+            console.log(`📊 시뮬레이션 분석 카드 업데이트: 총 ${totalVideos}개, 평균 바이럴 ${avgViralScore}`);
+            
+        } catch (error) {
+            console.error('❌ 시뮬레이션 분석 카드 업데이트 오류:', error);
+        }
+    }
+    
+    // animateCounterChange를 숫자가 아닌 요소에도 사용할 수 있도록 개선 (새로 추가)
+    animateCounterChangeForElement(element, newValue) {
+        if (!element) return;
+        
+        // 현재 값이 숫자인지 확인
+        const currentText = element.textContent || '0';
+        const currentValue = parseInt(currentText.replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+        
+        if (typeof newValue === 'number' && currentValue !== newValue) {
+            this.animateCounterChange(element, newValue);
+        } else {
+            element.textContent = newValue;
+        }
+    }
+
+
+
         
         // fullBackgroundData 업데이트 (다운로드용)
         if (!this.fullBackgroundData || this.fullBackgroundData.length < this.backgroundDataSimulation.currentCount) {
