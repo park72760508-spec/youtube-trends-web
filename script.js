@@ -2658,12 +2658,13 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.updateCounterDisplay();
     }
     
-    // 카운터 디스플레이 업데이트 (새로 추가)
+    // 카운터 디스플레이 업데이트 (개선)
     updateCounterDisplay() {
         const backgroundDataElement = document.getElementById('backgroundDataCount');
         const detectedVideosElement = document.getElementById('detectedVideos');
         const processingRateElement = document.getElementById('processingRate');
         
+        // 기본 실시간 카운터 업데이트
         if (backgroundDataElement) {
             this.animateCounterChange(backgroundDataElement, Math.floor(this.realTimeCounters.backgroundData));
         }
@@ -2675,6 +2676,16 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (processingRateElement) {
             processingRateElement.textContent = `${this.realTimeCounters.processingRate}/초`;
         }
+        
+        // Progress Stats 자동 업데이트 (스캔 진행 중이 아닐 때만)
+        if (!this.isScanning && this.allVideos && this.allVideos.length > 0) {
+            const foundVideosEl = document.getElementById('foundVideos');
+            if (foundVideosEl) {
+                foundVideosEl.textContent = this.allVideos.length.toLocaleString();
+            }
+        }
+        
+        console.log(`🔄 카운터 디스플레이 업데이트 완료: 백그라운드=${this.realTimeCounters.backgroundData}, 검출=${this.realTimeCounters.detectedVideos}, 속도=${this.realTimeCounters.processingRate}/초`);
     }
     
     // 카운터 값 변경 애니메이션 (새로 추가)
@@ -3748,9 +3759,15 @@ class OptimizedYoutubeTrendsAnalyzer {
             viewCountFilter: this.getViewCountFilterText(viewCountFilter)
         });
         
+        // 실시간 카운터 초기화
+        this.initializeRealtimeCounters();
+        
         const totalKeywords = keywords.length;
         let processedKeywords = 0;
         let foundVideos = 0;
+        
+        // 초기 Progress Stats 설정
+        this.updateProgressStats(0, totalKeywords, 0);
         
         for (const keyword of keywords) {
             if (!this.isScanning) break; // 중지 버튼 체크
@@ -4500,6 +4517,68 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
     // ===== 누락된 핵심 메서드들 추가 =====
+    
+    // 스캔 진행 상황 업데이트 (누락된 메소드 추가)
+    updateScanProgress(processedKeywords, totalKeywords, foundVideos) {
+        try {
+            // 기존 updateProgress 호출
+            const percent = Math.round((processedKeywords / totalKeywords) * 100);
+            this.updateProgress(percent, totalKeywords, processedKeywords, foundVideos, 
+                `🔍 키워드 검색 중... (${processedKeywords}/${totalKeywords})`);
+            
+            // 실시간 카운터 업데이트
+            this.updateRealtimeCounters(foundVideos, processedKeywords, totalKeywords);
+            
+            // Progress Stats 요소들 업데이트
+            this.updateProgressStats(processedKeywords, totalKeywords, foundVideos);
+            
+            // 카운터 디스플레이 업데이트
+            this.updateCounterDisplay();
+            
+            console.log(`📊 스캔 진행: ${processedKeywords}/${totalKeywords}, 발견: ${foundVideos}개`);
+        } catch (error) {
+            console.error('❌ 스캔 진행 업데이트 오류:', error);
+        }
+    }
+    
+    // 실시간 카운터 초기화 메소드 (새로 추가)
+    initializeRealtimeCounters() {
+        this.realTimeCounters = {
+            backgroundData: 0,
+            detectedVideos: 0,
+            processingRate: 0,
+            lastUpdateTime: Date.now(),
+            rateCalculationBuffer: []
+        };
+        
+        // 즉시 UI 업데이트
+        this.updateCounterDisplay();
+        
+        console.log('🔄 실시간 카운터 초기화 완료');
+    }
+    
+    // Progress Stats 업데이트 메소드 (새로 추가)
+    updateProgressStats(processedKeywords, totalKeywords, foundVideos) {
+        const processedKeywordsEl = document.getElementById('processedKeywords');
+        const totalKeywordsEl = document.getElementById('totalKeywords');
+        const foundVideosEl = document.getElementById('foundVideos');
+        const quotaUsageEl = document.getElementById('quotaUsage');
+        
+        if (processedKeywordsEl) {
+            processedKeywordsEl.textContent = processedKeywords.toLocaleString();
+        }
+        if (totalKeywordsEl) {
+            totalKeywordsEl.textContent = totalKeywords.toLocaleString();
+        }
+        if (foundVideosEl) {
+            foundVideosEl.textContent = foundVideos.toLocaleString();
+        }
+        if (quotaUsageEl) {
+            // API 할당량 사용량 계산 (키워드당 약 100 쿼터 사용 가정)
+            const estimatedQuotaUsage = processedKeywords * 100;
+            quotaUsageEl.textContent = estimatedQuotaUsage.toLocaleString();
+        }
+    }
         
     updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action) {
       const progressBar = document.getElementById('progressBar');
