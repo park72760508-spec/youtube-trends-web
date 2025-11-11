@@ -3913,32 +3913,30 @@ try {
             }
           }
           
-        // ... runSmartMode 내부
-        // ... runSmartMode 내부
-        if (videos && videos.length > 0) {
-          this.allVideos.push(...videos);
-          foundVideos += videos.length;
+          // ✅ try 블록 안으로 이동
+          if (videos && videos.length > 0) {
+            this.allVideos.push(...videos);
+            foundVideos += videos.length;
+            
+            // ▶ 실시간 카운터 즉시 반영
+            this.bumpCountersOnBatch({
+              addedBackground: videos.length,
+              addedDetected: 0
+            });
+            this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경
+          }
+
+          processedKeywords++;
           
-          // ▶ 실시간 카운터 즉시 반영
-          this.bumpCountersOnBatch({
-            addedBackground: videos.length,
-            addedDetected: 0
-          });
-          this.updateRealtimeDisplay(); // ✅ 실제 백데이터 업데이트 메서드로 변경
+          // ★ 실시간 카운터 갱신 추가
+          this.updateRealtimeCounters(foundVideos, processedKeywords);
+          
+          this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
+          this.updateCurrentAction?.(`"${keyword}" 처리 중`);
 
-    
-            processedKeywords++;
-            
-            // ★ 실시간 카운터 갱신 추가
-            this.updateRealtimeCounters(foundVideos, processedKeywords);
-            
-            this.updateScanProgress(processedKeywords, totalKeywords, foundVideos);
-            this.updateCurrentAction?.(`"${keyword}" 처리 중`);
-
-    
           await this.delay(300);
           
-        } catch (error) {
+        } catch (error) {  // ✅ 이제 올바른 try-catch 구조
           console.error(`❌ 스마트 모드 검색 실패:`, error);
         }
       }
