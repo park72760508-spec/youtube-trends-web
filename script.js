@@ -1374,9 +1374,20 @@ class OptimizedYoutubeTrendsAnalyzer {
                   addedDetected: 0                     // 검출(표시)은 후단에서 제한/정렬 후 반영
                 });
                 this.updateLiveCountersUI();
-                
-                this.updateProgress(...);
+
+                // 배치 진행률: 60% + (현재 처리 비율 * 30%)  → 60~90% 구간
+                const doneKw   = Math.min(i + batch.length, keywords.length);
+                const percent  = Math.round(60 + (doneKw / keywords.length) * 30);
+
+                this.updateProgress(
+                  percent,                // 진행률(%)
+                  keywords.length,        // 전체 키워드
+                  doneKw,                 // 처리된 키워드
+                  videos.length,          // 누적 발견된 영상 수
+                  `배치 처리 중 (${doneKw}/${keywords.length})`
+                );
                 await this.delay(1500);
+
 
                 
             } catch (error) {
