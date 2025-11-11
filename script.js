@@ -2572,7 +2572,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         this.updateRealtimeCounters(foundVideos, scannedKeywords);
         
         if (currentActionEl) {
-                if (percent >= 100) {
+            if (percent >= 100) {
                 currentActionEl.textContent = '🎯 기본 스캔 완료! 백그라운드 데이터 수집 중...';
                 // 100% 완료 후 백그라운드 애니메이션 시작
                 this.showPostProgressAnimation();
@@ -2587,7 +2587,6 @@ class OptimizedYoutubeTrendsAnalyzer {
                 setTimeout(() => {
                     this.startBackgroundDataSimulation();
                 }, 500);
-                }
             } else {
                 currentActionEl.textContent = action || `🔍 키워드 검색 중... (${scannedKeywords}/${totalKeywords})`;
             }
