@@ -2912,7 +2912,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (currentActionEl) {
             currentActionEl.textContent = `🎯 데이터 수집 완료! 총 ${this.backgroundDataSimulation.currentCount}개 수집됨`;
         }
-
+    } // ← 이 닫는 중괄호가 누락되었습니다!
 
 
 // 시뮬레이션된 분석 카드 업데이트 (새로 추가)
