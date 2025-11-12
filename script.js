@@ -522,26 +522,38 @@ class OptimizedYoutubeTrendsAnalyzer {
     // 진행바를 "API 소진 기준"으로 갱신:  percent = (usedSinceStart / planned) * 100
     updateQuotaProgressUI() {
       try {
-        // 1) 예상치/베이스라인 없으면 1회 초기화
         this.initQuotaProgressIfNeeded();
     
-        const planned  = Math.max(1, Number(this._quotaProgress?.planned || 0)); // 분모 보호
+        let planned  = Math.max(1, Number(this._quotaProgress?.planned || 0));
         const baseline = Number(this._quotaProgress?.baseline || 0);
         const usedNow  = this.getQuotaUsed();
         const usedSinceStart = Math.max(0, usedNow - baseline);
+    
+        // 🔧 언더에스티메이트 보정: 사용량이 분모의 90%를 넘으면 자동 상향(여유 20%)
+        if (usedSinceStart > planned * 0.90) {
+          const rebased = Math.ceil(usedSinceStart * 1.20); // 여유분 포함
+          if (rebased > planned) {
+            planned = rebased;
+            this._quotaProgress.planned = planned;
+    
+            // "예상 API 비용" UI도 함께 보정
+            const est = document.getElementById('estimatedCost');
+            if (est) est.textContent = planned.toLocaleString();
+    
+            console.log(`🔁 분모 자동 보정: planned=${planned.toLocaleString()} (usedSinceStart=${usedSinceStart.toLocaleString()})`);
+          }
+        }
     
         let pct = Math.round((usedSinceStart / planned) * 100);
         if (!Number.isFinite(pct)) pct = 0;
         if (pct > 100) pct = 100;
     
-        // 2) DOM 업데이트: "진행% (현재/예상)"로 표기
         const bar = document.getElementById('progressBar');
         if (bar) {
           bar.style.width = `${pct}%`;
           bar.textContent = `${pct}%  (${usedSinceStart.toLocaleString()} / ${planned.toLocaleString()})`;
         }
     
-        // 3) 별도 카운터 텍스트(#quotaUsage)가 있다면 누적 사용량만 그대로 유지 업데이트
         const quotaEl = document.getElementById('quotaUsage');
         if (quotaEl) quotaEl.textContent = usedNow.toLocaleString();
     
@@ -549,36 +561,72 @@ class OptimizedYoutubeTrendsAnalyzer {
         console.warn('updateQuotaProgressUI() 실패:', e);
       }
     }
+
     
 
     
     // === (신규) 스캔 예상 유닛 계산(보수적 상한): search + details ===
+    // === 현실적인 스캔 예상 유닛 계산 (보수적 상향) ===
+    // - search.list: 100 유닛/호출, 페이지당 50개 → 키워드당 ceil(topN/50) * 100
+    // - videos.list: 1 유닛/호출, 50개/호출 → 상세 ceil(topN/50) * 1
+    // - channel uploads(playlistItems.list): 1 유닛/호출, 50개/호출
+    //   * 키워드→영상→채널 확장 비율을 휴리스틱으로 반영
+    // - 안전 마진(safetyMultiplier) 적용
     estimatePlannedQuota() {
       try {
-        // 선택된 키워드 수
         const selected = this.getSelectedKeywords?.() || [];
         const keywordsCount = Array.isArray(selected) ? selected.length : Number(selected) || 0;
     
-        // 상위 N개(= resultCount)
         const topSel = document.getElementById('resultCount');
-        const topN   = topSel ? Number(topSel.value) : 50;
+        const topN   = topSel ? Math.max(1, Number(topSel.value)) : 50;
     
-        // 유닛 추정치:
-        //  - search.list : 키워드당 1회 ≈ 100 유닛
-        //  - videos.list : 50개당 1 유닛 → 키워드당 ceil(topN/50)
-        const searchUnits  = keywordsCount * 100;
-        const detailUnits  = keywordsCount * Math.ceil(Math.max(1, topN) / 50);
+        // 운영 파라미터(로컬스토리지로 조정 가능)
+        const perChannelMax = Math.max(1, Number(localStorage.getItem('hot_perChannelMax') || 300));   // 채널당 최대 가져올 업로드 수
+        const maxChannels   = Math.max(1, Number(localStorage.getItem('hot_maxChannels')   || 100));   // 확장 가능한 채널 수 상한
+        const uniqueChannelRatio = Math.min(1, Math.max(0.1, Number(localStorage.getItem('hot_uniqueChannelRatio') || 0.6))); // topN에서 유니크 채널 비율 추정
+        const safetyMultiplier   = Math.min(2.0, Math.max(1.10, Number(localStorage.getItem('hot_safetyMultiplier') || 1.30))); // 안전 마진(기본 30%)
     
-        const planned = Math.max(1, searchUnits + detailUnits); // 분모 0 방지
-        // 화면의 "예상 API 비용" 표시 요소가 있다면 갱신(있으면 유지, 없으면 무시)
+        // YouTube Data API v3 비용 테이블(조정 가능)
+        const COST_SEARCH        = Number(localStorage.getItem('hot_cost_search')        || 100); // search.list
+        const COST_VIDEOS        = Number(localStorage.getItem('hot_cost_videos')        || 1);   // videos.list
+        const COST_PLAYLISTITEMS = Number(localStorage.getItem('hot_cost_playlistItems') || 1);   // playlistItems.list
+    
+        // 1) 키워드 검색(search.list) — 페이지 수 반영
+        const searchPagesPerKeyword = Math.ceil(topN / 50);
+        const searchUnits = keywordsCount * searchPagesPerKeyword * COST_SEARCH;
+    
+        // 2) 동영상 상세(videos.list) — 페이지 수 반영
+        const videoDetailPagesPerKeyword = Math.ceil(topN / 50);
+        const detailUnits = keywordsCount * videoDetailPagesPerKeyword * COST_VIDEOS;
+    
+        // 3) 채널 업로드 확장(playlistItems.list) — 휴리스틱 기반
+        //    topN 결과에서 유니크 채널 수를 추정한 뒤, 각 채널에서 perChannelMax 만큼 가져온다고 가정
+        const estimatedUniqueChannels = Math.min(maxChannels, Math.round(topN * uniqueChannelRatio) * keywordsCount);
+        const uploadsPagesPerChannel  = Math.ceil(perChannelMax / 50);
+        const channelUploadsUnits = estimatedUniqueChannels * uploadsPagesPerChannel * COST_PLAYLISTITEMS;
+    
+        // 4) 합계 + 안전 마진
+        const rawPlanned = searchUnits + detailUnits + channelUploadsUnits;
+        const planned = Math.max(1, Math.ceil(rawPlanned * safetyMultiplier));
+    
+        // UI 갱신
         const est = document.getElementById('estimatedCost');
         if (est) est.textContent = planned.toLocaleString();
+    
+        // 로깅(선택)
+        console.log('[예상 유닛 계산]', { 
+          keywordsCount, topN, perChannelMax, maxChannels, uniqueChannelRatio,
+          searchPagesPerKeyword, videoDetailPagesPerKeyword, uploadsPagesPerChannel,
+          searchUnits, detailUnits, channelUploadsUnits, safetyMultiplier, planned
+        });
+    
         return planned;
       } catch (e) {
         console.warn('estimatePlannedQuota() 실패:', e);
-        return 1; // 안전값
+        return 1;
       }
     }
+
 
 
     // 진행률 상태 하드 리셋 (매 스캔 시작 시 0%에서 출발)
