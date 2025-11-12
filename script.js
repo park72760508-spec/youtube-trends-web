@@ -1236,18 +1236,15 @@ class OptimizedYoutubeTrendsAnalyzer {
                     
                     // 🔥 백그라운드 수집량과 화면 표시량 분리 (핵심 수정!)
                     // 🔥 백그라운드 수집량과 화면 표시량 분리 - 대용량 지원
+                    // 🔥 백그라운드 수집량과 화면 표시량 분리 - 대용량 지원
                     // 사용자 설정 maxChannels 값을 실제 반영
                     const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
+                    const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
                     const backgroundCollectionLimit = Math.max(maxChannels, 50000); // 설정값과 기본값 중 큰 값 사용
                     const displayLimit = count; // 화면에 표시할 데이터 수 (사용자 설정값)
                     
                     console.log(`🎯 대용량 수집 설정: ${backgroundCollectionLimit.toLocaleString('ko-KR')}개 수집 → 화면 표시 ${displayLimit}개`);
                     console.log(`📊 사용자 설정 채널 상한: ${maxChannels.toLocaleString('ko-KR')}개`);
-                    
-                    // [NEW] 채널-우회 파이프라인으로 실행 (대용량 수집)
-                    // [NEW] 대용량 지원 채널 파이프라인 실행
-                    const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
-                    const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
                     
                     // 대용량 검색을 위한 배치 처리 설정
                     const batchSettings = this.calculateOptimalBatchSettings(maxChannels, affordableKeywords.length);
