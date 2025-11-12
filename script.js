@@ -4097,13 +4097,6 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
-    // 채널 검색 후 유효성 검사 추가
-    const channels = await this.searchChannelsAllKeywords(keywords, softTarget);
-    console.log(`🔍 초기 채널 검색 완료: ${channels.length}개`);
-    
-    // 🔥 새로 추가: 유효하지 않은 채널 사전 필터링
-    const validChannels = await this.filterValidChannels(channels);
-    console.log(`✅ 유효한 채널만 필터링: ${validChannels.length}개`);
 
 
 
