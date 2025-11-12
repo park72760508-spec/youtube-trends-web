@@ -3510,18 +3510,44 @@ class OptimizedYoutubeTrendsAnalyzer {
       for (let attempt = 0; attempt <= maxRetry; attempt++) {
         try {
           const res = await fetch(url, { method, body, signal });
-          if (res.ok) { this.updateQuotaUsage(apiKey, units); return res; }
+          
+          // 성공 시 할당량 차감 후 반환
+          if (res.ok) { 
+            this.updateQuotaUsage(apiKey, units); 
+            return res; 
+          }
+          
+          // 404, 403, 400 등 클라이언트 에러는 재시도하지 않음
+          if ([400, 401, 403, 404, 409].includes(res.status)) {
+            console.warn(`🚫 API 클라이언트 에러 ${res.status}: ${url.split('&key=')[0]}...`);
+            this.updateQuotaUsage(apiKey, units); // 실패해도 할당량은 차감됨
+            return res; // 에러 응답을 그대로 반환하여 상위에서 처리하도록 함
+          }
+          
+          // 429, 500~504 서버 에러는 재시도
           if ([429, 500, 502, 503, 504].includes(res.status)) {
+            if (attempt < maxRetry) {
+              const delay = baseDelay * Math.pow(2, attempt);
+              console.warn(`⏳ API 서버 에러 ${res.status}, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetry + 1})`);
+              await this.delay(delay);
+              continue;
+            }
+          }
+          
+          // 기타 상태코드는 그대로 반환
+          this.updateQuotaUsage(apiKey, units);
+          return res;
+          
+        } catch(e) {
+          if (attempt < maxRetry) {
             const delay = baseDelay * Math.pow(2, attempt);
+            console.warn(`🔌 네트워크 오류, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetry + 1}):`, e.message);
             await this.delay(delay);
             continue;
           }
-          return res; // 4xx 등은 재시도하지 않음
-        } catch (e) {
-          if (e?.name === 'AbortError') throw e; // 취소 시 즉시 종료
-          const delay = baseDelay * Math.pow(2, attempt);
-          await this.delay(delay);
-          continue;
+          // 최대 재시도 초과 시 에러 던지기
+          console.error(`❌ 네트워크 오류 (최대 재시도 초과):`, e.message);
+          throw e;
         }
       }
       throw new Error('fetchWithRetry: max retry exceeded');
@@ -3566,6 +3592,45 @@ class OptimizedYoutubeTrendsAnalyzer {
       });
     }
 
+
+    // 유효하지 않은 채널 필터링 (새로 추가)
+    async filterValidChannels(channelIds) {
+      const validChannels = [];
+      const batchSize = 50; // channels API는 최대 50개까지 한 번에 조회 가능
+      
+      for (let i = 0; i < channelIds.length; i += batchSize) {
+        const batch = channelIds.slice(i, i + batchSize);
+        const apiKey = this.getApiKey();
+        if (!apiKey) break;
+        
+        try {
+          const url = `${this.baseUrl}/channels?part=id&id=${batch.join(',')}&key=${apiKey}`;
+          const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+          
+          if (res.ok) {
+            const data = await res.json();
+            const existingChannels = (data.items || []).map(item => item.id);
+            validChannels.push(...existingChannels);
+            
+            // 삭제된 채널 로깅
+            const missingChannels = batch.filter(id => !existingChannels.includes(id));
+            if (missingChannels.length > 0) {
+              console.warn(`🚫 삭제되거나 접근 불가한 채널들: ${missingChannels.length}개`);
+            }
+          }
+        } catch (error) {
+          console.error('채널 유효성 검사 오류:', error);
+          // 오류 시에도 기존 채널 ID들을 유지
+          validChannels.push(...batch);
+        }
+      }
+      
+      console.log(`📊 채널 필터링 결과: ${channelIds.length}개 → ${validChannels.length}개 (${channelIds.length - validChannels.length}개 제거)`);
+      return validChannels;
+    }
+
+
+
     
     // (E) 키워드 → 채널 인덱싱 (search.list: type=channel, 100units/호출)
     async discoverSeedChannels(keywords, maxPerKeyword = 200) {
@@ -3598,13 +3663,29 @@ class OptimizedYoutubeTrendsAnalyzer {
     
       const apiKey = this.getApiKey(); if (!apiKey) return null;
       const url = `${this.baseUrl}/channels?part=contentDetails&id=${channelId}&key=${apiKey}`;
-      const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
-      if (!res.ok) return null;
+       const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+        if (!res.ok) {
+          if (res.status === 404) {
+            console.warn(`🚫 플레이리스트를 찾을 수 없음: ${uploadsPlaylistId} (채널 삭제됨 또는 비공개)`);
+          } else if (res.status === 403) {
+            console.warn(`🚫 플레이리스트 접근 권한 없음: ${uploadsPlaylistId}`);
+          } else {
+            console.warn(`🚫 플레이리스트 조회 실패 (${res.status}): ${uploadsPlaylistId}`);
+          }
+          break;
+        }
+    }
     
-      const data = await res.json();
-      const id = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
-      if (id) this._cacheSetLS(ck, id);
-      return id;
+    const data = await res.json();
+    const id = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
+    if (id) {
+      this._cacheSetLS(ck, id);
+      console.log(`✅ 채널 업로드 플레이리스트 ID 획득: ${channelId} → ${id}`);
+    } else {
+      console.warn(`⚠️ 채널에 업로드 플레이리스트가 없음: ${channelId}`);
+      this._cacheSetLS(ck, null);
+    }
+    return id;
     }
     
     // (G) 업로드 재생목록 → 최근 업로드 영상ID 페이지네이션 (1unit/페이지)
@@ -4013,6 +4094,18 @@ class OptimizedYoutubeTrendsAnalyzer {
       scored.sort((a,b) => b.score - a.score);
       return scored.slice(0, topN).map((s, i) => ({ rank: i+1, score: s.score, ...s.video }));
     }
+
+
+    // 채널 검색 후 유효성 검사 추가
+    const channels = await this.searchChannelsAllKeywords(keywords, softTarget);
+    console.log(`🔍 초기 채널 검색 완료: ${channels.length}개`);
+    
+    // 🔥 새로 추가: 유효하지 않은 채널 사전 필터링
+    const validChannels = await this.filterValidChannels(channels);
+    console.log(`✅ 유효한 채널만 필터링: ${validChannels.length}개`);
+
+
+
     /* === [/NEW] ============================================================ */
 
 
