@@ -476,6 +476,59 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
+    // === (신규) 스캔 예상 유닛 계산(보수적 상한): search + details ===
+    estimatePlannedQuota() {
+      try {
+        // 선택된 키워드 수
+        const selected = this.getSelectedKeywords?.() || [];
+        const keywordsCount = Array.isArray(selected) ? selected.length : Number(selected) || 0;
+    
+        // 상위 N개(= resultCount)
+        const topSel = document.getElementById('resultCount');
+        const topN   = topSel ? Number(topSel.value) : 50;
+    
+        // 유닛 추정치:
+        //  - search.list : 키워드당 1회 ≈ 100 유닛
+        //  - videos.list : 50개당 1 유닛 → 키워드당 ceil(topN/50)
+        const searchUnits  = keywordsCount * 100;
+        const detailUnits  = keywordsCount * Math.ceil(Math.max(1, topN) / 50);
+    
+        const planned = Math.max(1, searchUnits + detailUnits); // 분모 0 방지
+        // 화면의 "예상 API 비용" 표시 요소가 있다면 갱신(있으면 유지, 없으면 무시)
+        const est = document.getElementById('estimatedCost');
+        if (est) est.textContent = planned.toLocaleString();
+        return planned;
+      } catch (e) {
+        console.warn('estimatePlannedQuota() 실패:', e);
+        return 1; // 안전값
+      }
+    },
+    
+    // === (신규) 할당량 진행바 초기화(1회) ===
+    initQuotaProgressIfNeeded() {
+      if (!this._quotaProgress) {
+        const planned  = this.estimatePlannedQuota();
+        const baseline = this.getQuotaUsed?.() || 0;
+    
+        this._quotaProgress = {
+          planned,
+          baseline,
+          startedAt: Date.now()
+        };
+    
+        // 부족 경고 UI가 있을 경우 유지(있으면 사용)
+        try {
+          const stats = this.apiKeyManager?.getOverallStats?.() || {};
+          const warn  = document.getElementById('costWarning');
+          if (warn && Number(planned) > Number(stats.remainingQuota || 0)) {
+            warn.style.display = 'block';
+          }
+        } catch (_) {}
+      }
+    },
+
+
+    
     
     // 초기화
     init() {
@@ -4625,6 +4678,7 @@ try {
     }
     
     // 3) 진행 상황 통합 갱신 (새 규격 + 구규격 ID 모두 지원)
+    // === (변경후) 진행 상황 통합 갱신: 스캔 중에는 'API 사용량 기반' 진행바 ===
     updateScanProgress(processedKeywords, totalKeywords, foundVideos, forcedPercent) {
       const progressBar = document.getElementById('progressBar');
     
@@ -4635,43 +4689,56 @@ try {
       const quotaEl     = document.getElementById('quotaUsage');
     
       // 구 규격(겸용)
-      const scannedEl   = document.getElementById('scannedKeywords');      // "x / y" 형식
-      const scoresEl    = document.getElementById('calculatedScores');     // (없으면 무시)
+      const scannedEl   = document.getElementById('scannedKeywords');   // "x / y" 형식
+      const scoresEl    = document.getElementById('calculatedScores');  // (없으면 무시)
     
       const safeTotal     = Math.max(1, Number(totalKeywords || 0));
       const safeProcessed = Math.max(0, Math.min(Number(processedKeywords || 0), safeTotal));
     
-      // 진행률 계산
+      // 기본 진행률: 채널/키워드 기준
       let percent = Math.round((safeProcessed / safeTotal) * 100);
       if (!Number.isFinite(percent)) percent = 0;
     
-      // 필요 시 외부 강제 퍼센트 적용(100% 초과 방지, 더 작은 값 우선)
+      // === 스캔중일 때만 '할당량(유닛) 기반' 진행률로 대체 ===
+      if (this.isScanning) {
+        // 필요 시 1회 초기화(예상 유닛, 베이스라인)
+        this.initQuotaProgressIfNeeded();
+    
+        const usedTotal      = this.getQuotaUsed();
+        const baseline       = Number(this._quotaProgress?.baseline || 0);
+        const planned        = Math.max(1, Number(this._quotaProgress?.planned || 0)); // 분모 0 방지
+        const usedSinceStart = Math.max(0, usedTotal - baseline);
+    
+        let quotaPercent = Math.round((usedSinceStart / planned) * 100);
+        if (!Number.isFinite(quotaPercent)) quotaPercent = 0;
+        percent = Math.min(100, quotaPercent);
+      }
+    
+      // 필요 시 외부 강제 퍼센트 적용(더 작은 값 우선)
       if (Number.isFinite(forcedPercent)) {
         percent = Math.min(percent, Math.max(0, Math.min(100, Math.round(forcedPercent))));
       }
     
-      // 새 규격 표시
+      // 숫자 카운터 갱신(※ 기존 소진량/표시부 그대로 유지)
       if (processedEl) this.updateCounterDisplay(processedEl, String(safeProcessed));
       if (totalEl)     this.updateCounterDisplay(totalEl,     String(safeTotal));
       if (foundEl)     this.updateCounterDisplay(foundEl,     String(Number(foundVideos || 0)));
       if (quotaEl) {
-        const used = this.getQuotaUsed(); // ← 새 헬퍼
+        const used = this.getQuotaUsed();
         this.updateCounterDisplay(quotaEl, String(used));
       }
     
-      // 구 규격 표시(겸용): "x / y"
-      if (scannedEl)   this.updateCounterDisplay(scannedEl,   `${safeProcessed} / ${safeTotal}`);
-      if (scoresEl)    this.updateCounterDisplay(scoresEl,    `${safeProcessed}`);
+      // 구 규격 표시(겸용)
+      if (scannedEl) this.updateCounterDisplay(scannedEl, `${safeProcessed} / ${safeTotal}`);
+      if (scoresEl)  this.updateCounterDisplay(scoresEl,  `${safeProcessed}`);
     
-      // 진행바
+      // 진행바 DOM
       if (progressBar) {
         progressBar.style.width = `${percent}%`;
         progressBar.textContent = `${percent}%`;
       }
-    
-      // 디버깅 로그
-      // console.log(`📊 진행률: ${safeProcessed}/${safeTotal} (${percent}%)`);
     }
+
     
     // 4) 현재 작업 상태 문구
     updateCurrentAction(text) {
