@@ -1119,6 +1119,7 @@ class OptimizedYoutubeTrendsAnalyzer {
             }
     
             // 스캔 시작 시 백그라운드 데이터 초기화
+            // 스캔 시작 시 백그라운드 데이터 초기화
             this.isScanning = true;
             this.allVideos = [];
             this.scanResults = [];
@@ -1129,6 +1130,15 @@ class OptimizedYoutubeTrendsAnalyzer {
                 totalCollected: 0,
                 processedCount: 0,
                 collectionTime: new Date().toISOString()
+            };
+            
+            // 🔥 실시간 카운터 완전 초기화
+            this.realTimeCounters = {
+                backgroundData: 0,
+                detectedVideos: 0,
+                processingRate: 0,
+                lastUpdateTime: Date.now(),
+                rateCalculationBuffer: []
             };
             
             // UI 상태 변경
@@ -1206,18 +1216,17 @@ class OptimizedYoutubeTrendsAnalyzer {
               this.backgroundDataStats.collectionTime = new Date().toISOString();
             
               // 4) 🔥 실시간 카운터 반영
-              this.realTimeCounters = this.realTimeCounters || {
-                backgroundData: 0,
-                detectedVideos: 0,
+              // 5) 🔥 실시간 카운터 초기화 (데모 모드용)
+              this.realTimeCounters = {
+                backgroundData: this.fullBackgroundData.length, // 초기값으로 설정
+                detectedVideos: Math.max(
+                  this.realTimeCounters?.detectedVideos || 0,
+                  (this.scanResults?.length || 0)
+                ),
                 processingRate: 0,
                 lastUpdateTime: Date.now(),
                 rateCalculationBuffer: []
               };
-              this.realTimeCounters.backgroundData = this.fullBackgroundData.length;
-              this.realTimeCounters.detectedVideos = Math.max(
-                this.realTimeCounters.detectedVideos || 0,
-                (this.scanResults?.length || 0)
-              );
             
               // 5) 🔥 DOM 즉시 업데이트
               if (typeof this.updateRealtimeDisplay === 'function') {
@@ -1354,10 +1363,12 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
                     // 🔥 실시간 카운터에 반영 (배치 결과 기준)
-                    this.bumpCountersOnBatch({
-                      addedBackground: this.fullBackgroundData?.length || 0,     // 백데이터 총량 반영
-                      addedDetected: this.scanResults?.length || 0               // 검출(표시) 영상 수
-                    });
+                    // 🔥 실시간 카운터 초기화 (실제 검색용) - 전체 값으로 설정
+                    this.realTimeCounters = this.realTimeCounters || {};
+                    this.realTimeCounters.backgroundData = this.fullBackgroundData?.length || 0; // 전체 값으로 초기화
+                    this.realTimeCounters.detectedVideos = this.scanResults?.length || 0; // 전체 값으로 초기화
+                    this.realTimeCounters.lastUpdateTime = Date.now();
+                    
                     // 통계에 맞춰 즉시 DOM 업데이트
                     this.updateLiveCountersUI();
 
@@ -5640,15 +5651,41 @@ try {
     }
     
     bumpCountersOnBatch({ addedBackground = 0, addedDetected = 0 }) {
-      // 누적 증가
-      this.realTimeCounters.backgroundData += addedBackground;
-      this.realTimeCounters.detectedVideos += addedDetected;
+      // 실시간 카운터 초기화 확인
+      if (!this.realTimeCounters) {
+        this.realTimeCounters = {
+          backgroundData: 0,
+          detectedVideos: 0,
+          processingRate: 0,
+          lastUpdateTime: Date.now(),
+          rateCalculationBuffer: []
+        };
+      }
+      
+      // 누적 증가 (0 이상의 값만 추가)
+      if (addedBackground > 0) {
+        this.realTimeCounters.backgroundData = Math.max(0, this.realTimeCounters.backgroundData + addedBackground);
+      }
+      if (addedDetected > 0) {
+        this.realTimeCounters.detectedVideos = Math.max(0, this.realTimeCounters.detectedVideos + addedDetected);
+      }
     
-      // 처리율 버퍼 채우기 (added 만큼 타임스탬프 push)
+      // 처리율 버퍼 채우기 (추가된 양만큼 타임스탬프 push)
       const now = Date.now();
-      for (let i = 0; i < (addedBackground + addedDetected); i++) {
+      const totalAdded = Math.max(0, addedBackground + addedDetected);
+      for (let i = 0; i < totalAdded; i++) {
         this.realTimeCounters.rateCalculationBuffer.push(now);
       }
+      
+      // 버퍼 크기 제한 (최근 1000개만 유지)
+      if (this.realTimeCounters.rateCalculationBuffer.length > 1000) {
+        this.realTimeCounters.rateCalculationBuffer = this.realTimeCounters.rateCalculationBuffer.slice(-1000);
+      }
+      
+      // 마지막 업데이트 시간 기록
+      this.realTimeCounters.lastUpdateTime = now;
+      
+      console.log(`📊 카운터 증가: +${addedBackground}개 백그라운드, +${addedDetected}개 검출 → 총 ${this.realTimeCounters.backgroundData}개`);
     }
     
     updateLiveCountersUI() {
@@ -5658,15 +5695,59 @@ try {
       const rateEl = document.querySelector('#processingRate, [data-metric="processingRate"]');
       const foundEl = document.querySelector('#discoveredVideosCount, [data-metric="discoveredVideos"]');
     
-      // 화면 수치는 보존된 전체/현재 표시값 기준
-      const totalCollected = this.fullBackgroundData ? this.fullBackgroundData.length : this.allVideos.length;
-      const detected = this.scanResults?.length || this.realTimeCounters.detectedVideos || 0;
-      const rate = this.realTimeCounters.processingRate || 0;
-      const discovered = (this.allVideos?.length || 0);
+      // 실시간 카운터가 없으면 초기화
+      if (!this.realTimeCounters) {
+        this.realTimeCounters = {
+          backgroundData: 0,
+          detectedVideos: 0,
+          processingRate: 0,
+          lastUpdateTime: Date.now(),
+          rateCalculationBuffer: []
+        };
+      }
     
-      // ✅ 백데이터 업데이트 복원
-      if (bgEl) bgEl.textContent = totalCollected.toLocaleString('ko-KR');
-    }  // ✅ 메서드 닫는 중괄호 추가
+      // 실제 데이터와 실시간 카운터 중 더 정확한 값 선택
+      const actualBackgroundData = this.fullBackgroundData ? this.fullBackgroundData.length : (this.allVideos?.length || 0);
+      const realtimeBackgroundData = this.realTimeCounters.backgroundData || 0;
+      const totalCollected = Math.max(actualBackgroundData, realtimeBackgroundData);
+      
+      const detected = Math.max(
+        this.scanResults?.length || 0,
+        this.realTimeCounters.detectedVideos || 0
+      );
+      
+      const rate = this.realTimeCounters.processingRate || 0;
+    
+      // 대용량 검색 시 진행률 표시
+      const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
+      const isLargeScale = maxChannels > 1000;
+      
+      // ✅ 백데이터 업데이트 - 대용량 시 진행률 포함
+      if (bgEl) {
+        if (isLargeScale && totalCollected > 0) {
+          const progressPercent = Math.min(100, Math.round((totalCollected / maxChannels) * 100));
+          bgEl.textContent = `${totalCollected.toLocaleString('ko-KR')} (${progressPercent}%)`;
+        } else {
+          bgEl.textContent = totalCollected.toLocaleString('ko-KR');
+        }
+      }
+      
+      // 검출된 영상 수 업데이트
+      if (detEl) {
+        detEl.textContent = detected.toLocaleString('ko-KR');
+      }
+      
+      // 처리 속도 업데이트
+      if (rateEl && rate > 0) {
+        rateEl.textContent = `${rate.toLocaleString('ko-KR')}/분`;
+      }
+      
+      // 실시간 카운터를 실제 값과 동기화
+      this.realTimeCounters.backgroundData = totalCollected;
+      this.realTimeCounters.detectedVideos = detected;
+      
+      console.log(`🔄 UI 업데이트: 백그라운드 ${totalCollected}개, 검출 ${detected}개, 속도 ${rate}/분`);
+    }
 
 
         // 대용량 검색 경고 함수 (OptimizedYoutubeTrendsAnalyzer 클래스 내부에 추가)
