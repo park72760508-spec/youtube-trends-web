@@ -840,20 +840,26 @@ class OptimizedYoutubeTrendsAnalyzer {
 
             
         // maxChannels (검출 채널 상한)
+        // maxChannels (검출 채널 상한) - 대용량 확장
         {
           const mcEl  = document.getElementById('maxChannels');
           const mcVal = document.getElementById('maxChannelsValue');
           if (mcEl && mcVal) {
-            const stored = Number(localStorage.getItem('hot_maxChannels') || 100);
-            const clamped = Math.min(1000, Math.max(10, stored));
+            const stored = Number(localStorage.getItem('hot_maxChannels') || 500);
+            const clamped = Math.min(10000, Math.max(10, stored)); // 최대 10,000개로 확장
             mcEl.value = clamped;
-            mcVal.textContent = clamped.toString();
+            mcVal.textContent = clamped.toLocaleString('ko-KR'); // 천단위 구분자 추가
         
             mcEl.addEventListener('input', (e) => {
               const v = Number(e.target.value);
-              const safe = Math.min(1000, Math.max(10, v));
-              mcVal.textContent = safe.toString();
+              const safe = Math.min(10000, Math.max(10, v)); // 최대 10,000개로 확장
+              mcVal.textContent = safe.toLocaleString('ko-KR'); // 천단위 구분자 추가
               localStorage.setItem('hot_maxChannels', String(safe));
+        
+              // 🔥 대용량 검색 시 경고 표시
+              if (safe > 5000) {
+                this.showLargeScaleWarning?.(safe);
+              }
         
               // 🔁 예상 소진 API 수 즉시 갱신
               if (typeof ytAnalyzer?.estimatePlannedQuota === 'function') {
@@ -1229,23 +1235,38 @@ class OptimizedYoutubeTrendsAnalyzer {
                     }
                     
                     // 🔥 백그라운드 수집량과 화면 표시량 분리 (핵심 수정!)
-                    // 백그라운드에서는 항상 대용량 수집, 화면 표시만 사용자 설정값으로 제한
-                    const backgroundCollectionLimit = 50000; // 백그라운드에서 수집할 최대 데이터 수
+                    // 🔥 백그라운드 수집량과 화면 표시량 분리 - 대용량 지원
+                    // 사용자 설정 maxChannels 값을 실제 반영
+                    const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
+                    const backgroundCollectionLimit = Math.max(maxChannels, 50000); // 설정값과 기본값 중 큰 값 사용
                     const displayLimit = count; // 화면에 표시할 데이터 수 (사용자 설정값)
                     
-                    console.log(`🎯 백그라운드 수집 설정: ${backgroundCollectionLimit}개 수집 → 화면 표시 ${displayLimit}개`);
+                    console.log(`🎯 대용량 수집 설정: ${backgroundCollectionLimit.toLocaleString('ko-KR')}개 수집 → 화면 표시 ${displayLimit}개`);
+                    console.log(`📊 사용자 설정 채널 상한: ${maxChannels.toLocaleString('ko-KR')}개`);
                     
                     // [NEW] 채널-우회 파이프라인으로 실행 (대용량 수집)
-                    const ranked = await this.runChannelUploadPipeline(
+                    // [NEW] 대용량 지원 채널 파이프라인 실행
+                    const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
+                    const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
+                    
+                    // 대용량 검색을 위한 배치 처리 설정
+                    const batchSettings = this.calculateOptimalBatchSettings(maxChannels, affordableKeywords.length);
+                    
+                    console.log(`🚀 대용량 파이프라인 시작: ${maxChannels.toLocaleString('ko-KR')}개 채널, 배치 크기: ${batchSettings.batchSize}`);
+                    
+                    const ranked = await this.runLargeScaleChannelPipeline(
                       affordableKeywords,
                       { 
                         format, 
                         timeRange, 
-                        perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000), // 최대 기본 1000
-                        topN: backgroundCollectionLimit // 🔥 수정: 화면 표시와 무관하게 대용량 수집
+                        maxChannels: maxChannels,
+                        perChannelMax: Number(localStorage.getItem('hot_perChannelMax') || 1000),
+                        topN: backgroundCollectionLimit,
+                        concurrency: concurrency,
+                        batchSettings: batchSettings
                       }
                     );
-    
+                        
                     // 🔥 수집 결과 상세 로깅
                     console.log(`📈 원시 데이터 수집 결과: ${ranked ? ranked.length : 0}개`);
                     
@@ -3666,6 +3687,42 @@ class OptimizedYoutubeTrendsAnalyzer {
         return out;
       });
     }
+
+
+        // 최적의 배치 설정 계산
+        calculateOptimalBatchSettings(maxChannels, keywordCount) {
+            let batchSize, delayMs;
+            
+            if (maxChannels <= 1000) {
+                batchSize = 200;
+                delayMs = 1000;
+            } else if (maxChannels <= 5000) {
+                batchSize = 500;
+                delayMs = 2000;
+            } else {
+                batchSize = 1000;
+                delayMs = 3000;
+            }
+            
+            // API 할당량을 고려한 조정
+            const estimatedApiCalls = (maxChannels / batchSize) * keywordCount;
+            const availableQuota = this.apiKeyManager.getOverallStats().remainingQuota;
+            
+            if (estimatedApiCalls > availableQuota * 0.8) {
+                batchSize = Math.max(100, Math.floor(batchSize * 0.7));
+                delayMs = Math.min(5000, delayMs * 1.5);
+            }
+            
+            return {
+                batchSize,
+                delayMs,
+                estimatedBatches: Math.ceil(maxChannels / batchSize),
+                estimatedTime: Math.ceil((maxChannels / batchSize) * (delayMs / 1000 / 60)) // 분 단위
+            };
+        }
+
+
+
     
     // (K) 전체 파이프라인 (동시성 제한 + 품질 로그)
     async runChannelUploadPipeline(
@@ -4940,6 +4997,46 @@ try {
       const el = document.getElementById('currentAction');
       if (el) el.textContent = text || '';
     }
+
+
+    // 대용량 검색 진행률 표시
+    updateLargeScaleProgress(message, processedChannels, targetChannels, currentBatch, totalBatches) {
+        const channelPercent = Math.round((processedChannels / targetChannels) * 100);
+        const batchPercent = Math.round((currentBatch / totalBatches) * 100);
+        
+        // 기존 진행률 업데이트
+        this.updateProgress(
+            channelPercent,
+            targetChannels,
+            processedChannels,
+            this.realTimeCounters.backgroundData || 0,
+            message
+        );
+        
+        // 추가 상세 정보 표시
+        const progressEl = document.querySelector('.progress-details');
+        if (progressEl) {
+            progressEl.innerHTML = `
+                <div class="progress-detail-row">
+                    <span class="label">처리된 채널:</span>
+                    <span class="value">${processedChannels.toLocaleString('ko-KR')} / ${targetChannels.toLocaleString('ko-KR')} (${channelPercent}%)</span>
+                </div>
+                <div class="progress-detail-row">
+                    <span class="label">완료된 배치:</span>
+                    <span class="value">${currentBatch} / ${totalBatches} (${batchPercent}%)</span>
+                </div>
+                <div class="progress-detail-row">
+                    <span class="label">수집된 영상:</span>
+                    <span class="value">${(this.realTimeCounters.backgroundData || 0).toLocaleString('ko-KR')}개</span>
+                </div>
+            `;
+        }
+    }
+
+
+
+
+
     
     // 5) [호환용] 기존 updateProgress 시그니처 유지
     //    updateProgress(percent, totalKeywords, scannedKeywords, foundVideos, action)
@@ -4954,6 +5051,30 @@ try {
       // 통합 갱신 함수 호출(필요 시 percent를 강제값으로 전달)
       const forcedPercent = Number.isFinite(percent) ? percent : undefined;
       this.updateScanProgress(safeProcessed, safeTotal, foundVideos, forcedPercent);
+
+    // 대용량 검색 시 추가 통계 표시
+    const maxChannels = Number(localStorage.getItem('hot_maxChannels') || 500);
+    const bgDataCount = this.realTimeCounters.backgroundData || 0;
+    
+    // 백그라운드 데이터 카운터 업데이트 시 대용량 표시
+    const bgEl = document.getElementById('backgroundDataCount');
+    if (bgEl && maxChannels > 1000) {
+        const progressPercent = Math.round((bgDataCount / maxChannels) * 100);
+        bgEl.textContent = `${bgDataCount.toLocaleString('ko-KR')}개 (${progressPercent}%)`;
+    } else if (bgEl) {
+        bgEl.textContent = bgDataCount.toLocaleString('ko-KR');
+    }
+    
+    // 처리 속도 계산 개선
+    if (this.largeScaleStartTime) {
+        const elapsedSeconds = (Date.now() - this.largeScaleStartTime) / 1000;
+        const rate = elapsedSeconds > 0 ? Math.round(bgDataCount / (elapsedSeconds / 60)) : 0;
+        
+        const rateEl = document.getElementById('processingRate');
+        if (rateEl) {
+            rateEl.textContent = `${rate.toLocaleString('ko-KR')} 채널/분`;
+            }
+        }
     }
 
 
@@ -5549,6 +5670,99 @@ try {
       // ✅ 백데이터 업데이트 복원
       if (bgEl) bgEl.textContent = totalCollected.toLocaleString('ko-KR');
     }  // ✅ 메서드 닫는 중괄호 추가
+
+
+        // 대용량 검색 경고 함수 (OptimizedYoutubeTrendsAnalyzer 클래스 내부에 추가)
+        showLargeScaleWarning(channelCount) {
+            const warningEl = document.getElementById('apiStatusBanner');
+            if (warningEl) {
+                const originalClass = warningEl.className;
+                const originalContent = warningEl.innerHTML;
+                
+                // 경고 스타일로 변경
+                warningEl.className = 'api-status-banner warning';
+                warningEl.innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>⚠️ 대용량 검색 모드: ${channelCount.toLocaleString('ko-KR')}개 채널 검색 - 완료까지 시간이 오래 걸릴 수 있습니다</span>
+                `;
+                
+                // 3초 후 원래 상태로 복원
+                setTimeout(() => {
+                    warningEl.className = originalClass;
+                    warningEl.innerHTML = originalContent;
+                }, 5000);
+            }
+        }
+
+
+        // 대용량 지원 채널 파이프라인
+        async runLargeScaleChannelPipeline(keywords, options = {}) {
+            const { maxChannels, batchSettings, concurrency = 4 } = options;
+            
+            console.log(`🔄 대용량 파이프라인 시작: ${maxChannels.toLocaleString('ko-KR')}개 채널 목표`);
+            console.log(`⚙️ 배치 설정:`, batchSettings);
+            
+            // 기존 파이프라인을 확장하여 대용량 처리
+            const results = [];
+            let processedChannels = 0;
+            let currentBatch = 0;
+            
+            try {
+                // 키워드별로 배치 처리
+                for (const keyword of keywords) {
+                    if (processedChannels >= maxChannels) break;
+                    
+                    const remainingChannels = maxChannels - processedChannels;
+                    const currentBatchSize = Math.min(batchSettings.batchSize, remainingChannels);
+                    
+                    currentBatch++;
+                    
+                    // 진행률 업데이트
+                    this.updateLargeScaleProgress(
+                        `키워드 "${keyword}" 처리 중... (배치 ${currentBatch})`,
+                        processedChannels,
+                        maxChannels,
+                        currentBatch,
+                        batchSettings.estimatedBatches
+                    );
+                    
+                    // 기존 파이프라인 호출 (배치 크기 제한)
+                    const batchResults = await this.runChannelUploadPipeline(
+                        [keyword],
+                        {
+                            ...options,
+                            topN: currentBatchSize
+                        }
+                    );
+                    
+                    if (batchResults && batchResults.length > 0) {
+                        results.push(...batchResults);
+                        processedChannels += batchResults.length;
+                        
+                        // 실시간 카운터 업데이트
+                        this.realTimeCounters.backgroundData += batchResults.length;
+                        this.updateRealtimeDisplay();
+                    }
+                    
+                    // 배치 간 딜레이 (API 안정성)
+                    if (currentBatch < keywords.length && processedChannels < maxChannels) {
+                        await this.delay(batchSettings.delayMs);
+                    }
+                    
+                    console.log(`✅ 배치 ${currentBatch} 완료: ${batchResults?.length || 0}개 결과 (누적: ${processedChannels.toLocaleString('ko-KR')}개)`);
+                }
+                
+            } catch (error) {
+                console.error(`❌ 대용량 파이프라인 오류:`, error);
+            }
+            
+            console.log(`🎯 대용량 파이프라인 완료: ${results.length.toLocaleString('ko-KR')}개 최종 결과`);
+            
+            return results;
+        }
+    
+
+
     
   
 }  // ★★★★★ Class OptimizedYoutubeTrendsAnalyzer 모듈 끝 부분 ★★★★★
