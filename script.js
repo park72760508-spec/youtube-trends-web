@@ -525,7 +525,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         console.warn('estimatePlannedQuota() 실패:', e);
         return 1; // 안전값
       }
-    },
+    }
     
     // === (신규) 할당량 진행바 초기화(1회) ===
     initQuotaProgressIfNeeded() {
@@ -548,7 +548,7 @@ class OptimizedYoutubeTrendsAnalyzer {
           }
         } catch (_) {}
       }
-    },
+    }
 
 
     // === (신규) 저비용 API 키 테스트(1 유닛)
