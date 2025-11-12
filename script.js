@@ -444,11 +444,28 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // 할당량 사용량 업데이트 (API 키별)
+    // (Analyzer) 할당량 사용량 업데이트 — 매니저 누적 + 진행바(UI) 즉시 동기화
     updateQuotaUsage(apiKey, units) {
-        if (apiKey) {
-            this.apiKeyManager.updateQuotaUsage(apiKey, units);
+      if (!apiKey) return;
+    
+      // 1) 데이터 계층: 키별 누적(매니저)
+      this.apiKeyManager.updateQuotaUsage(apiKey, units);
+    
+      // 2) UI 계층: 진행바 = "API 소진 누적 / 스캔 예상 소진" 강제 갱신
+      try {
+        // 베이스라인/예상치가 없으면 1회 세팅
+        if (!this._quotaProgress && typeof this.initQuotaProgressIfNeeded === 'function') {
+          this.initQuotaProgressIfNeeded();
         }
+        // 진행바 텍스트: "진행%  (현재누적 / 예상)"
+        if (typeof this.updateQuotaProgressUI === 'function') {
+          this.updateQuotaProgressUI();
+        }
+      } catch (e) {
+        console.warn('updateQuotaUsage(): UI 동기화 실패', e);
+      }
     }
+
     
     // 할당량 확인 (전체 풀 기준)
     canUseQuota(requiredUnits = 100) {
@@ -562,6 +579,13 @@ class OptimizedYoutubeTrendsAnalyzer {
         return 1; // 안전값
       }
     }
+
+
+    // 진행률 상태 하드 리셋 (매 스캔 시작 시 0%에서 출발)
+    resetQuotaProgress() {
+      this._quotaProgress = null;
+    }
+
     
     // === (신규) 할당량 진행바 초기화(1회) ===
     initQuotaProgressIfNeeded() {
