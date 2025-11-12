@@ -519,6 +519,24 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
 
 
+    // 📡 검출 채널 상한 (슬라이더 연동)
+    // - 1000이면 "전체" 처리(자르지 않음)
+    // - 그 외엔 10~1000 범위 clamp
+    getMaxChannels() {
+      const v = Number(localStorage.getItem('hot_maxChannels') || 100);
+      if (v >= 1000) return Infinity; // == 모든 채널 스캔
+      return Math.max(10, Math.min(1000, v));
+    }
+    
+    // ⚙️ 동시 요청 수 (슬라이더 연동) — 4~8 clamp
+    getConcurrency() {
+      const v = Number(localStorage.getItem('hot_concurrency') || 4);
+      return Math.max(4, Math.min(8, v));
+    }
+
+
+    
+
     // 진행바를 "API 소진 기준"으로 갱신:  percent = (usedSinceStart / planned) * 100
     updateQuotaProgressUI() {
       try {
@@ -3642,10 +3660,32 @@ class OptimizedYoutubeTrendsAnalyzer {
       };
     
       // ===== 1) 키워드 → 채널 인덱싱 =====
-      upd(undefined, keywords.length, 0, 0, '키워드 인덱싱 중…');
-      const channels = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax * 2));
-      upd(25, keywords.length, keywords.length, 0, `채널 발견: ${channels.length}개`);
-      if (!channels.length) return [];
+    // ===== 1) 키워드 → 채널 인덱싱 =====
+    // ===== 1) 키워드 → 채널 인덱싱 =====
+    upd(undefined, keywords.length, 0, 0, '키워드 인덱싱 중…');
+    const channelsRaw = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax * 2));
+    
+    // 📡 슬라이더 상한 적용: 1000 ⇒ 전체(무제한), 그 외 N개만 스캔
+    const maxCh = (typeof this.getMaxChannels === 'function')
+      ? this.getMaxChannels()
+      : Number(localStorage.getItem('hot_maxChannels') || 100);
+    
+    const channels = (maxCh === Infinity)
+      ? channelsRaw
+      : channelsRaw.slice(0, Math.max(1, Number(maxCh)));
+    
+    upd(25, keywords.length, keywords.length, 0, `채널 발견: ${channelsRaw.length}개 → 스캔 대상: ${channels.length}개`);
+    if (!channels.length) return [];
+    
+    // ===== 2) 채널 → 업로드 재생목록 ID =====
+    // ⚙️ 동시성(슬라이더) — 기존 코드 스타일 유지
+    const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
+    let chDone = 0;
+    const uploadsIds = await this.runWithPool(channels, concurrency, async (ch) => {
+      // ...
+    });
+
+
     
       // ===== 2) 채널 → 업로드 재생목록 ID =====
       const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
@@ -3714,11 +3754,16 @@ class OptimizedYoutubeTrendsAnalyzer {
 
 
     // 전역 최대 채널 수 (샘플 실행/운영 상한)
+    // 📡 검출 채널 상한 (슬라이더 연동)
+    // - 1000이면 "전체" 처리(자르지 않음 = Infinity)
+    // - 그 외엔 10~1000 범위 clamp
     getMaxChannels() {
-      const v = Number(localStorage.getItem('hot_maxChannels'));
-      if (Number.isFinite(v) && v > 0) return Math.min(5000, Math.floor(v));
-      return 100; // 기본 100 (UI 슬라이더로 10~1000 조절)
+      const raw = Number(localStorage.getItem('hot_maxChannels'));
+      if (!Number.isFinite(raw) || raw <= 0) return 100; // 기본 100
+      if (raw >= 1000) return Infinity;                  // == 전체 스캔
+      return Math.max(10, Math.min(1000, Math.floor(raw)));
     }
+
 
 
 
