@@ -3668,7 +3668,10 @@ class OptimizedYoutubeTrendsAnalyzer {
     }
     
     // (K) 전체 파이프라인 (동시성 제한 + 품질 로그)
-    async runChannelUploadPipeline(keywords, { format, timeRange, perChannelMax, topN, softTarget = 2000, dailyCapUnits = 8000 } = {}) {
+    async runChannelUploadPipeline(
+      keywords,
+      { format, timeRange, perChannelMax, topN, softTarget = 2000, dailyCapUnits = 8000 } = {}
+    ) {
       const upd = (percent, totalKw, doneKw, found, action) => {
         // 프로젝트의 진행 업데이트 함수에 맞춰 호출
         if (typeof this.updateProgress === 'function') {
@@ -3677,42 +3680,59 @@ class OptimizedYoutubeTrendsAnalyzer {
       };
     
       // ===== 1) 키워드 → 채널 인덱싱 =====
-    // ===== 1) 키워드 → 채널 인덱싱 =====
-    // ===== 1) 키워드 → 채널 인덱싱 =====
-    upd(undefined, keywords.length, 0, 0, '키워드 인덱싱 중…');
-    const channelsRaw = await this.discoverSeedChannels(keywords, Math.min(400, perChannelMax * 2));
+      upd(undefined, keywords.length, 0, 0, '키워드 인덱싱 중…');
     
-    // 📡 슬라이더 상한 적용: 1000 ⇒ 전체(무제한), 그 외 N개만 스캔
-    const maxCh = (typeof this.getMaxChannels === 'function')
-      ? this.getMaxChannels()
-      : Number(localStorage.getItem('hot_maxChannels') || 100);
+      // 채널 후보 수집
+      const channelsRaw = await this.discoverSeedChannels(
+        keywords,
+        Math.min(400, perChannelMax * 2)
+      );
     
-    const channels = (maxCh === Infinity)
-      ? channelsRaw
-      : channelsRaw.slice(0, Math.max(1, Number(maxCh)));
+      // 📡 슬라이더 상한 적용: 1000 ⇒ 전체(무제한), 그 외 N개만 스캔
+      const maxChSetting = (typeof this.getMaxChannels === 'function')
+        ? this.getMaxChannels()
+        : (function () {
+            const v = Number(localStorage.getItem('hot_maxChannels') || 100);
+            if (!Number.isFinite(v) || v <= 0) return 100;
+            if (v >= 1000) return Infinity;
+            return Math.max(10, Math.min(1000, Math.floor(v)));
+          })();
     
-    upd(25, keywords.length, keywords.length, 0, `채널 발견: ${channelsRaw.length}개 → 스캔 대상: ${channels.length}개`);
-    if (!channels.length) return [];
+      const channels = (maxChSetting === Infinity)
+        ? channelsRaw
+        : channelsRaw.slice(0, Math.max(1, Number(maxChSetting)));
     
-    // ===== 2) 채널 → 업로드 재생목록 ID =====
-    // ⚙️ 동시성(슬라이더) — 기존 코드 스타일 유지
-    const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
-    let chDone = 0;
-    const uploadsIds = await this.runWithPool(channels, concurrency, async (ch) => {
-      // ...
-    });
-
-
+      upd(
+        25,
+        keywords.length,
+        keywords.length,
+        0,
+        `채널 발견: ${channelsRaw.length}개 → 스캔 대상: ${channels.length}개`
+      );
+      if (!channels.length) return [];
+    
+      // ⚙️ 동시성(슬라이더) — 한 번만 선언하고 아래 단계에서 재사용
+      const concurrency = (typeof this.getConcurrency === 'function')
+        ? this.getConcurrency()
+        : (function () {
+            const c = Number(localStorage.getItem('hot_concurrency') || 4);
+            return Math.max(4, Math.min(8, c));
+          })();
     
       // ===== 2) 채널 → 업로드 재생목록 ID =====
-      const concurrency = Number(localStorage.getItem('hot_concurrency') || 4);
       let chDone = 0;
       const uploadsIds = await this.runWithPool(channels, concurrency, async (ch) => {
         if (!this.isScanning || this.abortController?.signal?.aborted) return null;
         const up = await this.getUploadsPlaylistId(ch);
         chDone++;
         // 키워드 진행은 종료했으니 분모는 키워드 수, 분자는 그대로 유지하되 액션/퍼센트만 단계에 맞게 업데이트
-        upd(25 + Math.round((chDone / channels.length) * 15), keywords.length, keywords.length, 0, `업로드 재생목록 수집 ${chDone}/${channels.length}`);
+        upd(
+          25 + Math.round((chDone / channels.length) * 15),
+          keywords.length,
+          keywords.length,
+          0,
+          `업로드 재생목록 수집 ${chDone}/${channels.length}`
+        );
         return up ? { ch, up } : null;
       });
       const valid = uploadsIds.filter(Boolean);
@@ -3720,13 +3740,20 @@ class OptimizedYoutubeTrendsAnalyzer {
       // ===== 3) 업로드 재생목록 → 영상ID =====
       const allIdsSet = new Set();
       let plDone = 0;
+    
       await this.runWithPool(valid, concurrency, async (row) => {
         if (!this.isScanning || this.abortController?.signal?.aborted) return null;
         const ids = await this.fetchRecentUploads(row.up, perChannelMax);
         ids.forEach(id => allIdsSet.add(id));
         plDone++;
         // 발견된 영상(중복 제거 전) 실시간 반영
-        upd(40 + Math.round((plDone / Math.max(1, valid.length)) * 30), keywords.length, keywords.length, allIdsSet.size, `영상ID 수집 ${plDone}/${valid.length}`);
+        upd(
+          40 + Math.round((plDone / Math.max(1, valid.length)) * 30),
+          keywords.length,
+          keywords.length,
+          allIdsSet.size,
+          `영상ID 수집 ${plDone}/${valid.length}`
+        );
       });
     
       const allIds = Array.from(allIdsSet);
@@ -3745,7 +3772,7 @@ class OptimizedYoutubeTrendsAnalyzer {
       // ===== 5) 점수 계산/정렬 =====
       const tryScore = (fmt, tr) => {
         const s = this.computeViralScore(stats, { format: fmt, timeRange: tr });
-        s.sort((a,b) => b.score - a.score);
+        s.sort((a, b) => b.score - a.score);
         return s;
       };
       let scored = tryScore(format, timeRange);
@@ -3755,12 +3782,14 @@ class OptimizedYoutubeTrendsAnalyzer {
         if (!scored.length) scored = tryScore(fmt2, 'custom:30');
       }
     
-      const top = scored.slice(0, Math.min(topN || 200, 10000)).map((s, i) => {
-        const v = s.video;
-        const vid = v.id || v.videoId || v?.contentDetails?.videoId;
-        if (!v.id && vid) v.id = vid;
-        return { rank: i+1, score: s.score, ...v };
-      });
+      const top = scored
+        .slice(0, Math.min(topN || 200, 10000))
+        .map((s, i) => {
+          const v = s.video;
+          const vid = v.id || v.videoId || v?.contentDetails?.videoId;
+          if (!v.id && vid) v.id = vid;
+          return { rank: i + 1, score: s.score, ...v };
+        });
     
       upd(100, keywords.length, keywords.length, top.length, `정렬/상위 도출 완료 (${top.length}개)`);
       return top;
