@@ -223,37 +223,23 @@
         }
         
         // 할당량 사용량 업데이트
+        // 할당량 사용량 업데이트 (API 키별)  — 진행바를 "API 소진 기준"으로 즉시 갱신
         updateQuotaUsage(apiKey, units) {
-            if (!apiKey) return;
-            
-            const currentUsage = this.keyQuotaUsage.get(apiKey) || 0;
-            const newUsage = currentUsage + units;
-            
-            this.keyQuotaUsage.set(apiKey, newUsage);
-            this.saveKeyQuotaUsage();
-            
-            // 할당량 한계 확인
-            // 🔥 할당량 한계 확인 (97% 사용시 제한 모드)
-            // 🔥 설정 기반 할당량 관리
-            const limitThreshold = Math.floor(this.quotaLimit * this.quotaSettings.limitModeThreshold);
-            const warningThreshold = Math.floor(this.quotaLimit * this.quotaSettings.warningThreshold);
-            const usagePercent = ((newUsage / this.quotaLimit) * 100).toFixed(1);
-            
-            // 제한 모드 설정 (limitModeThreshold 기준)
-            if (newUsage >= limitThreshold) {
-                this.keyStatus.set(apiKey, 'limited');
-                const limitPercent = (this.quotaSettings.limitModeThreshold * 100).toFixed(0);
-                console.warn(`⚠️ API 키 제한 모드 (${limitPercent}%+ 사용): ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
-            }
-            // 경고 모드 설정 (warningThreshold 기준)
-            else if (newUsage >= warningThreshold) {
-                const warningPercent = (this.quotaSettings.warningThreshold * 100).toFixed(0);
-                console.warn(`🟡 API 키 주의 (${warningPercent}%+ 사용): ${apiKey.substr(0, 10)}... (${newUsage}/${this.quotaLimit}, ${usagePercent}%)`);
-            }
-            
-            console.log(`📊 할당량 업데이트: ${apiKey.substr(0, 10)}... +${units} (총: ${newUsage}/${this.quotaLimit})`);
-            this.updateApiKeyStatusDisplay();
+          if (!apiKey) return;
+          // 매니저에 누적
+          this.apiKeyManager.updateQuotaUsage(apiKey, units);
+        
+          // 진행바를 "API 소진 누적/예상 소진"으로 강제 동기화
+          // (스캔 중이 아니어도 _quotaProgress가 있으면 갱신하여, 화면이 100%로 먼저 끝나도
+          //  실제 API 후속 작업이 남아있을 때 계속 올바른 비율을 표기)
+          try {
+            if (!this._quotaProgress) this.initQuotaProgressIfNeeded();
+            this.updateQuotaProgressUI();
+          } catch (e) {
+            console.warn('updateQuotaUsage(): 진행바 갱신 실패', e);
+          }
         }
+
         
         // API 키 에러 처리
         handleApiKeyError(apiKey, error) {
@@ -498,7 +484,47 @@ class OptimizedYoutubeTrendsAnalyzer {
         });
     }
 
+    
+    // 전체 키 풀의 현재까지 누적 사용 유닛
+    getQuotaUsed() {
+      const stats = this.apiKeyManager?.getOverallStats?.();
+      return Number(stats?.totalQuotaUsed || 0);
+    }
 
+
+    // 진행바를 "API 소진 기준"으로 갱신:  percent = (usedSinceStart / planned) * 100
+    updateQuotaProgressUI() {
+      try {
+        // 1) 예상치/베이스라인 없으면 1회 초기화
+        this.initQuotaProgressIfNeeded();
+    
+        const planned  = Math.max(1, Number(this._quotaProgress?.planned || 0)); // 분모 보호
+        const baseline = Number(this._quotaProgress?.baseline || 0);
+        const usedNow  = this.getQuotaUsed();
+        const usedSinceStart = Math.max(0, usedNow - baseline);
+    
+        let pct = Math.round((usedSinceStart / planned) * 100);
+        if (!Number.isFinite(pct)) pct = 0;
+        if (pct > 100) pct = 100;
+    
+        // 2) DOM 업데이트: "진행% (현재/예상)"로 표기
+        const bar = document.getElementById('progressBar');
+        if (bar) {
+          bar.style.width = `${pct}%`;
+          bar.textContent = `${pct}%  (${usedSinceStart.toLocaleString()} / ${planned.toLocaleString()})`;
+        }
+    
+        // 3) 별도 카운터 텍스트(#quotaUsage)가 있다면 누적 사용량만 그대로 유지 업데이트
+        const quotaEl = document.getElementById('quotaUsage');
+        if (quotaEl) quotaEl.textContent = usedNow.toLocaleString();
+    
+      } catch (e) {
+        console.warn('updateQuotaProgressUI() 실패:', e);
+      }
+    }
+    
+
+    
     // === (신규) 스캔 예상 유닛 계산(보수적 상한): search + details ===
     estimatePlannedQuota() {
       try {
@@ -912,6 +938,8 @@ class OptimizedYoutubeTrendsAnalyzer {
     // 최적화된 스캔 시작
         async startOptimizedScan() {
             // API 키 풀링 시스템 확인
+
+            
             const stats = this.apiKeyManager.getOverallStats();
             if (stats.totalKeys === 0) {
                 this.showError('등록된 API 키가 없습니다. 위의 API 키 관리 섹션에서 키를 추가해주세요.');
@@ -983,6 +1011,11 @@ class OptimizedYoutubeTrendsAnalyzer {
             // UI 상태 변경
             this.showScanProgress();
             this.updateScanButton(true);
+
+            // ✅ 진행바(API 소진 기준) 초기화 + 0% 동기화
+            if (this.resetQuotaProgress) this.resetQuotaProgress(); // 있다면: 매 스캔마다 베이스라인 리셋
+            this.initQuotaProgressIfNeeded();                       // planned/baseline 세팅
+            if (this.updateQuotaProgressUI) this.updateQuotaProgressUI(); // "0% (0 / 예상)"로 즉시 표시
             
             try {
                 // 설정 값들 가져오기 (키워드는 선택된 것만)
