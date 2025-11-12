@@ -3663,29 +3663,30 @@ class OptimizedYoutubeTrendsAnalyzer {
     
       const apiKey = this.getApiKey(); if (!apiKey) return null;
       const url = `${this.baseUrl}/channels?part=contentDetails&id=${channelId}&key=${apiKey}`;
-       const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
-        if (!res.ok) {
-          if (res.status === 404) {
-            console.warn(`🚫 플레이리스트를 찾을 수 없음: ${uploadsPlaylistId} (채널 삭제됨 또는 비공개)`);
-          } else if (res.status === 403) {
-            console.warn(`🚫 플레이리스트 접근 권한 없음: ${uploadsPlaylistId}`);
-          } else {
-            console.warn(`🚫 플레이리스트 조회 실패 (${res.status}): ${uploadsPlaylistId}`);
-          }
-          break;
+      const res = await this.fetchWithRetry(url, { apiKey, units: 1 });
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn(`🚫 채널을 찾을 수 없음: ${channelId} (채널 삭제됨 또는 비공개)`);
+        } else if (res.status === 403) {
+          console.warn(`🚫 채널 접근 권한 없음: ${channelId}`);
+        } else {
+          console.warn(`🚫 채널 조회 실패 (${res.status}): ${channelId}`);
         }
-    }
+        // 실패한 채널 ID를 캐시에 null로 저장하여 재시도 방지
+        this._cacheSetLS(ck, null);
+        return null;
+      }
     
-    const data = await res.json();
-    const id = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
-    if (id) {
-      this._cacheSetLS(ck, id);
-      console.log(`✅ 채널 업로드 플레이리스트 ID 획득: ${channelId} → ${id}`);
-    } else {
-      console.warn(`⚠️ 채널에 업로드 플레이리스트가 없음: ${channelId}`);
-      this._cacheSetLS(ck, null);
-    }
-    return id;
+      const data = await res.json();
+      const id = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
+      if (id) {
+        this._cacheSetLS(ck, id);
+        console.log(`✅ 채널 업로드 플레이리스트 ID 획득: ${channelId} → ${id}`);
+      } else {
+        console.warn(`⚠️ 채널에 업로드 플레이리스트가 없음: ${channelId}`);
+        this._cacheSetLS(ck, null);
+      }
+      return id;
     }
     
     // (G) 업로드 재생목록 → 최근 업로드 영상ID 페이지네이션 (1unit/페이지)
