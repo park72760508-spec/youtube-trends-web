@@ -3698,9 +3698,11 @@ class OptimizedYoutubeTrendsAnalyzer {
             return Math.max(10, Math.min(1000, Math.floor(v)));
           })();
     
-      const channels = (maxChSetting === Infinity)
-        ? channelsRaw
-        : channelsRaw.slice(0, Math.max(1, Number(maxChSetting)));
+        // ✅ 유니크 채널 기준으로 상한 적용
+        const uniqueChannels = Array.from(new Set(channelsRaw));
+        const channels = (maxChSetting === Infinity)
+          ? uniqueChannels
+          : uniqueChannels.slice(0, Math.max(1, Number(maxChSetting)));
     
       upd(
         25,
@@ -3799,15 +3801,14 @@ class OptimizedYoutubeTrendsAnalyzer {
     /* === [/NEW] ============================================================= */
 
 
-    // 전역 최대 채널 수 (샘플 실행/운영 상한)
-    // 📡 검출 채널 상한 (슬라이더 연동)
-    // - 1000이면 "전체" 처리(자르지 않음 = Infinity)
-    // - 그 외엔 10~1000 범위 clamp
+    // 📡 검출 채널 상한 (슬라이더 연동, 유니크 기준)
+    // - 1000이면 "전체" 처리(자르지 않음)
+    // - 슬라이더 값 그대로 반영 (최소 보정 제거)
     getMaxChannels() {
-      const raw = Number(localStorage.getItem('hot_maxChannels'));
-      if (!Number.isFinite(raw) || raw <= 0) return 100; // 기본 100
-      if (raw >= 1000) return Infinity;                  // == 전체 스캔
-      return Math.max(10, Math.min(1000, Math.floor(raw)));
+      const v = Number(localStorage.getItem('hot_maxChannels') || 100);
+      if (!Number.isFinite(v) || v <= 0) return 100; // 기본값
+      if (v >= 1000) return Infinity; // == 전체 스캔
+      return Math.min(1000, Math.floor(v)); // 슬라이더 값 그대로 적용
     }
 
 
