@@ -224,21 +224,31 @@
         
         // 할당량 사용량 업데이트
         // 할당량 사용량 업데이트 (API 키별)  — 진행바를 "API 소진 기준"으로 즉시 갱신
+        // 할당량 사용량 업데이트 (API 키별) — 순수 매니저 로직
         updateQuotaUsage(apiKey, units) {
           if (!apiKey) return;
-          // 매니저에 누적
-          this.apiKeyManager.updateQuotaUsage(apiKey, units);
+          const u = Number(units) || 0;
+          if (u <= 0) return;
         
-          // 진행바를 "API 소진 누적/예상 소진"으로 강제 동기화
-          // (스캔 중이 아니어도 _quotaProgress가 있으면 갱신하여, 화면이 100%로 먼저 끝나도
-          //  실제 API 후속 작업이 남아있을 때 계속 올바른 비율을 표기)
-          try {
-            if (!this._quotaProgress) this.initQuotaProgressIfNeeded();
-            this.updateQuotaProgressUI();
-          } catch (e) {
-            console.warn('updateQuotaUsage(): 진행바 갱신 실패', e);
+          // 1) 누적
+          const curr = this.keyQuotaUsage.get(apiKey) || 0;
+          const next = curr + u;
+          this.keyQuotaUsage.set(apiKey, next);
+        
+          // 2) 임계치에 따른 상태 전환(경고/제한)
+          const limitCutoff   = Math.floor(this.quotaLimit * this.quotaSettings.disableThreshold); // 98%
+          const warningCutoff = Math.floor(this.quotaLimit * this.quotaSettings.warningThreshold); // 90%
+          if (next >= limitCutoff) {
+            this.keyStatus.set(apiKey, 'limited');
+          } else if (next >= warningCutoff && this.keyStatus.get(apiKey) === 'active') {
+            // 상태표시는 active 유지, UI에서 색만 경고로 (기존 정책 유지)
           }
+        
+          // 3) 저장 & UI
+          this.saveKeyQuotaUsage();
+          this.updateApiKeyStatusDisplay?.();
         }
+
 
         
         // API 키 에러 처리
