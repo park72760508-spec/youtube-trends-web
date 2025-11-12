@@ -837,40 +837,57 @@ class OptimizedYoutubeTrendsAnalyzer {
               localStorage.setItem('hot_perChannelMax', String(safe));
             });
           }
+
             
-          // concurrency
-          if (ccEl && ccVal) {
-            const storedC = Number(localStorage.getItem('hot_concurrency') || 4);
-            const clampedC = Math.min(8, Math.max(4, storedC));
-            ccEl.value = clampedC;
-            ccVal.textContent = clampedC.toString();
+        // maxChannels (검출 채널 상한)
+        {
+          const mcEl  = document.getElementById('maxChannels');
+          const mcVal = document.getElementById('maxChannelsValue');
+          if (mcEl && mcVal) {
+            const stored = Number(localStorage.getItem('hot_maxChannels') || 100);
+            const clamped = Math.min(1000, Math.max(10, stored));
+            mcEl.value = clamped;
+            mcVal.textContent = clamped.toString();
         
-            ccEl.addEventListener('input', (e) => {
+            mcEl.addEventListener('input', (e) => {
               const v = Number(e.target.value);
-              const safe = Math.min(8, Math.max(4, v));
-              ccVal.textContent = safe.toString();
-              localStorage.setItem('hot_concurrency', String(safe));
+              const safe = Math.min(1000, Math.max(10, v));
+              mcVal.textContent = safe.toString();
+              localStorage.setItem('hot_maxChannels', String(safe));
+        
+              // 🔁 예상 소진 API 수 즉시 갱신
+              if (typeof ytAnalyzer?.estimatePlannedQuota === 'function') {
+                ytAnalyzer.estimatePlannedQuota();
+                if (typeof ytAnalyzer.updateQuotaProgressUI === 'function') {
+                  ytAnalyzer._quotaProgress = null; // 분모 재설정 위해 리셋
+                  ytAnalyzer.initQuotaProgressIfNeeded();
+                  ytAnalyzer.updateQuotaProgressUI();
+                }
+              }
             });
           }
-
-            // maxChannels (검출 채널 상한)
-            {
-              const mcEl  = document.getElementById('maxChannels');
-              const mcVal = document.getElementById('maxChannelsValue');
-              if (mcEl && mcVal) {
-                const stored = Number(localStorage.getItem('hot_maxChannels') || 100);
-                const clamped = Math.min(1000, Math.max(10, stored));
-                mcEl.value = clamped;
-                mcVal.textContent = clamped.toString();
-            
-                mcEl.addEventListener('input', (e) => {
-                  const v = Number(e.target.value);
-                  const safe = Math.min(1000, Math.max(10, v));
-                  mcVal.textContent = safe.toString();
-                  localStorage.setItem('hot_maxChannels', String(safe));
-                });
-              }
+        }
+        
+        // concurrency
+        if (ccEl && ccVal) {
+          const storedC = Number(localStorage.getItem('hot_concurrency') || 4);
+          const clampedC = Math.min(8, Math.max(4, storedC));
+          ccEl.value = clampedC;
+          ccVal.textContent = clampedC.toString();
+        
+          ccEl.addEventListener('input', (e) => {
+            const v = Number(e.target.value);
+            const safe = Math.min(8, Math.max(4, v));
+            ccVal.textContent = safe.toString();
+            localStorage.setItem('hot_concurrency', String(safe));
+        
+            // (참고) 동시성은 소진량 총합에 영향 X → 분모 재계산은 선택
+            if (typeof ytAnalyzer?.updateQuotaProgressUI === 'function') {
+              ytAnalyzer.updateQuotaProgressUI();
             }
+          });
+        }
+
 
           
         }
