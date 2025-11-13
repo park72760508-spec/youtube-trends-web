@@ -425,7 +425,7 @@ class OptimizedYoutubeTrendsAnalyzer {
         // 최적화된 키워드 (우선순위별)
         this.optimizedKeywords = {
             tier1: [
-                '시니어', '노인', '중년', '50대', '60대', '70대', '실버'
+                '시니어', '실버', '중년', '노인'
             ],
             tier2: [
                 '라이프', '노후 생활', '건강', '명언',
@@ -6379,3 +6379,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('🚀 API 할당량 최적화 시스템 준비 완료!');
 });
+
