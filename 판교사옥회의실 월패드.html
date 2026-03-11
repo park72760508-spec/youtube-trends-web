@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKT AI Wallpad Guidance</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;500;700;900&display=swap');
+
+        /* 기본 스타일 및 SKT AI 컨셉 배경 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Noto Sans KR', sans-serif;
+            overflow: hidden;
+            background-color: #0B0E14; /* 깊은 공간감의 다크 배경 */
+            color: #ffffff;
+            /* SKT AI 피라미드/네트워크 컨셉을 반영한 배경 디자인 */
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(225, 0, 42, 0.15) 0%, transparent 40%), /* SKT Red Glow */
+                radial-gradient(circle at 85% 30%, rgba(0, 100, 255, 0.15) 0%, transparent 50%), /* AI Blue Glow */
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" opacity="0.05"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)" /></svg>');
+            background-size: cover;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 헤더 영역 (SKT 로고 및 AI 슬로건) */
+        .header {
+            position: absolute;
+            top: 30px;
+            left: 40px;
+            right: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .skt-logo {
+            height: 42px;
+            width: auto;
+            display: block;
+        }
+
+        .ai-slogan {
+            font-size: 16px;
+            color: rgba(255,255,255,0.7);
+            font-weight: 500;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        /* 메인 안내 화면 */
+        #display-screen {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+            padding: 100px 40px 40px 40px; /* 헤더 공간 확보 */
+            box-sizing: border-box;
+            align-items: center;
+        }
+
+        /* 좌측: 큰 명칭 표시부 */
+        .main-title-area {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-right: 1px solid rgba(255,255,255,0.15);
+            padding-right: 50px;
+            padding-left: 20px;
+        }
+
+        .type-label {
+            font-size: 20px;
+            color: #E1002A;
+            margin-bottom: 15px;
+            letter-spacing: 3px;
+            font-weight: 700;
+        }
+
+        .main-name {
+            font-size: 800px;
+            font-weight: 900;
+            line-height: 1.1;
+            word-break: keep-all;
+            color: #fff;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            margin-bottom: 10px;
+        }
+        /* 회의실 2글자 이하: 회의실(1줄) + 회의실명(2줄) 2줄 표기 */
+        .main-title-area.meeting-short .type-label {
+            margin-bottom: 15px;
+        }
+
+        /* 회의실: 3글자 이상일 때 130px */
+        .main-title-area.meeting-long .main-name {
+            font-size: 130px;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .main-title-area.meeting-long {
+            min-width: 0;
+        }
+
+        .exec-title {
+            font-size: 32px;
+            color: rgba(255,255,255,0.7);
+            font-weight: 300;
+        }
+
+        /* 임원실 전용 스타일 */
+        .main-title-area.executive-mode {
+            --exec-name-size: clamp(140px, 16vw, 260px);
+        }
+        .main-title-area.executive-mode .main-name {
+            font-size: var(--exec-name-size);
+            font-family: "맑은 고딕", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .main-title-area.executive-mode         .exec-nim {
+            display: none;
+            font-size: calc(var(--exec-name-size) * 0.3);
+            font-family: "맑은 고딕", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            font-weight: 500;
+            color: rgba(255,255,255,0.85);
+        }
+        .main-title-area.executive-mode .exec-nim {
+            display: inline;
+        }
+        .main-title-area.executive-mode .exec-title-area {
+            display: none !important;
+        }
+
+        /* 임원실: 소속+직급 1줄 (이름의 20%) */
+        .exec-dept-line {
+            display: none;
+            font-size: calc(var(--exec-name-size) * 0.2);
+            color: rgba(255,255,255,0.75);
+            font-family: "맑은 고딕", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            font-weight: 500;
+            margin-bottom: 0.3em;
+            white-space: nowrap;
+        }
+        .main-title-area.executive-mode .exec-dept-line {
+            display: block;
+        }
+
+        /* 임원실: 이름(전체) + 님(30%) */
+        .exec-name-row {
+            display: block;
+        }
+        .main-title-area.executive-mode .exec-name-row {
+            display: flex;
+            flex-direction: row;
+            align-items: baseline;
+            gap: 0.2em;
+            flex-wrap: nowrap;
+        }
+
+        /* 우측: 상세 안내부 */
+        .detail-info-area {
+            flex: 1;
+            padding-left: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .info-block {
+            margin-bottom: 50px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+        }
+
+        .info-header {
+            font-size: 18px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 500;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+
+        .info-content {
+            font-size: 26px;
+            line-height: 1.5;
+            color: #ffffff;
+            font-weight: 300;
+            word-break: keep-all;
+        }
+
+        /* 설정 버튼 (화면 구석, 오류 수정됨) */
+        #settings-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            font-size: 24px;
+            z-index: 9999; /* 어떤 화면이 떠도 항상 위에 있도록 Z-index 대폭 상향 */
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #settings-toggle:hover {
+            background: rgba(225, 0, 42, 0.8);
+            transform: rotate(90deg);
+        }
+
+        /* 전체화면 버튼 */
+        #fullscreen-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 80px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            font-size: 22px;
+            z-index: 9999;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #fullscreen-toggle:hover {
+            background: rgba(0, 100, 255, 0.8);
+        }
+
+        /* 설정 모달 패널 */
+        #settings-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 14, 20, 0.95);
+            z-index: 8000;
+            padding: 50px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            backdrop-filter: blur(15px);
+        }
+
+        #settings-panel.active { display: block; }
+
+        .settings-header {
+            font-size: 32px;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+
+        .settings-section {
+            margin-bottom: 35px;
+            padding: 25px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .settings-section h3 {
+            font-size: 20px;
+            color: #E1002A;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 8px;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 25px;
+            margin-top: 10px;
+        }
+
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .radio-group input[type="radio"] {
+            width: auto;
+            accent-color: #E1002A;
+        }
+
+        .btn-save {
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            background: #E1002A;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.3s;
+        }
+
+        .btn-save:hover {
+            background: #c00024;
+        }
+
+        .btn-close {
+            margin-left: 15px;
+            padding: 14px 30px;
+            font-size: 16px;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .btn-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .conditional-fields { display: none; }
+        .conditional-fields.show { display: block; }
+
+        .exec-title-area { display: none; }
+        .exec-title-area.show { display: block; }
+
+        .contact-area { display: none; }
+        .contact-area.show { display: block; }
+
+        /* 임원실 상태 표시 (전등 스타일) */
+        .executive-status-area { display: none; }
+        .executive-status-area.show { display: block; }
+        .status-indicators {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .status-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 28px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            font-size: 22px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        .status-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.25);
+        }
+        .status-btn.active {
+            background: rgba(225, 0, 42, 0.2);
+            border-color: #E1002A;
+            color: #fff;
+        }
+        .status-light {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.3s;
+        }
+        .status-btn[data-status="in"].active .status-light { background: #22c55e; box-shadow: 0 0 15px 4px rgba(34, 197, 94, 0.8); }
+        .status-btn[data-status="out"].active .status-light { background: #ef4444; box-shadow: 0 0 15px 4px rgba(239, 68, 68, 0.8); }
+        .status-btn[data-status="meeting"].active .status-light { background: #f59e0b; box-shadow: 0 0 15px 4px rgba(245, 158, 11, 0.8); }
+
+        /* 회의실 사용 여부 (수용인원 우측) */
+        .capacity-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .capacity-row .info-content { margin-bottom: 0; }
+        .meeting-status-indicators {
+            display: flex;
+            gap: 12px;
+        }
+        .meeting-status-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 140px;
+            padding: 10px 18px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            font-size: 18px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+        .meeting-status-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .meeting-status-light {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.3s;
+        }
+        .meeting-status-btn[data-status="available"].active .meeting-status-light { background: #22c55e; box-shadow: 0 0 10px 3px rgba(34, 197, 94, 0.7); }
+        .meeting-status-btn[data-status="inuse"].active .meeting-status-light { background: #ef4444; box-shadow: 0 0 10px 3px rgba(239, 68, 68, 0.7); }
+    </style>
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <img src="https://www.sktelecom.com/images/introduce-re/brand-download-skt.svg" alt="SK텔레콤" class="skt-logo">
+        <div class="ai-slogan">통신과 AI 최첨단 기술을 선도합니다</div>
+    </header>
+
+    <!-- 메인 안내 화면 (가로형) -->
+    <div id="display-screen">
+        <div class="main-title-area">
+            <div class="type-label" id="type-label">회의실</div>
+            <div class="exec-dept-line" id="exec-dept-line"></div>
+            <div class="exec-name-row">
+                <div class="main-name" id="main-name">A</div>
+                <span class="exec-nim" id="exec-nim"></span>
+                <div class="exec-title-area" id="exec-title-area">
+                    <div class="exec-title" id="exec-title"></div>
+                </div>
+            </div>
+        </div>
+        <div class="detail-info-area">
+            <div class="info-block contact-area" id="contact-block">
+                <div class="info-header">회의실 이용 안내</div>
+                <div class="info-content" id="guide-text">회의실 이용 시 T net > 회의실 예약을 통해 이용해 주세요.</div>
+            </div>
+            <div class="info-block contact-area" id="capacity-block">
+                <div class="info-header">수용인원</div>
+                <div class="capacity-row">
+                    <div class="info-content" id="capacity-text">-</div>
+                    <div class="meeting-status-indicators">
+                        <button type="button" class="meeting-status-btn active" data-status="available" title="예약 가능">
+                            <span class="meeting-status-light"></span>
+                            <span class="meeting-status-label">예약 가능</span>
+                        </button>
+                        <button type="button" class="meeting-status-btn" data-status="inuse" title="회의 중">
+                            <span class="meeting-status-light"></span>
+                            <span class="meeting-status-label">회의 중</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="info-block contact-area" id="contact-info-block">
+                <div class="info-header">연락처</div>
+                <div class="info-content" id="contact-text">031-1234-5678</div>
+            </div>
+            <!-- 임원실 전용: 재실/부재중 표시 -->
+            <div class="info-block executive-status-area" id="executive-status-block">
+                <div class="info-header">상태</div>
+                <div class="status-indicators">
+                    <button type="button" class="status-btn active" data-status="in" title="재실">
+                        <span class="status-light"></span>
+                        <span class="status-label">재실</span>
+                    </button>
+                    <button type="button" class="status-btn" data-status="out" title="부재중">
+                        <span class="status-light"></span>
+                        <span class="status-label">부재중</span>
+                    </button>
+                    <button type="button" class="status-btn" data-status="meeting" title="회의중">
+                        <span class="status-light"></span>
+                        <span class="status-label">회의중</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 전체화면 / 설정 버튼 -->
+    <button id="fullscreen-toggle" title="전체화면">⛶</button>
+    <button id="settings-toggle" title="설정">⚙</button>
+
+    <!-- 설정 패널 -->
+    <div id="settings-panel">
+        <h2 class="settings-header">판교사옥 월패드 설정</h2>
+
+        <div class="settings-section">
+            <h3>화면 유형 선택</h3>
+            <div class="radio-group">
+                <label><input type="radio" name="roomType" value="meeting" checked> 회의실</label>
+                <label><input type="radio" name="roomType" value="executive"> 임원실</label>
+            </div>
+        </div>
+
+        <!-- 회의실 설정 -->
+        <div class="settings-section conditional-fields show" id="meeting-fields">
+            <h3>회의실 설정</h3>
+            <div class="form-group">
+                <label>회의실명 (A~Z 또는 1~50)</label>
+                <input type="text" id="meeting-name" placeholder="예: A, B, 1, 25, Seminar Room">
+            </div>
+            <div class="form-group">
+                <label>회의실 이용 안내 맨트</label>
+                <textarea id="meeting-guide" placeholder="회의실 이용 시 T net > 회의실 예약을 통해 이용해 주세요."></textarea>
+            </div>
+            <div class="form-group">
+                <label>수용인원</label>
+                <input type="text" id="meeting-capacity" placeholder="예: 10명, 20명">
+            </div>
+            <div class="form-group">
+                <label>연락처</label>
+                <input type="text" id="meeting-contact" placeholder="예: 031-1234-5678">
+            </div>
+        </div>
+
+        <!-- 임원실 설정 -->
+        <div class="settings-section conditional-fields" id="executive-fields">
+            <h3>임원실 설정</h3>
+            <div class="form-group">
+                <label>소속</label>
+                <input type="text" id="exec-affiliation" placeholder="예: Enterprise">
+            </div>
+            <div class="form-group">
+                <label>직급</label>
+                <input type="text" id="exec-position" placeholder="예: 기술지원담당, 본부장">
+            </div>
+            <div class="form-group">
+                <label>이름</label>
+                <input type="text" id="exec-name" placeholder="예: 임홍동">
+            </div>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button class="btn-save" id="btn-save">저장 후 적용</button>
+            <button class="btn-close" id="btn-close">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'pangyo_wallpad_config';
+
+        const typeLabel = document.getElementById('type-label');
+        const mainName = document.getElementById('main-name');
+        const execDeptLine = document.getElementById('exec-dept-line');
+        const execNim = document.getElementById('exec-nim');
+        const execTitleArea = document.getElementById('exec-title-area');
+        const execTitle = document.getElementById('exec-title');
+        const guideText = document.getElementById('guide-text');
+        const capacityText = document.getElementById('capacity-text');
+        const contactText = document.getElementById('contact-text');
+        const contactBlock = document.getElementById('contact-block');
+        const capacityBlock = document.getElementById('capacity-block');
+        const contactInfoBlock = document.getElementById('contact-info-block');
+        const executiveStatusBlock = document.getElementById('executive-status-block');
+
+        const settingsToggle = document.getElementById('settings-toggle');
+        const settingsPanel = document.getElementById('settings-panel');
+        const btnSave = document.getElementById('btn-save');
+        const btnClose = document.getElementById('btn-close');
+
+        const meetingFields = document.getElementById('meeting-fields');
+        const executiveFields = document.getElementById('executive-fields');
+        const meetingNameInput = document.getElementById('meeting-name');
+        const meetingGuideInput = document.getElementById('meeting-guide');
+        const meetingCapacityInput = document.getElementById('meeting-capacity');
+        const meetingContactInput = document.getElementById('meeting-contact');
+        const execAffiliationInput = document.getElementById('exec-affiliation');
+        const execNameInput = document.getElementById('exec-name');
+        const execPositionInput = document.getElementById('exec-position');
+
+        const roomTypeRadios = document.querySelectorAll('input[name="roomType"]');
+
+        function loadConfig() {
+            var cfg = getDefaultConfig();
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    cfg = JSON.parse(raw);
+                }
+            } catch (e) {
+                console.warn('Config load error:', e);
+            }
+
+            if (cfg.roomType === 'executive') {
+                document.querySelector('input[name="roomType"][value="executive"]').checked = true;
+                document.querySelector('input[name="roomType"][value="meeting"]').checked = false;
+                meetingFields.classList.remove('show');
+                executiveFields.classList.add('show');
+                execAffiliationInput.value = cfg.execAffiliation || '';
+                execNameInput.value = cfg.execName || '';
+                execPositionInput.value = cfg.execPosition || '';
+            } else {
+                document.querySelector('input[name="roomType"][value="meeting"]').checked = true;
+                document.querySelector('input[name="roomType"][value="executive"]').checked = false;
+                meetingFields.classList.add('show');
+                executiveFields.classList.remove('show');
+                meetingNameInput.value = cfg.meetingName || 'A';
+                meetingGuideInput.value = cfg.meetingGuide || '회의실 이용 시 T net > 회의실 예약을 통해 이용해 주세요.';
+                meetingCapacityInput.value = cfg.meetingCapacity || '';
+                meetingContactInput.value = cfg.meetingContact || '031-1234-5678';
+            }
+            applyConfig(cfg);
+        }
+
+        function getDefaultConfig() {
+            return {
+                roomType: 'meeting',
+                meetingName: 'A',
+                meetingGuide: '회의실 이용 시 T net > 회의실 예약을 통해 이용해 주세요.',
+                meetingCapacity: '',
+                meetingContact: '031-1234-5678',
+                execName: '',
+                execAffiliation: '',
+                execPosition: ''
+            };
+        }
+
+        function applyConfig(cfg) {
+            const mainTitleArea = document.querySelector('.main-title-area');
+            if (cfg.roomType === 'executive') {
+                mainTitleArea.classList.add('executive-mode');
+                mainTitleArea.classList.remove('meeting-long', 'meeting-short');
+                typeLabel.textContent = '임원실';
+                const aff = (cfg.execAffiliation || '').trim();
+                const pos = (cfg.execPosition || '').trim();
+                const name = (cfg.execName || '').trim();
+                execDeptLine.textContent = (aff || pos) ? (aff + pos) : '';
+                mainName.textContent = name || '임원';
+                execNim.textContent = ' 님';
+                execTitleArea.classList.remove('show');
+                contactBlock.classList.remove('show');
+                capacityBlock.classList.remove('show');
+                contactInfoBlock.classList.remove('show');
+                executiveStatusBlock.classList.add('show');
+                setExecutiveStatusActive(cfg.execStatus || 'in');
+            } else {
+                mainTitleArea.classList.remove('executive-mode');
+                typeLabel.textContent = '회의실';
+                var meetingName = (cfg.meetingName || 'A').trim() || 'A';
+                mainName.textContent = meetingName;
+                var isShort = meetingName.length <= 2;
+                mainTitleArea.classList.remove('meeting-long', 'meeting-short');
+                if (isShort) {
+                    mainTitleArea.classList.add('meeting-short');
+                    mainName.style.fontSize = '';
+                    contactBlock.classList.remove('show');
+                } else {
+                    mainTitleArea.classList.add('meeting-long');
+                    contactBlock.classList.add('show');
+                }
+                execDeptLine.textContent = '';
+                execNim.textContent = '';
+                execTitle.textContent = '';
+                execTitleArea.classList.remove('show');
+                guideText.textContent = cfg.meetingGuide || '회의실 이용 시 T net > 회의실 예약을 통해 이용해 주세요.';
+                capacityText.textContent = (cfg.meetingCapacity || '').trim() || '-';
+                contactText.textContent = cfg.meetingContact || '031-1234-5678';
+                setMeetingStatusActive(cfg.meetingStatus || 'available');
+                contactBlock.classList.add('show');
+                capacityBlock.classList.add('show');
+                contactInfoBlock.classList.add('show');
+                executiveStatusBlock.classList.remove('show');
+            }
+        }
+
+        function setMeetingStatusActive(status) {
+            document.querySelectorAll('.meeting-status-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.status === status);
+            });
+        }
+
+        function saveMeetingStatus(status) {
+            var cfg = getDefaultConfig();
+            try {
+                var raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) cfg = JSON.parse(raw);
+            } catch (e) {}
+            cfg.meetingStatus = status;
+            cfg.roomType = cfg.roomType || 'meeting';
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+            } catch (e) {}
+        }
+
+        function setExecutiveStatusActive(status) {
+            document.querySelectorAll('.status-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.status === status);
+            });
+        }
+
+        function saveExecutiveStatus(status) {
+            var cfg = getDefaultConfig();
+            try {
+                var raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) cfg = JSON.parse(raw);
+            } catch (e) {}
+            cfg.execStatus = status;
+            cfg.roomType = cfg.roomType || 'executive';
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+            } catch (e) {}
+        }
+
+        function saveConfig() {
+            const roomType = document.querySelector('input[name="roomType"]:checked').value;
+            var cfg = {
+                roomType,
+                meetingName: meetingNameInput.value.trim(),
+                meetingGuide: meetingGuideInput.value.trim(),
+                meetingCapacity: meetingCapacityInput.value.trim(),
+                meetingContact: meetingContactInput.value.trim(),
+                execName: execNameInput.value.trim(),
+                execAffiliation: execAffiliationInput.value.trim(),
+                execPosition: execPositionInput.value.trim()
+            };
+            try {
+                var prev = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+                if (prev.execStatus) cfg.execStatus = prev.execStatus;
+                if (prev.meetingStatus) cfg.meetingStatus = prev.meetingStatus;
+            } catch (e) {}
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+                applyConfig(cfg);
+                settingsPanel.classList.remove('active');
+            } catch (e) {
+                alert('저장에 실패했습니다: ' + e.message);
+            }
+        }
+
+        roomTypeRadios.forEach(function(r) {
+            r.addEventListener('change', function() {
+                if (this.value === 'meeting') {
+                    meetingFields.classList.add('show');
+                    executiveFields.classList.remove('show');
+                } else {
+                    meetingFields.classList.remove('show');
+                    executiveFields.classList.add('show');
+                }
+            });
+        });
+
+        settingsToggle.addEventListener('click', function() {
+            settingsPanel.classList.toggle('active');
+            if (settingsPanel.classList.contains('active')) {
+                loadConfig();
+            }
+        });
+
+        btnSave.addEventListener('click', saveConfig);
+        btnClose.addEventListener('click', function() {
+            settingsPanel.classList.remove('active');
+        });
+
+        /* 회의실 사용 여부 버튼 클릭 */
+        document.querySelectorAll('.meeting-status-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var status = this.dataset.status;
+                setMeetingStatusActive(status);
+                saveMeetingStatus(status);
+            });
+        });
+
+        /* 임원실 상태 버튼 클릭 */
+        document.querySelectorAll('.status-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var status = this.dataset.status;
+                setExecutiveStatusActive(status);
+                saveExecutiveStatus(status);
+            });
+        });
+
+        /* 전체화면 토글 */
+        const fullscreenToggle = document.getElementById('fullscreen-toggle');
+        fullscreenToggle.addEventListener('click', function() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(function(err) {
+                    alert('전체화면을 지원하지 않는 브라우저입니다. F11 키를 사용해 보세요.');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        });
+        document.addEventListener('fullscreenchange', function() {
+            fullscreenToggle.textContent = document.fullscreenElement ? '⊟' : '⛶';
+            fullscreenToggle.title = document.fullscreenElement ? '전체화면 종료 (Esc)' : '전체화면';
+        });
+
+        loadConfig();
+    </script>
+</body>
+</html>
